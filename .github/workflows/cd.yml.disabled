@@ -5,10 +5,10 @@ on:
   pull_request:
   push:
     branches:
-      - main
+    - main
   release:
     types:
-      - published
+    - published
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -23,11 +23,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
-      - uses: hynek/build-and-inspect-python-package@v2
+    - uses: hynek/build-and-inspect-python-package@v2
 
   publish:
     needs: [dist]
@@ -39,14 +39,14 @@ jobs:
     if: github.event_name == 'release' && github.event.action == 'published'
 
     steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: Packages
-          path: dist
+    - uses: actions/download-artifact@v4
+      with:
+        name: Packages
+        path: dist
 
-      - uses: pypa/gh-action-pypi-publish@release/v1
-        if: github.event_name == 'release' && github.event.action == 'published'
-        with:
+    - uses: pypa/gh-action-pypi-publish@release/v1
+      if: github.event_name == 'release' && github.event.action == 'published'
+      with:
           # Remember to tell (test-)pypi about this repo before publishing
           # Remove this line to publish to PyPI
-          repository-url: https://test.pypi.org/legacy/
+        repository-url: https://test.pypi.org/legacy/

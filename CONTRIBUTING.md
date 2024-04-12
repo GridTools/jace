@@ -33,7 +33,9 @@ You can set up a development environment by running:
 ```bash
 python3 -m venv .venv
 source ./.venv/bin/activate
-pip install -v -e .[dev]
+pip install --upgrade pip setuptools wheel
+pip install -r requirements-dev.txt 
+pip install -v -e .
 ```
 
 If you have the
@@ -42,7 +44,9 @@ can instead do:
 
 ```bash
 py -m venv .venv
-py -m install -v -e .[dev]
+py -m pip install --upgrade pip setuptools wheel
+py -m pip install -r requirements-dev.txt 
+py -m pip install -v -e .
 ```
 
 # Post setup
