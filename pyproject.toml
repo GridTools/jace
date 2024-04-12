@@ -42,20 +42,33 @@ report.exclude_also = [
 ]
 run.source = ["jace"]
 
+# -- mypy  --
 [tool.mypy]
-disallow_incomplete_defs = false
-disallow_untyped_defs = false
-enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
-files = ["src", "tests"]
-python_version = "3.10"
-strict = true
-warn_unreachable = true
-warn_unused_configs = true
-
-[[tool.mypy.overrides]]
 disallow_incomplete_defs = true
 disallow_untyped_defs = true
-module = "jace.*"
+files = ["src", "tests"]
+ignore_missing_imports = false
+implicit_optional = false
+implicit_reexport = false
+# install_types = true
+namespace_packages = false
+# pretty = true
+python_version = "3.10"
+show_column_numbers = true
+show_error_codes = true
+warn_redundant_casts = true
+warn_unreachable = true
+warn_unused_configs = true
+warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+disallow_incomplete_defs = false
+disallow_untyped_defs = false
+ignore_missing_imports = true
+module = "tests.*"
+
+# -- pytest  --
+[tool.pytest]
 
 [tool.pytest.ini_options]
 addopts = ["-ra", "--showlocals", "--strict-markers", "--strict-config"]
@@ -69,40 +82,67 @@ testpaths = [
 ]
 xfail_strict = true
 
+# -- ruff --
 [tool.ruff]
+line-length = 100
+respect-gitignore = true
+show-fixes = true
 src = ["src"]
+
+[tool.ruff.format]
+docstring-code-format = true
 
 [tool.ruff.lint]
 extend-select = [
+  "A",  # flake8-builtins
   "B",  # flake8-bugbear
   "I",  # isort
-  "ARG",  # flake8-unused-arguments
-  "C4",  # flake8-comprehensions
-  "EM",  # flake8-errmsg
-  "ICN",  # flake8-import-conventions
   "G",  # flake8-logging-format
+  "C4",  # flake8-comprehensions
+  "PT",  # flake8-pytest-style
+  "UP",  # pyupgrade  # TODO: evaluate and remove if needed
+  "ARG",  # flake8-unused-arguments
+  "ERA",  # eradicate
+  "ICN",  # flake8-import-conventions
   "PGH",  # pygrep-hooks
   "PIE",  # flake8-pie
-  "PL",  # pylint
-  "PT",  # flake8-pytest-style
   "PTH",  # flake8-use-pathlib
-  "RET",  # flake8-return
+  "RET",  # flake8-return  # TODO: evaluate and remove if needed
   "RUF",  # Ruff-specific
-  "SIM",  # flake8-simplify
-  "T20",  # flake8-print
-  "UP",  # pyupgrade
-  "YTT",  # flake8-2020
-  "EXE",  # flake8-executable
-  "NPY",  # NumPy specific rules
-  "PD"  # pandas-vet
+  "SIM",  # flake8-simplify  # TODO: evaluate and remove if needed
+  "T10",  # flake8-debugger
+  "T20",  # flake8-print  # TODO: evaluate and remove if needed
+  "NPY"  # NumPy specific rules
 ]
 ignore = [
-  "PLR09",  # Too many <...>
-  "PLR2004",  # Magic value used in comparison
-  "ISC001"  # Conflicts with formatter
+  'E501'  # [line-too-long]
 ]
-isort.required-imports = ["from __future__ import annotations"]
+ignore-init-module-imports = true
+unfixable = []
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+known-first-party = ['jace']
+known-third-party = [
+  'cupy',
+  'dace',
+  'jax',
+  'numpy',
+  'pytest',
+  'typing_extensions'
+]
+lines-after-imports = 2
+order-by-type = true
+required-imports = ["from __future__ import annotations"]
+section-order = [
+  'future',
+  'standard-library',
+  'third-party',
+  'first-party',
+  'tests',
+  'local-folder'
+]
 
 [tool.ruff.lint.per-file-ignores]
 "noxfile.py" = ["T20"]
-"tests/**" = ["T20"]
+"tests/**" = ["T10", "T20"]

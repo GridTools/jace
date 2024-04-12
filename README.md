@@ -1,4 +1,12 @@
-# JaCe
+# JaCe - JAX Just-In-Time compilation using DaCe (Data Centric Parallel Programming)
+
+### JAX: High-Performance Array Computing
+
+JAX is a Python library for accelerator-oriented array computation and program transformation, designed for high-performance numerical computing and large-scale machine learning.
+
+### DaCe: Data-Centric Parallel Programming
+
+The DaCe project aims to build new representations for programs and algorithms, in order to efficiently map them to the entire hardware architecture landscape (CPU, GPU, and FPGA) with high utilization. With data-centric parallel programming, we enable direct knowledge transfer of performance optimization, regardless of the scientific application or the target processor.
 
 [![Actions Status][actions-badge]][actions-link]
 [![Documentation Status][rtd-badge]][rtd-link]

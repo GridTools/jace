@@ -1,4 +1,4 @@
-# JaCe - JAX jit using DaCe (Data Centric Parallel Programming)
+# JaCe - JAX Just-In-Time compilation using DaCe (Data Centric Parallel Programming)
 #
 # Copyright (c) 2024, ETH Zurich
 # All rights reserved.
@@ -9,8 +9,9 @@ from __future__ import annotations
 
 import importlib.metadata
 
+
 project = "JaCe"
-copyright = "2024, ETH Zurich"
+copyright = "2024, ETH Zurich"  # noqa: A001 [builtin-variable-shadowing]
 author = "ETH Zurich"
 version = release = importlib.metadata.version("jace")
 
