@@ -1,0 +1,12 @@
+# Changes here will be overwritten by Copier; NEVER EDIT MANUALLY
+_commit: 2024.03.10-12-gcc2e43a
+_src_path: gh:scientific-python/cookie
+backend: setuptools621
+email: gridtools@cscs.ch
+full_name: ETH Zurich
+license: BSD
+org: GridTools
+project_name: JaCe
+project_short_description: JAX jit using DaCe (Data Centric Parallel Programming)
+url: https://github.com/GridTools/JaCe
+vcs: false
