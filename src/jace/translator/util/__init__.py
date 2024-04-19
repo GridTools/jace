@@ -9,7 +9,14 @@
 
 from __future__ import annotations
 
-from .jace_translation_memento import JaCeTranslationMemento  # noqa: F401 # Unused import
-from .revision_counter import RevisionCounterManager  # noqa: F401 # Unused import
-from .subtranslator_helper_order import sort_subtranslators  # noqa: F401 # Unused import
-from .util import list_to_dict  # noqa: F401 # Unused import
+from .jace_translation_memento import JaCeTranslationMemento
+from .revision_counter import RevisionCounterManager
+from .util import list_to_dict
+
+
+# Q: Is there a way to import everything from `.util` and put it into `__all__` without writing it manually?
+__all__ = [
+    "JaCeTranslationMemento",
+    "RevisionCounterManager",
+    "list_to_dict",
+]

@@ -57,7 +57,7 @@ class JaCeSubTranslatorInterface:
         self,
         *args,
         **kwargs,
-    ):
+    ) -> None:
         """Initialize the interface.
 
         It is required that subclasses calls this method during initialization.

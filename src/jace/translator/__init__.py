@@ -9,8 +9,8 @@
 
 from __future__ import annotations
 
-from jace.translator.jace_subtranslator_interface import JaCeSubTranslatorInterface
-from jace.translator.jaxpr_translator_driver import JaxprTranslationDriver
+from .jace_subtranslator_interface import JaCeSubTranslatorInterface
+from .jaxpr_translator_driver import JaxprTranslationDriver
 
 
 __all__ = [

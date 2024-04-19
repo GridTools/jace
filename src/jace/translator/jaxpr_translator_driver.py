@@ -9,18 +9,16 @@ from __future__ import annotations
 
 import re
 from collections.abc import Collection, Iterable, Mapping, Sequence
-from typing import Any, Final, cast, overload, Type
+from typing import Any, Final, cast, overload
 
 import dace
 import jax
 from dace import data as ddata, properties as dprop
 from jax import core as jcore
 
-import jace
 from jace import translator as trans
+from jace.translator import sub_translators as jtsubt, util as jtrutil
 from jace.util import jax as jutil
-from jace.translator import util as jtrutil
-from jace.translator import sub_translators as jtsubt
 
 
 class JaxprTranslationDriver:
@@ -391,15 +389,14 @@ class JaxprTranslationDriver:
         small_ctx: Sequence[Any] = [
             getattr(self, x) for x in self.__shared_slots__ if x != "_reserved_names"
         ]
-        if all((x is None) for x in small_ctx):
+        if all((x is not None) for x in small_ctx):
             if self._reserved_names is None:
                 raise RuntimeError(
                     "Invalid allocation state: All context variables except the reserved name list are allocated."
                 )
             return True
-        elif all((x is not None) for x in small_ctx):
+        if all((x is None) for x in small_ctx):
             return False
-
         raise RuntimeError("Invalid allocation state: Translation context is mixed allocated.")
 
     def is_head_translator(self) -> bool:
@@ -418,7 +415,7 @@ class JaxprTranslationDriver:
         They belong to the same family if they descend from the same head translator.
         """
         if not isinstance(other, JaxprTranslationDriver):
-            return NotImplemented
+            return NotImplemented  # type: ignore[unreachable]
         if all(getattr(self, x) is getattr(self, x) for x in self.__shared_slots__):
             assert (self if (self._rev_idx < other._rev_idx) else other).is_allocated()
             return True
@@ -484,7 +481,7 @@ class JaxprTranslationDriver:
             raise KeyError(
                 f"Tried to create the mapping '{jax_name} -> {sdfg_name}', but '{sdfg_name}' is not a known SDFG variable."
             )
-        elif sdfg_name in self._forbidden_names:
+        if sdfg_name in self._forbidden_names:
             raise NameError(  # This is actually an internal error
                 f"Tried to create the mapping '{jax_name} -> {sdfg_name}', but '{sdfg_name}' is forbidden."
             )
@@ -501,7 +498,7 @@ class JaxprTranslationDriver:
 
         if reserved_names is None:
             return self
-        elif isinstance(reserved_names, str):
+        if isinstance(reserved_names, str):
             reserved_names = [reserved_names]
         elif isinstance(reserved_names, Collection):
             pass
@@ -599,9 +596,8 @@ class JaxprTranslationDriver:
                 )
             alt_name = jutil.get_jax_var_name(arg)
         if name_prefix is not None:
-            assert isinstance(name_prefix, str) and (
-                len(name_prefix) > 0
-            ), f"Invalid 'name_prefix': '{name_prefix}'."
+            assert isinstance(name_prefix, str)
+            assert len(name_prefix) > 0
             if alt_name is not None:
                 raise ValueError("Specified 'name_prefix' and 'alt_name' which is not possible.")
 
@@ -883,12 +879,10 @@ class JaxprTranslationDriver:
         # Handle the `reserved_names` argument as described above.
         #  This is essentially needed that children works properly.
         if self._reserved_names is None:
-            self._reserved_names = set()
-        elif isinstance(self._reserved_names, set):
-            assert not self.is_head_translator()
-            assert all(isinstance(x, str) for x in self._reserved_names)
+            self._reserved_names = set()  # type: ignore[unreachable]
         else:
             raise RuntimeError("The reserved names are allocated incorrectly.")
+        assert all(isinstance(x, str) for x in self._reserved_names)  # type: ignore[unreachable]
         self._add_reserved_names(reserved_names)
 
         return self
@@ -904,7 +898,7 @@ class JaxprTranslationDriver:
         """
         if isinstance(self._sub_translators, dict):
             raise RuntimeError("Tried to allocate the internal subtranslators twice.")
-        assert self._sub_translators is None
+        assert self._sub_translators is None  # type: ignore[unreachable]
 
         # We might get arguments that starts with an underscore, which are not meant for the subtranslators.
         kwargs = {k: v for k, v in kwargs.items() if not k.startswith("_")}
@@ -913,7 +907,7 @@ class JaxprTranslationDriver:
         subtranslators: dict[str, list[trans.JaCeSubTranslatorInterface]] = {}
 
         # First we will create all subtranslators and partition them.
-        subtranslator_cls: Type[trans.JaCeSubTranslatorInterface]
+        subtranslator_cls: type[trans.JaCeSubTranslatorInterface]
         for subtranslator_cls in jtsubt._get_subtranslators_cls():
             subtranslator: trans.JaCeSubTranslatorInterface = subtranslator_cls(**kwargs)
             handled_primitives: Iterable[str] = jutil.ensure_iterability(
@@ -1024,7 +1018,8 @@ class JaxprTranslationDriver:
             While `jaxpr` must be the closed version, `eqn` must come from the unclosed version.
             The function will also perform some consistency checking.
         """
-        assert isinstance(eqn, jcore.JaxprEqn) and isinstance(jaxpr, jcore.ClosedJaxpr)
+        assert isinstance(eqn, jcore.JaxprEqn)
+        assert isinstance(jaxpr, jcore.ClosedJaxpr)
 
         if len(eqn.effects) != 0:
             raise NotImplementedError(f"Equation '{eqn}' had side effects.")
@@ -1195,7 +1190,7 @@ class JaxprTranslationDriver:
                 self.map_jax_var_to_sdfg(jax_out_var) for jax_out_var in jaxpr.jaxpr.outvars
             )
             raise NotImplementedError("Please test me.")
-            return self
+            return self  # type: ignore[unreachable] # reminder
         #
         assert self._term_sdfg_state is self._init_sdfg_state
         assert len(self._sdfg_in_names) > 0

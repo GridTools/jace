@@ -25,21 +25,16 @@ def is_str(
     """
     if len(args) == 0:
         return False
-
-    elif allow_empty:
+    if allow_empty:
         for x in args:
             if not isinstance(x, str):
                 return False  # Not a string
-        # end for(x):
     else:
         for x in args:
             if not isinstance(x, str):
-                return False  # Not a string
+                return False
             if len(x) == 0:
-                return False  # A string but empty; and check enabled
-        # end for(x):
-    # end if:
-
+                return False
     return True
 
 
