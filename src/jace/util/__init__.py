@@ -10,13 +10,10 @@
 from __future__ import annotations
 
 from .jax import get_jax_var_name
-from .traits import is_iterable, is_str
 from .util import ensure_iterability
 
 
 __all__ = [
     "get_jax_var_name",
-    "is_str",
-    "is_iterable",
     "ensure_iterability",
 ]
