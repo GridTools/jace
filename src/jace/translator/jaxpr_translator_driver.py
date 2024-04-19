@@ -9,16 +9,18 @@ from __future__ import annotations
 
 import re
 from collections.abc import Collection, Iterable, Mapping, Sequence
-from typing import Any, Final, cast, overload
+from typing import Any, Final, cast, overload, Type
 
 import dace
 import jax
 from dace import data as ddata, properties as dprop
 from jax import core as jcore
 
-from jace import translator
-from jace.translator import util as jtrutil
+import jace
+from jace import translator as trans
 from jace.util import jax as jutil
+from jace.translator import util as jtrutil
+from jace.translator import sub_translators as jtsubt
 
 
 class JaxprTranslationDriver:
@@ -108,7 +110,7 @@ class JaxprTranslationDriver:
         #  They are partitioned by the names of the primitive they have registered for.
         #  Inside a partition they are ordered by priority, lowest first, more important.
         #  This member is allocated by '_init_sub_translators()' and remains allocated during the lifetime of the object.
-        self._sub_translators: dict[str, list[translator.JaCeSubTranslatorInterface]] = None  # type: ignore[assignment]
+        self._sub_translators: dict[str, list[trans.JaCeSubTranslatorInterface]] = None  # type: ignore[assignment]
 
         # The SDFG object that we are currently constructing.
         #  Only allocated during an ongoing translation.
@@ -908,12 +910,12 @@ class JaxprTranslationDriver:
         kwargs = {k: v for k, v in kwargs.items() if not k.startswith("_")}
 
         # Will contain all subtranslators we create.
-        subtranslators: dict[str, list[translator.JaCeSubTranslatorInterface]] = {}
+        subtranslators: dict[str, list[trans.JaCeSubTranslatorInterface]] = {}
 
         # First we will create all subtranslators and partition them.
-        subtranslator_cls: type[translator.JaCeSubTranslatorInterface]
+        subtranslator_cls: Type[trans.JaCeSubTranslatorInterface]
         for subtranslator_cls in []:
-            subtranslator: translator.JaCeSubTranslatorInterface = subtranslator_cls(**kwargs)
+            subtranslator: trans.JaCeSubTranslatorInterface = subtranslator_cls(**kwargs)
             handled_primitives: Iterable[str] = jutil.ensure_iterability(
                 subtranslator.getHandledPrimitives()
             )
@@ -964,7 +966,7 @@ class JaxprTranslationDriver:
         in_var_names: Sequence[str | None],
         out_var_names: Sequence[str],
         eqn: jcore.JaxprEqn,
-    ) -> translator.JaCeSubTranslatorInterface:
+    ) -> trans.JaCeSubTranslatorInterface:
         """Returns the subtranslator object to translate `eqn`.
 
         The subtranslators are checked for applicability in the order of their priority.
@@ -981,7 +983,7 @@ class JaxprTranslationDriver:
         subtranslator_canidates = self._sub_translators[prim_name]
         assert len(subtranslator_canidates) > 0
 
-        subtranslator: translator.JaCeSubTranslatorInterface = None  # type: ignore[assignment]
+        subtranslator: trans.JaCeSubTranslatorInterface = None  # type: ignore[assignment]
         if len(subtranslator_canidates) == 1:
             subtranslator = next(iter(subtranslator_canidates))
             assert subtranslator.can_translate_jaxeqn(
@@ -1038,7 +1040,7 @@ class JaxprTranslationDriver:
         )
 
         # Find the subtranslator
-        subtranslator: translator.JaCeSubTranslatorInterface = self._find_sub_translator_for(
+        subtranslator: trans.JaCeSubTranslatorInterface = self._find_sub_translator_for(
             in_var_names=in_var_names,
             out_var_names=out_var_names,
             eqn=eqn,
