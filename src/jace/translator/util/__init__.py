@@ -1,4 +1,4 @@
-# JaCe - JAX jit using DaCe (Data Centric Parallel Programming)
+# JaCe - JAX Just-In-Time compilation using DaCe (Data Centric Parallel Programming)
 #
 # Copyright (c) 2024, ETH Zurich
 # All rights reserved.
@@ -9,9 +9,7 @@
 
 from __future__ import annotations
 
-from .jace_translation_memento import JaCeTranslationMemento
-from .revision_counter import RevisionCounterManager
-from .subtranslator_helper_order import sort_subtranslators
-from .util import list_to_dict
-
-
+from .jace_translation_memento import JaCeTranslationMemento  # noqa: F401 # Unused import
+from .revision_counter import RevisionCounterManager  # noqa: F401 # Unused import
+from .subtranslator_helper_order import sort_subtranslators  # noqa: F401 # Unused import
+from .util import list_to_dict  # noqa: F401 # Unused import

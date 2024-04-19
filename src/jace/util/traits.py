@@ -1,4 +1,4 @@
-# JaCe - JAX jit using DaCe (Data Centric Parallel Programming)
+# JaCe - JAX Just-In-Time compilation using DaCe (Data Centric Parallel Programming)
 #
 # Copyright (c) 2024, ETH Zurich
 # All rights reserved.
@@ -9,7 +9,8 @@
 
 from __future__ import annotations
 
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 
 def is_str(

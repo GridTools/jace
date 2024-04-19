@@ -1,9 +1,10 @@
-# JaCe - JAX jit using DaCe (Data Centric Parallel Programming)
+# JaCe - JAX Just-In-Time compilation using DaCe (Data Centric Parallel Programming)
 #
 # Copyright (c) 2024, ETH Zurich
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
+
 from __future__ import annotations
 
 from typing import Final
@@ -50,6 +51,3 @@ class RevisionCounterManager:
     ) -> bool:
         """This function checks if 'rev' revers to the (absolute) unique revision of the root."""
         return rev == self.ROOT_REVISION
-
-
-# end class(RevisionCounterManager):

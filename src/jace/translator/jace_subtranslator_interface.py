@@ -1,9 +1,10 @@
-# JaCe - JAX jit using DaCe (Data Centric Parallel Programming)
+# JaCe - JAX Just-In-Time compilation using DaCe (Data Centric Parallel Programming)
 #
 # Copyright (c) 2024, ETH Zurich
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
+
 from __future__ import annotations
 
 from collections.abc import Collection, Sequence
@@ -80,7 +81,7 @@ class JaCeSubTranslatorInterface:
 
     def can_translate_jaxeqn(
         self,
-        driver: "JaxprTranslationDriver",
+        driver: JaxprTranslationDriver,
         in_var_names: Sequence[str | None],
         out_var_names: Sequence[str],
         eqn: jcore.JaxprEqn,
@@ -109,7 +110,7 @@ class JaCeSubTranslatorInterface:
 
     def translate_jaxeqn(
         self,
-        driver: "JaxprTranslationDriver",
+        driver: JaxprTranslationDriver,
         in_var_names: Sequence[str | None],
         out_var_names: Sequence[str],
         eqn: jcore.JaxprEqn,
@@ -245,6 +246,3 @@ class JaCeSubTranslatorInterface:
         other: Any,
     ) -> bool:
         return NotImplemented
-
-
-# end class(JaCeSubTranslatorInterface):

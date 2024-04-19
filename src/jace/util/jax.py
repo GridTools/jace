@@ -1,4 +1,4 @@
-# JaCe - JAX jit using DaCe (Data Centric Parallel Programming)
+# JaCe - JAX Just-In-Time compilation using DaCe (Data Centric Parallel Programming)
 #
 # Copyright (c) 2024, ETH Zurich
 # All rights reserved.
@@ -41,3 +41,6 @@ def get_jax_var_name(jax_var: jcore.Atom | str) -> str:
             f"Failed to translate the Jax variable '{jax_var}' into a name, the result was empty."
         )
     return jax_var
+
+
+# NEW LINE
