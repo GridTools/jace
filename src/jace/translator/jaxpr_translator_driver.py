@@ -914,7 +914,7 @@ class JaxprTranslationDriver:
 
         # First we will create all subtranslators and partition them.
         subtranslator_cls: Type[trans.JaCeSubTranslatorInterface]
-        for subtranslator_cls in []:
+        for subtranslator_cls in jtsubt._get_subtranslators_cls():
             subtranslator: trans.JaCeSubTranslatorInterface = subtranslator_cls(**kwargs)
             handled_primitives: Iterable[str] = jutil.ensure_iterability(
                 subtranslator.getHandledPrimitives()
