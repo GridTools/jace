@@ -16,7 +16,7 @@ def test_subtranslatior_order_simple():
         _EXP_ORDER = 0
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
-        def getPriority(self):
+        def get_priority(self):
             return 1
     # end class(SimpleSubTrans1):
 
@@ -24,7 +24,7 @@ def test_subtranslatior_order_simple():
         _EXP_ORDER = 1  # Not last because, default prio is always last.
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
-        def getPriority(self):
+        def get_priority(self):
             return jtrans.JaCeSubTranslatorInterface.DEFAULT_PRIORITY + 1
     # end class(SimpleSubTrans2):
 
@@ -34,32 +34,32 @@ def test_subtranslatior_order_simple():
             super().__init__(*args, **kwargs)
     # end class(SimpleSubTrans3):
 
-    initialOrder = [
+    initial_order = [
             SimpleSubTrans3(),
             SimpleSubTrans2(),
             SimpleSubTrans1(),
     ]
 
     # Now call the function.
-    sortedTranslators = sortSubtranslators(initialOrder)
+    sorted_translators = sort_subtranslators(initial_order)
 
     # Now we bring the list in expected order.
-    expectedOrder = sorted(initialOrder, key=lambda st: st._EXP_ORDER)
+    expected_order = sorted(initial_order, key=lambda st: st._EXP_ORDER)
 
-    assert all(ist is soll  for ist, soll in zip(sortedTranslators, expectedOrder)), \
-            f"Expected order was `{[type(x).__name__  for x in expectedOrder]}`, but got `{[type(x).__name__  for x in sortedTranslators]}`."
+    assert all(ist is soll  for ist, soll in zip(sorted_translators, expected_order)), \
+            f"Expected order was `{[type(x).__name__  for x in expected_order]}`, but got `{[type(x).__name__  for x in sorted_translators]}`."
     return True
 # end def: test_subtranslatior_order_simple
 
 
 def test_subtranslatior_order_custom1():
-    from Jax2DaCe.translator.util._subtranslator_helper_order       import sortSubtranslators
+    from jace.translator.util.subtranslator_helper_order import  sort_subtranslators
 
     class SimpleSubTrans1(jtrans.JaCeSubTranslatorInterface):
         _EXP_ORDER = 0
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
-        def getPriority(self):
+        def get_priority(self):
             return NotImplemented
         def __lt__(self, other):
             return isinstance(other, SimpleSubTrans2)
@@ -69,7 +69,7 @@ def test_subtranslatior_order_custom1():
         _EXP_ORDER = 1
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
-        def getPriority(self):
+        def get_priority(self):
             return NotImplemented
         def __lt__(self, other):
             return True
@@ -79,7 +79,7 @@ def test_subtranslatior_order_custom1():
         _EXP_ORDER = 2
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
-        def getPriority(self):
+        def get_priority(self):
             return NotImplemented
         def __lt__(self, other):
             return False
@@ -89,7 +89,7 @@ def test_subtranslatior_order_custom1():
         _EXP_ORDER = 3
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
-        def getPriority(self):
+        def get_priority(self):
             return jtrans.JaCeSubTranslatorInterface.DEFAULT_PRIORITY + 1
     # end class(SimpleSubTrans4):
 
@@ -101,7 +101,7 @@ def test_subtranslatior_order_custom1():
 
     assert SimpleSubTrans2() < SimpleSubTrans1()
 
-    initialOrder = [
+    initial_order = [
             SimpleSubTrans5(),
             SimpleSubTrans4(),
             SimpleSubTrans3(),
@@ -110,13 +110,13 @@ def test_subtranslatior_order_custom1():
     ]
 
     # Now call the function.
-    sortedTranslators = sortSubtranslators(initialOrder)
+    sorted_translators = sort_subtranslators(initial_order)
 
     # Now we bring the list in expected order.
-    expectedOrder = sorted(initialOrder, key=lambda st: st._EXP_ORDER)
+    expected_order = sorted(initial_order, key=lambda st: st._EXP_ORDER)
 
-    assert all(ist is soll  for ist, soll in zip(sortedTranslators, expectedOrder)), \
-            f"Expected order was `{[type(x).__name__  for x in expectedOrder]}`, but got `{[type(x).__name__  for x in sortedTranslators]}`."
+    assert all(ist is soll  for ist, soll in zip(sorted_translators, expected_order)), \
+            f"Expected order was `{[type(x).__name__  for x in expected_order]}`, but got `{[type(x).__name__  for x in sorted_translators]}`."
     return True
 # end def: test_subtranslatior_order_custom1
 
