@@ -99,7 +99,8 @@ Before submitting a pull request, check that it meets the following criteria:
 4. If the pull request contains code authored by first-time contributors, they should add their names to the [AUTHORS.md](AUTHORS.md) file.
 5. Pick one reviewer and try to contact them directly to let them know about the pull request. If there is no feedback in 24h/48h try to contact them again or pick another reviewer.
 6. Once the pull request has been approved, it should be squash-merged as soon as possible with a meaningful description of the changes. We use the [Conventional Commits][https://www.conventionalcommits.org/en/v1.0.0/#summary] specification for writing informative and automation-friendly commit messages. The following _commit types_ are accepted:
-   - `chore`: changes that only modify development-related tools, the build system configuration or external dependencies
+   - `build`: changes that affect the build system or external dependencies
+   - `chore`: changes related to the development tools or process
    - `ci`: changes to our CI configuration files and scripts
    - `docs`: documentation only changes
    - `feat`: a new feature

@@ -164,7 +164,7 @@ def test_subtranslatior_managing():
         def get_handled_primitives(self) -> Collection[str] | str:
             return "add"
 
-        def can_translate_jaxeqn(self, *args: Any, **kwargs: Any): # noqa: ARG002  # Unused arguments
+        def can_translate_jaxeqn(self, *args: Any, **kwargs: Any):  # noqa: ARG002  # Unused arguments
             return False
 
         def translate_jaxeqn(self, *args: Any, **kwargs: Any):
