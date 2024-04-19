@@ -16,7 +16,7 @@ import jax
 from dace import data as ddata, properties as dprop
 from jax import core as jcore
 
-from jace import translator as trans
+from jace import translator as jtrans
 from jace.translator import sub_translators as jtsubt, util as jtrutil
 from jace.util import jax as jutil
 
@@ -24,45 +24,41 @@ from jace.util import jax as jutil
 class JaxprTranslationDriver:
     """Internal driver class for creating an SDFG equivalent of a `Jaxpr` instance.
 
-    The idea of the transformation is quite simple.
-    Since Jaxpr is essentially a list consisting of more or less simple instructions, we will process them one after the other.
-    For simplicity we will put each equation in its own state, primitives that needs more states must be put into a nested SDFG.
-
-    This class builds an SDFG of a very particular form, which is not directly usable.
-    But it is used as the canonical form inside JaCe and characterized by:
-    - the SDFG is a list of states, each state corresponds to single Jax primitive,
+    This class builds an SDFG of a very particular form, which for us is canonical, which is not
+    directly usable. Thus this class should not be directly used, instead a user should use TBA.
+    The canonical form is characterized by the following:
+    - the SDFG is a list of states, ideally each state corresponds to single Jax primitive,
     - all variable names are derived from Jax names,
     - there are no global variables inside the SDFG,
     - there is no possibility to return something.
 
-    To support nested Jaxpr expressions the driver provides the possibility to clone/fork itself, see `self.fork()` for more.
-    Clones, i.e. the return values of `self.fork()`, also known as children or clone, have a unique identifier, called revision.
-    It is important that the revision is only unique within a family and during a translation process.
-    This identifier is used to generate unique variable names.
-    The clones form a tree that is rooted at the so called 'head translator', i.e. the driver that was explicitly created.
+    The idea of the translator is extremely simple.
+    Since Jaxpr is a list consisting of more or less simple instructions/equations, they get processed one after the other.
+    Each equation is translated into its own state that is appended to the SDFG, thus the SDFG is a long list of states.
+    In certain cases it might be that an equation needs more states, but this is an exception.
 
-    The actual translation of a Jaxpr equation is not handled by the driver instance directly.
-    Instead it is forwarded to a subtranslator instance, see `JaCeSubTranslatorInterface` for more.
+    The actual translation is not handled by the driver instead a so called subtranslator object is used.
+    This subtranslator, is specialized for one type of primitive.
+    For more information on the subtranslators see the documentation of `JaCeSubTranslatorInterface`.
+
     These subtranslators are independent objects that are owned by the driver.
-    However, they are tightly coupled and thus a subtranslator is allowed to use the following private functions:
+    However, due to their tight coupling they are allowed to use the following private functions:
     - `_add_array()` if the translator has to create new.
     - `_create_jax_var_list()` for the bulk creation of Jax variables.
     - `_add_reserved_names()` if a name should be blocked (only affects later equation.
     - `_add_jax_name_mapping()` for creating new links between Jax variables and SDFG variables.
     However, a subtranslator should only call them if it is necessary.
 
+    To support nested Jaxpr expressions the driver provides the possibility to clone/fork itself, see `self.fork()` for more.
+    Every clone, i.e. return value of `self.fork()`, of a driver, which is also known as child, has a unique identifier.
+    This identifier is used for example to generate unique SDFG variable names during a translation process.
+    The original driver, the one that was explicitly created, is also known as head translator, see `is_head_translator()`.
+    It is important that the revision is only unique within a family and during a translation process.
 
-    If no translation is ongoing the only function that makes sense to call is `translate_jaxpr()` to start a translation.
-    Driver supplied to the subtranslators as arguments, such as in `translateEqn()` are allowed to call any public function of the driver.
-    In addition to them it is allowed to call:
-
-    Notes:
-        Equations that only have `_` as output variable are skipped.
-        It is not safe to deepcopy `self` during an active translation instead you should use `self.fork()`.
-        To ensure unique names also in the presence of nested SDFG every instance contains a revision index.
+    If no translation is ongoing the only function that makes sense to call is `translate_jaxpr()` which starts a translation.
 
     Todos:
-        Split the functions into several interfaces one, that is for the whole world to use, one for subtranlators and one for the implementation.
+        Find a better way than to allow giving access to protected functions.
     """
 
     # Member variables that are private to an instance, i.e. they are not passed on to the children.
@@ -91,16 +87,15 @@ class JaxprTranslationDriver:
     ) -> None:
         """Creates the base translator.
 
-        This function will forward all arguments that does _not_ start with an underscore to the constructors of the subtranslators.
-        Furthermore, this function will allocate the shared members, but the private members are not allocated.
+        All arguments that does not start with an underscore are used as arguments to construct the subtranslators.
 
         Args:
             _no_shared_alloc (bool):     If set then all allocation will be avoided (internal)
 
         Notes:
-            All arguments that does not start with an underscore are forwarded to the translators for the intrinsics.
+            This function will not allocate the translation context of `self` but will only allocate the shared members.
             By setting `_no_shared_alloc` to `True` the function will not allocate the shared part.
-                This flag is provided only for implementing `self.fork()` using it denotes an error and undefined behaviour.
+                This flag is provided only for implementing `self.fork()` using it is an error and undefined behaviour.
         """
         allocate_shared_parts: bool = not kwargs.pop("_no_shared_alloc", False)
 
@@ -108,7 +103,7 @@ class JaxprTranslationDriver:
         #  They are partitioned by the names of the primitive they have registered for.
         #  Inside a partition they are ordered by priority, lowest first, more important.
         #  This member is allocated by '_init_sub_translators()' and remains allocated during the lifetime of the object.
-        self._sub_translators: dict[str, list[trans.JaCeSubTranslatorInterface]] = None  # type: ignore[assignment]
+        self._sub_translators: dict[str, list[jtrans.JaCeSubTranslatorInterface]] = None  # type: ignore[assignment]
 
         # The SDFG object that we are currently constructing.
         #  Only allocated during an ongoing translation.
@@ -161,25 +156,24 @@ class JaxprTranslationDriver:
         name: str | None = None,
         reserved_names: str | Collection[str] | None = None,
         allow_empty_jaxpr: bool = False,
-        _clear_translation_ctx: bool = True,
+        **kwargs: Any,
     ) -> jtrutil.JaCeTranslationMemento:
         """Perform the translation of a Jaxpr description into a SDFG.
 
-        As described above the function will create the canonical form of Jaxpr based SDFGs.
-        Furthermore the function will return the SDFG encaplulated inside a `jace.translator.util.JaCeTranslationMemento` object.
+        While this function is running `self` has an ongoing translation.
+        As explained above the translation will not result in a "good" SDFG but needs further preprocessing.
+        However, it is the internal format that the translation toolchain expects.
 
         Args:
-            inp_scalar_as_array:       Translate scalar _input_ arguments to arrays of length 1.
+            inp_scalar_as_array:    Translate scalar _input_ arguments to arrays of length 1.
             name:                   Use this name for the SDFG instead some generated one.
-            reserved_names:          Prevent the generation of such names, when translating Jax variable names into SDFG names.
-            allow_empty_jaxpr:        Allows empty Jaxpr.
-            _clear_translation_ctx:      Do not deallocate the inner state of `self`.
+            reserved_names:         Prevent the generation of variables with these names, see `self._add_array()` for more.
+            allow_empty_jaxpr:      Allows empty Jaxpr.
 
-        Notes:
-            By default the function will store its translation state inside the return value and deallocate the internal members.
-                However, by setting `_clear_translation_ctx` to `False` `self` is not deallocated.
-                This means that `self` and the returned memento share the same state.
-                To explicitly deallocate the translation context of `self`, which is required, use `self._clearTranslatorCtx()`.
+        Returns:
+            The function will not return the SDFG directly.
+            Instead it will be wrapped inside a `JaCeTranslationMemento` instance.
+            That contains the SDFG and some meta data needed for further processing.
         """
         if self.is_allocated():
             raise RuntimeError(
@@ -200,6 +194,9 @@ class JaxprTranslationDriver:
                 "The translation only works if 'jax_enable_x64' is enabled. Do it manually or use 'self.transform()'!"
             )
 
+        # Consume the hidden flags
+        _clear_translation_ctx: bool = kwargs.pop("_clear_translation_ctx", True)
+
         self._allocate_translation_ctx(
             name=name,
             reserved_names=reserved_names,
@@ -213,6 +210,8 @@ class JaxprTranslationDriver:
         )
         memento: jtrutil.JaCeTranslationMemento = self._translate_jaxpr_internal(jaxpr)
 
+        # If the translation context is not cleared `self` and `memento` will share the same data.
+        #  There is some legitimate use for that.
         if _clear_translation_ctx:
             self._clear_translation_ctx()
 
@@ -223,12 +222,13 @@ class JaxprTranslationDriver:
 
         The returned object, known as child, will always be of type `JaxprTranslationDriver`, and should be seen as a partial clone of `self`.
         While the child shares some members with its parent, i.e. `self`, it has an unallocated translation context.
-        Essentially, this function returns an object that when its `translate_jaxpr()` function is called behaves the exact same way as
+        If `translate_jaxpr(jaxpr)` is called on the returned object function will behave the exact same way as
         its parent behaved as it was called just with another `jaxpr` argument.
 
         Notes:
-            A user has to ensure that the lifetime of a fork ends before the one of its direct parent.
+            A user has to ensure that the lifetime of a child ends before the lifetime of its direct parent.
                 In case of a head translator, the lifetime of its children have to end before the translation process finishes.
+            It is important that a clone instance should not be reused, instead you should fork it again, even from the clone.
         """
         # Create a new (empty) driver instance; prevent allocation to make it cheep
         dolly: JaxprTranslationDriver = JaxprTranslationDriver(_no_shared_alloc=True)
@@ -251,33 +251,41 @@ class JaxprTranslationDriver:
         *,
         prev_state: dace.SDFGState | None = None,
     ) -> dace.SDFGState:
-        """Creates a new SDFGState and appends it.
+        """Creates a new `SDFGState` and adds it to the SDFG.
 
-        By default the new SDFGState is appended to the current terminal SDFGState.
-        However, if `prev_state` is given the new SDFGState will be appended to it instead.
+        By default the new state is appended to the current terminal state.
+        This will also update the terminal SDFG state of `self`.
+
+        However, if `prev_state` is specified the state new state will be appended to `prev_state` instead.
+        This will not modify the terminal state unless `prev_state` is the current terminal state.
 
         Args:
-            label:          The name that should be used for the new SDFGState.
-            condition:      The condition of the state transitions used on the InterstateEdge.
+            label:          The name that should be given to the new `SDFGState`.
+            condition:      The condition of the state transitions used on the `InterstateEdge`.
             assignments:    Symbol assignments that should be done during the transition.
-            prev_state:      Alternative SDFGState to which we should append the new SDFGState.
+            prev_state:     Alternative `SDFGState` at which we should append the new state.
 
         Notes:
-            In case no SDFGState exists yet, an initial SDFGState will be created first.
+            In case no `SDFGState` exists yet, an initial SDFGState will be created first.
             This function is similar to `SDFGState.add_state_after()` but differs in the fact that it does not perform reconnecting.
                 I.e. if the state to which we append already has downstream states they will not be reconnected to be after the newly created state.
-            This function will not update the head state of `self`.
         """
         assert self._sdfg is not None
 
         # Test if we must create a start state.
         if self._sdfg.start_block is None:
+            assert all(
+                x is None for x in (self._init_sub_translators, self._term_sdfg_state, prev_state)
+            )
             self._init_sdfg_state = self._sdfg.add_state(label="initial_state", is_start_block=True)
             self._term_sdfg_state = self._init_sdfg_state
-        assert self._sdfg.start_block is self._init_sdfg_state
 
-        # Now create and append the new state
-        app_state: dace.SDFGState = self._term_sdfg_state if prev_state is None else prev_state
+        # Decide if appending to that state will modify the terminal state.
+        modify_term_state: bool = False
+        if (prev_state is self._term_sdfg_state) or (prev_state is None):
+            modify_term_state = True
+            app_state = prev_state
+
         new_state = self._sdfg.add_state(label, is_start_block=False)
         self._sdfg.add_edge(
             app_state,
@@ -285,12 +293,16 @@ class JaxprTranslationDriver:
             dace.sdfg.InterstateEdge(condition=condition, assignments=assignments),
         )
 
+        if modify_term_state:
+            self._term_sdfg_state = new_state
         return new_state
 
     def get_arrays(self) -> Mapping[str, ddata.Data]:
-        """Get the maps containing all known arrays inside the SDFG.
+        """Get all `Data` descriptors that are currently known to the SDFG.
 
-        Essentially a shorthand and preferred way for `self.get_sdfg().arrays`.
+        Notes:
+            Essentially a shorthand and preferred way for `self.get_sdfg().arrays`.
+            For getting a specific data descriptor use `self.get_array()`.
         """
         assert self._sdfg is not None
         return cast(Mapping[str, ddata.Data], self._sdfg.arrays)
@@ -299,10 +311,10 @@ class JaxprTranslationDriver:
         self,
         name: str | jcore.Atom,
     ) -> ddata.Data:
-        """Returns the `dace.data.Data` object `name` referees to.
+        """Returns the SDFG `Data` object `name` referees to.
 
-        If `name` is a string, it is directly interpreted as the name of an SDFG variable.
-        In case it is a `jax.core.Atom` it is first translated.
+        If `name` is a string it is directly interpreted as the name of an SDFG variable.
+        In case it is a `jax.core.Atom` it is first translated, see `self.map_jax_var_to_sdfg()`.
         """
         assert self._sdfg is not None
 
@@ -353,7 +365,7 @@ class JaxprTranslationDriver:
         return self._jax_name_map[jax_var]
 
     def get_sdfg(self) -> dace.SDFG:
-        """Returns the tentative SDFG that is currently constructed.
+        """Returns the SDFG that is currently constructed.
 
         If you want access to the arrays of the SDFG use `self.get_arrays()`/`self.get_array()`.
         """
@@ -362,32 +374,27 @@ class JaxprTranslationDriver:
         return self._sdfg
 
     def get_terminal_sdfg_state(self) -> dace.SDFGState:
-        """Returns the current tentative terminal state of the SDFG under construction.
+        """Returns the current terminal state of the SDFG under construction.
 
-        Since the translator works by turning each Jax primitive into an SDFG state, the constructed SDFG is essentially a list of states.
-        This function returns the tentative final/terminal SDFGState of the SDFG.
-        States of new primitives will be appended to this one.
-
-        Notes:
-            It is an error to call this function outside the context of a subtranslator.
-                If you want access to the arrays of the SDFG use `self.get_arrays()`.
+        The SDFGs that are constructed by the driver are essentially a list of states.
+        New states are appended at the current terminal/end state and becoming the new terminal state.
+        This function returns the current terminal state.
         """
         assert all(x is not None for x in (self._sdfg, self._term_sdfg_state))
         return self._term_sdfg_state
 
     def is_allocated(self) -> bool:
-        """Tests if `self` is allocated.
-
-        This function only checks if the translation context is allocated.
-        As a side effect a return value of `True` means that a translation process is ongoing.
+        """Tests if the translation context of `self` is allocated.
 
         Notes:
-            The state of the reserved name list is handled specially.
-                In case the function returns `True` it is guaranteed that it is allocated.
-                If `False` is returned it might or might not be allocated.
+            It is safe to call this function any time.
+            If this function returns `True` it means that an allocation is ongoing.
         """
         small_ctx: Sequence[Any] = [
-            getattr(self, x) for x in self.__shared_slots__ if x != "_reserved_names"
+            # for the proper implementation of forking the reserved names are handled special.
+            getattr(self, x)
+            for x in self.__shared_slots__
+            if x != "_reserved_names"
         ]
         if all((x is not None) for x in small_ctx):
             if self._reserved_names is None:
@@ -412,7 +419,7 @@ class JaxprTranslationDriver:
     ) -> bool:
         """Test if `self` and `other` belongs to the same family of driver/translators.
 
-        They belong to the same family if they descend from the same head translator.
+        The family of a translator is given by the set of all driver that descend from the same head translator.
         """
         if not isinstance(other, JaxprTranslationDriver):
             return NotImplemented  # type: ignore[unreachable]
@@ -455,35 +462,33 @@ class JaxprTranslationDriver:
     def _add_jax_name_mapping(
         self, jax_var: str | jcore.Atom, sdfg_name: str
     ) -> JaxprTranslationDriver:
-        """Creates the mapping between `jax_var` to `sdfg_name`.
+        """Creates a mapping between `jax_var` to `sdfg_name`.
 
         It is an error if there is already a mapping installed for `jax_var`.
 
         Args:
-            jax_var:     The Jax variable that is used.
+            jax_var:     The Jax variable.
             sdfg_name:   The name of the corresponding SDFG variable.
-
-        Notes:
-            While the function allows to create a mapping for Jax names that are in the set of avoided names,
-                it will refuse to create a mapping for a forbidden name.
         """
         assert self._jax_name_map is not None
         assert isinstance(jax_var, (jcore.Atom, str))
+        assert isinstance(sdfg_name, str)
 
         jax_name = jutil.get_jax_var_name(jax_var)
         if jax_name in self._jax_name_map:
             if self._jax_name_map[jax_name] == sdfg_name:  # We consider this as no ops.
                 return self
             raise ValueError(
-                f"Tried to create a mapping for Jax variable '{jax_name}' to '{sdfg_name}', but that mapping exists already and is pointing to '{self.map_jax_var_to_sdfg(jax_name)}'."
+                f"Tried to create the mapping '{jax_name} -> {sdfg_name}', but '{jax_name}'"
+                + f" already points to '{self.map_jax_var_to_sdfg(jax_name)}'."
             )
         if sdfg_name not in self.get_arrays():
             raise KeyError(
-                f"Tried to create the mapping '{jax_name} -> {sdfg_name}', but '{sdfg_name}' is not a known SDFG variable."
+                f"Tried to create the mapping '{jax_name} -> {sdfg_name}', but SDFG target unknown."
             )
         if sdfg_name in self._forbidden_names:
-            raise NameError(  # This is actually an internal error
-                f"Tried to create the mapping '{jax_name} -> {sdfg_name}', but '{sdfg_name}' is forbidden."
+            raise NameError(
+                f"Tried to create the mapping '{jax_name} -> {sdfg_name}', but forbidden name."
             )
 
         self._jax_name_map[jax_name] = sdfg_name
@@ -503,11 +508,9 @@ class JaxprTranslationDriver:
         elif isinstance(reserved_names, Collection):
             pass
         else:
-            raise TypeError(
-                f"Does not know how to handle the type '{type(reserved_names).__name__}'."
-            )
-        assert all(isinstance(x, str) for x in reserved_names)
-
+            raise TypeError(f"Does not know how to handle the type '{type(reserved_names)}'.")
+        if not all(isinstance(x, str) and (len(x) != 0) for x in reserved_names):
+            raise TypeError("Reserved names must all be non empty strings.")
         self._reserved_names.update(reserved_names)
         return self
 
@@ -527,27 +530,27 @@ class JaxprTranslationDriver:
         force_jax_name: bool = False,
         update_var_mapping: bool = False,
     ) -> str:
-        """Creates an SDFG variable for the Jax variable `arg` and returns the SDFG name.
+        """Creates an SDFG variable for the Jax variable `arg` and returns its SDFG name.
 
-        By default the function will create a transient, which can be changed by setting `as_transient` to `False`.
-        In case the Jax variable `arg` refers to a scalar, i.e. having an empty shape, the function will generate a SDFG scalar.
-        However, if `force_array` is set, then it will generate an array with shape `(1,)`.
-        For generating a `View` you must set `as_view` to `True`.
+        By default the function will create a transient, use `as_transient` to change that.
+        By default the function will honor if the Jax variable is a scalar or an array.
+        However, by setting `force_array` the function will always generate an array.
 
+        By default the name for the SDFG variable is derived from the Jax variable.
+        It is guaranteed that this name is unique in the SDFG, even in the presence of nested SDFGs.
         By specifying `alt_name` it is possible to force a certain name on a variable.
         It is important that if `alt_name` is specified the function will either generate the variable or fail.
-        In case `alt_name` is not given, then the function will be derived one from `jutil.get_jax_var_name(arg)`.
+
         The  driver distinguishes between two kinds of "bad (SDFG) variable names".
         The first category are the forbidden names, which the function refuses to generate.
-        The second one are the reserved names, which were set at the beginning.
+        The second type are the so called reserved names, which were set at the beginning.
         These names can be used if they are specified through `alt_name` but are not used in automatic naming.
 
         If nothing is specified, the strides of the data are determined by DaCe, which is continuous C order.
         There are two ways to change that.
         The first way is to specify the `strides` argument, which are then forwarded to the underlying DaCe function.
-        The function will only check if enough values were provided, but no further check is performed.
-        The second one is to set `symb_strides` to `True` in which case the function will generate symbols and use them.
-        However, even if symbolic strides are activated, arrays with just one dimensions have always a non symbolic stride.
+        The second way is to set `symb_strides` to `True` in which case the function will generate symbols and use them.
+        However, even if symbolic strides are activated, arrays with just one dimensions have always a non symbolic stride of 1.
         Furthermore, dimensions with shape 1 will always have stride 0.
 
         By default this function does not update the internal variable map.
@@ -555,21 +558,22 @@ class JaxprTranslationDriver:
 
         Args:
             arg:                The Jax object for which a SDFG equivalent should be created.
-            as_transient:        If set, the SDFG variable is a transient, `True` by default.
-            alt_name:            Try to create the variable with this name; either succeed or fail.
-            name_prefix:         If given and in automatic naming mode, add this prefix to the name before anything else.
-            force_array:         Instead of a `dace.Scalar` object create a `dace.Array` object with one element.
-            as_view:             Creates a view instead of an array, if it is a scalar it is silently ignored.
-            strides:            Instead of the default strides use this value for the strides.
-            symb_strides:        Create symbols and use them for fully symbolic strides.
-            find_new_name:        The translator will try to find a new name if the designated is already occupied.
+            as_transient:       If set, the SDFG variable is a transient, `True` by default.
+            alt_name:           Try to create the variable with this name; either succeed or fail.
+            name_prefix:        If given and in automatic naming mode, add this prefix to the name.
+            force_array:        Instead of a `dace.Scalar` object create a `dace.Array` with one element.
+            as_view:            Creates a view instead of an array, if it is a scalar it is silently ignored.
+            strides:            Instead of the default strides use these values.
+            symb_strides:       Create symbols and use them for fully symbolic strides.
+            find_new_name:      The translator will try to find a new name if the designated is already occupied.
                                     This does not work if the name was supplied by `alt_name`.
-            allow_literals:      If `True` then also allows JaxLiterals as `arg`.
-            force_jax_name:       If `True` then, the verbatim Jax name will be used.
-            update_var_mapping:   Update the internal variable mapping; by default `False`.
+            allow_literals:     If `True` then also allows JaxLiterals as `arg`.
+            force_jax_name:     If `True` then, the verbatim Jax name will be used.
+            update_var_mapping: Update the internal variable mapping; by default `False`.
 
         Notes:
-            If `find_new_name` is `None` the default the function will only look for a new name if there is a need for that.
+            If this function is used directly a user is advised to always set `update_var_mapping` to `True`.
+            If `find_new_name` is `None` the default, the function will only look for a new name if there is a need for it.
                 If it is `True` the function will always look for a new name, even if the initial name was fine.
                 If it is `False` the function will never look for a new new, thus if the name is unavailable an error is generated.
             Specifying `alt_name` implies `find_new_name=False`.
@@ -584,41 +588,34 @@ class JaxprTranslationDriver:
 
         if (alt_name is not None) and (not re.fullmatch("[a-zA-Z_][a-zA-Z0-9_]*", alt_name)):
             raise ValueError(f"The passed name 'alt_name' '{alt_name}' is invalid.")
-
         if force_jax_name:
             if alt_name is not None:
-                raise ValueError(
-                    f"Specified 'force_jax_name' but passed '{alt_name}' as 'alt_name'."
-                )
-            if name_prefix is not None:
-                raise ValueError(
-                    f"Specified 'force_jax_name' and set 'name_prefix' to '{name_prefix}'."
-                )
+                raise ValueError("Specified 'force_jax_name' but passed  'alt_name'.")
             alt_name = jutil.get_jax_var_name(arg)
+            if name_prefix is not None:
+                assert isinstance(name_prefix, str)
+                alt_name = name_prefix + alt_name
         if name_prefix is not None:
             assert isinstance(name_prefix, str)
-            assert len(name_prefix) > 0
             if alt_name is not None:
                 raise ValueError("Specified 'name_prefix' and 'alt_name' which is not possible.")
-
         if (symb_strides is None) and (strides is None):
             symb_strides = False if (len(shape) <= 1) else False
         if as_view and (not as_transient):
             raise ValueError("You tried to create a global view, which is not allowed.")
 
         if isinstance(arg, jcore.Var):
-            prop_name = jutil.get_jax_var_name(
-                arg
-            )  # This is the name that is _suggested_ by the conversion.
+            prop_name = jutil.get_jax_var_name(arg)
             if (alt_name is None) and prop_name.startswith("__"):
                 raise ValueError(
-                    f"You tried to create the variable '{prop_name}' which starts with two underscores, if you really want to do that use 'alt_name'."
+                    f"You tried to create the variable '{prop_name}' which"
+                    "starts with two underscores, use 'alt_name' for that."
                 )
             if isinstance(name_prefix, str):
                 prop_name = name_prefix + prop_name
         elif isinstance(arg, jcore.Literal):
             if not allow_literals:
-                raise NotImplementedError("Jax Literals are not yet implemented.")
+                raise NotImplementedError("Jax Literals are not supported.")
             if alt_name is None:
                 raise ValueError(f"Passed literal '{arg}', but not specified a name to use.")
         else:
@@ -635,7 +632,8 @@ class JaxprTranslationDriver:
                 raise ValueError(f"You used 'alt_name' to create the forbidden name '{alt_name}'.")
             if arg_name in self._sdfg.arrays:
                 raise ValueError(
-                    f"Tried to create a variable with name '{arg_name}' explicitly, but it is already known."
+                    f"Tried to create a variable with name '{arg_name}'"
+                    " explicitly, but it is already known."
                 )
         if find_new_name is None:
             find_new_name = (arg_name in self._forbidden_names) or (
@@ -658,9 +656,9 @@ class JaxprTranslationDriver:
             else:
                 raise ValueError(f"Failed to find a replacement name for '{arg_name}'")
             del iCounter, _arg_name
-        elif arg_name in self._forbidden_names:
+        if arg_name in self._forbidden_names:
             raise ValueError(f"Can not create variable '{arg_name}', name is forbidden.")
-        elif arg_name in self._sdfg.arrays:
+        if arg_name in self._sdfg.arrays:
             raise ValueError(f"Can not create variable '{arg_name}', variable is already created.")
         if not re.fullmatch("[a-zA-Z_][a-zA-Z0-9_]*", arg_name):
             raise ValueError(f"The requested variable name '{arg_name}' is invalid.")
@@ -677,7 +675,8 @@ class JaxprTranslationDriver:
                 raise ValueError("Specified 'symb_strides' and 'stride at the same time.")
             if len(strides) != len(shape):
                 raise ValueError(
-                    f"'strides' was '{strides}' it had length {len(strides)}, but the array has rank {len(shape)}."
+                    f"'strides' was '{strides}' it had length {len(strides)},"
+                    f" but the array has rank {len(shape)}."
                 )
             strides = tuple(strides)
 
@@ -726,19 +725,18 @@ class JaxprTranslationDriver:
         """Creates SDFG variables for the listed Jax variables and returns the SDFG names as a list.
 
         Before the function will create a variable, by using `_add_array()` with `update_var_mapping=True`,
-        the function will check if the variable is known and no new variable is created.
-        Instead the name of the previously created variable is added to the return value.
-        In case the Jax Atom denotes a literal, no variable will be created, instead `None`
-        will be added to the output list.
+        it will check if the variable is known and if so no new variable is created.
+        Instead the name of the previously created variable is added to the list.
+        In case the Jax Atom denotes a Jax Literal, no variable will be created,
+        instead `None` will be added to the list.
 
         Args:
-            jax_var_list:         The list of Jax variables that should be transformed to SDFG names.
-            prevent_creation:    Never create a variable, indicates that all variables must already exists.
-            only_creation:       Indicates that no variables exists yet and all must be created.
-            kwargs:             In case of variable creation will be forwarded to `self._add_array()` function.
+            jax_var_list:       The list of Jax variables that should be transformed to SDFG names.
+            prevent_creation:   Never create a variable, indicates that all variables must already exists.
+            only_creation:      If a variable already exists, generate an error instead of using it.
+            kwargs:             Will be forwarded to `self._add_array()` if a variable will be created.
 
         Notes:
-            Expected input arguments are `jcore.JaxprEqn.invars` or `jcore.JaxprEqn.outvars`.
             If `only_creation` is set, then literals will cause an error.
             It is an error to pass the `update_var_mapping` argument.
         """
@@ -754,23 +752,16 @@ class JaxprTranslationDriver:
                 ret_list.append(None)
             elif isinstance(jax_var, jcore.jax_var):
                 mapped_sdfg_name: str | None = self.map_jax_var_to_sdfg(jax_var, allow_fail=True)
+                if (mapped_sdfg_name is None) and prevent_creation:
+                    raise ValueError(f"prevent_creation' given but have to create '{jax_var}'.")
                 if mapped_sdfg_name is None:
-                    if prevent_creation:
-                        raise ValueError(
-                            f"Forbid the creation of jaxVariables, but need to create '{jax_var!s}'."
-                        )
                     ret_list.append(self._add_array(arg=jax_var, update_var_mapping=True, **kwargs))
+                elif only_creation:
+                    raise ValueError(f"'only_creation' given '{jax_var}' already exists.")
                 else:
-                    if only_creation:
-                        raise ValueError(
-                            f"Requested 'only_creation', but '{jax_var}' already exists as '{mapped_sdfg_name}'."
-                        )
                     ret_list.append(mapped_sdfg_name)
             else:
-                raise ValueError(
-                    f"The translation process is not implemented for '{type(jax_var)}'"
-                )
-
+                raise TypeError(f"Does not know how to handle '{type(jax_var).__name__}'")
         return ret_list
 
     def _create_initial_input(
@@ -781,8 +772,8 @@ class JaxprTranslationDriver:
         """This function will create the internal input variables that are used for the SDFG.
 
         Args:
-            jaxpr:              The Jaxpr that we want to translate.
-            inp_scalar_as_array:   Promote scalars to arrays of size one.
+            jaxpr:                  The Jaxpr that we want to translate.
+            inp_scalar_as_array:    Promote scalars to arrays of size one.
 
         Returns:
             The list of SDFG variables used as input arguments of `jaxpr` in the same order.
@@ -804,12 +795,12 @@ class JaxprTranslationDriver:
             only_creation=True,
             as_transient=True,  # Explicit transient; no error!
             force_array=inp_scalar_as_array,
-            force_jax_name=self.is_head_translator(),  # Ensure head get the pure Jax name.
+            force_jax_name=self.is_head_translator(),  # Ensure head get pure Jax names.
         )
         sdfg.arg_names.extend(init_in_var_names)
 
         # Store the list of inputs in self; this is done to simplify exporting.
-        #  The output list is either generated by `self._translate_jaxpr_internal()` of `self._handle_null_jaxpr()`.
+        #  The output list is populated by `self._translate_jaxpr_internal()`
         self._sdfg_in_names = tuple(init_in_var_names)
 
         return init_in_var_names
@@ -852,17 +843,13 @@ class JaxprTranslationDriver:
         name: str | None = None,
         reserved_names: str | Collection[str] | None = None,
     ) -> JaxprTranslationDriver:
-        """This function allocates and initialize the members related to the translation context.
+        """This function allocates and initialize the members of the translation context of `self`.
 
         After this function is called, `self` is said to have an ongoing translation process.
 
         Args:
             name:               The name of the SDFG.
             reserved_names:     Add these name to the set of resered names of `self`.
-
-        Notes:
-            It is not an error, if the reserved names are already allocated.
-                In that case the names passed by `reserved_names` are added to the list already preset.
         """
         if self.is_allocated():
             raise RuntimeError("The translator is already allocated.")
@@ -876,16 +863,13 @@ class JaxprTranslationDriver:
         self._sdfg_in_names = ()
         self._sdfg_out_names = ()
 
-        # Handle the `reserved_names` argument as described above.
-        #  This is essentially needed that children works properly.
+        # If the reserved names are already allocated then keep them.
+        #  This is needed to preserve them among forks.
         if self._reserved_names is None:
             self._reserved_names = set()  # type: ignore[unreachable]
-        else:
+        elif not isinstance(self._reserved_names, set):
             raise RuntimeError("The reserved names are allocated incorrectly.")
-        assert all(isinstance(x, str) for x in self._reserved_names)  # type: ignore[unreachable]
-        self._add_reserved_names(reserved_names)
-
-        return self
+        return self._add_reserved_names(reserved_names)
 
     def _init_sub_translators(
         self,
@@ -900,23 +884,19 @@ class JaxprTranslationDriver:
             raise RuntimeError("Tried to allocate the internal subtranslators twice.")
         assert self._sub_translators is None  # type: ignore[unreachable]
 
-        # We might get arguments that starts with an underscore, which are not meant for the subtranslators.
         kwargs = {k: v for k, v in kwargs.items() if not k.startswith("_")}
 
-        # Will contain all subtranslators we create.
-        subtranslators: dict[str, list[trans.JaCeSubTranslatorInterface]] = {}
-
         # First we will create all subtranslators and partition them.
-        subtranslator_cls: type[trans.JaCeSubTranslatorInterface]
+        subtranslators: dict[str, list[jtrans.JaCeSubTranslatorInterface]] = {}
         for subtranslator_cls in jtsubt._get_subtranslators_cls():
-            subtranslator: trans.JaCeSubTranslatorInterface = subtranslator_cls(**kwargs)
+            subtranslator: jtrans.JaCeSubTranslatorInterface = subtranslator_cls(**kwargs)
             handled_primitives: Iterable[str] = jutil.ensure_iterability(
-                subtranslator.getHandledPrimitives()
+                subtranslator.get_handled_primitives()
             )
 
             # Now add the subtranslator to the primitives it requests, we will sort them later into the correct order.
-            for handledPrimitive in handled_primitives:
-                subtranslators.setdefault(handledPrimitive, []).append(subtranslator)
+            for handled_primitive in handled_primitives:
+                subtranslators.setdefault(handled_primitive, []).append(subtranslator)
 
         # Now we order the subtranslators for the primitives.
         self._sub_translators = {
@@ -930,8 +910,9 @@ class JaxprTranslationDriver:
 
         Notes:
             While it is allowed for outside code to call this explicitly function, it is is most likely an error.
-            If this function is called on a head translator, then the revision state will be rested.
-                Thus a caller has to make sure that the lifetime of all children has ended.
+            If this function is called on a head translator, then the translation process ends.
+                This implies that all direct and indirect children, i.e. output of `self.fork()` must already be deallocated.
+                A further side effect is that now revision indexes will be reused.
             If `self` is not allocated this function acts as a noops.
             The reserved names are only deallocated if `self` is a head translator.
         """
@@ -960,8 +941,8 @@ class JaxprTranslationDriver:
         in_var_names: Sequence[str | None],
         out_var_names: Sequence[str],
         eqn: jcore.JaxprEqn,
-    ) -> trans.JaCeSubTranslatorInterface:
-        """Returns the subtranslator object to translate `eqn`.
+    ) -> jtrans.JaCeSubTranslatorInterface:
+        """Returns the appropriate subtranslator for equation `eqn`.
 
         The subtranslators are checked for applicability in the order of their priority.
         The fist one that accepts the translation will be taken.
@@ -973,23 +954,20 @@ class JaxprTranslationDriver:
 
         prim_name: str = eqn.primitive.name
         if prim_name not in self._sub_translators:
-            raise NotImplementedError(f"No subtranslators known to hanble primitive '{prim_name}'.")
+            raise NotImplementedError(f"No subtranslators known to handle '{prim_name}'.")
         subtranslator_canidates = self._sub_translators[prim_name]
         assert len(subtranslator_canidates) > 0
 
-        subtranslator: trans.JaCeSubTranslatorInterface = None  # type: ignore[assignment]
+        subtranslator: jtrans.JaCeSubTranslatorInterface = None  # type: ignore[assignment]
         if len(subtranslator_canidates) == 1:
             subtranslator = next(iter(subtranslator_canidates))
             assert subtranslator.can_translate_jaxeqn(
-                driver=self, in_var_names=in_var_names, out_var_names=out_var_names, eqn=eqn
+                in_var_names=in_var_names, out_var_names=out_var_names, driver=self, eqn=eqn
             )
         else:
             for subtranslatorCanidate in subtranslator_canidates:
                 if subtranslatorCanidate.can_translate_jaxeqn(
-                    driver=self,
-                    in_var_names=in_var_names,
-                    out_var_names=out_var_names,
-                    eqn=eqn,
+                    driver=self, in_var_names=in_var_names, out_var_names=out_var_names, eqn=eqn
                 ):
                     subtranslator = subtranslatorCanidate
             else:
@@ -1005,29 +983,32 @@ class JaxprTranslationDriver:
 
         To do this the function will do the following steps:
         - Assemble the in and output variables.
-        - Select which subtranslator to use.
-        - Create a new empty state, i.e. append to the tentative terminal state.
-        - Perform the actual translation.
+        - Select the appropriate subtranslator to use.
+        - Create a new empty state terminal state.
+        - Call the subtranslator to perform the translation inside the new state.
 
         Returns:
-            The SDFG names that where used as input and output are returned.
-            The inputs might contain `None` which indicates that the input was a Jax literal.
+            The SDFG names that were used as input and output are returned.
+            The inputs might contain `None` which indicates that that input was a Jax Literal.
             For more information see `JaCeSubTranslatorInterface.can_translate_jaxeqn()`.
 
         Notes:
-            While `jaxpr` must be the closed version, `eqn` must come from the unclosed version.
-            The function will also perform some consistency checking.
+            While `jaxpr` must be a `ClosedJaxpr`, `eqn` must come from the unclosed instance.
+            The function will perform some consistency checking after the subtranslator was called.
         """
         assert isinstance(eqn, jcore.JaxprEqn)
         assert isinstance(jaxpr, jcore.ClosedJaxpr)
 
         if len(eqn.effects) != 0:
-            raise NotImplementedError(f"Equation '{eqn}' had side effects.")
+            raise NotImplementedError(f"Equation '{eqn}' has side effects.")
 
         # Input/Output variables
-        in_var_names: Sequence[str | None] = self._create_jax_var_list(
-            eqn.invars,
-            prevent_creation=True,  # Inputs must already exists.
+        #  Using a tuple for the input ensures that it is not modified.
+        in_var_names: Sequence[str | None] = tuple(
+            self._create_jax_var_list(
+                eqn.invars,
+                prevent_creation=True,  # Inputs must already exists.
+            )
         )
         out_var_names: Sequence[str] = self._create_jax_var_list(  # type: ignore[assignment]
             eqn.outvars,
@@ -1035,17 +1016,17 @@ class JaxprTranslationDriver:
         )
 
         # Find the subtranslator
-        subtranslator: trans.JaCeSubTranslatorInterface = self._find_sub_translator_for(
+        subtranslator: jtrans.JaCeSubTranslatorInterface = self._find_sub_translator_for(
             in_var_names=in_var_names,
             out_var_names=out_var_names,
             eqn=eqn,
         )
 
-        # Create the state into which the equation is put
+        # Create the state into which the equation should be translated
         last_term_state: dace.SDFGState = self.get_terminal_sdfg_state()  # noqa: F841 # Will be used later
         eqn_state = self.append_new_state(
             label=f"{eqn.primitive.name}_{out_var_names[0]}",
-            prev_state=None,  # Force to append as terminal state.
+            prev_state=None,
         )
 
         # Now perform the actual translation of the equation.
@@ -1059,41 +1040,48 @@ class JaxprTranslationDriver:
 
         # Determine the new (tentative) terminal state of the SDFG we are building.
         if new_sdfg_term_state is None:
-            if eqn_state is self._term_sdfg_state:
+            if eqn_state is not self._term_sdfg_state:
                 raise RuntimeError("Inconsistent terminal state was detected.")
             new_sdfg_term_state = eqn_state
         elif isinstance(new_sdfg_term_state, dace.SDFGState):
-            # TODO(phimuell): use `last_term_state` to test if there is reachability to new end.
+            # TODO(phimuell): use `last_term_state` to test if `new_sdfg_term_state` is reachable.
             pass
         else:
             raise TypeError(f"Encountered illegal types '{type(new_sdfg_term_state)}'")
 
-        # In case a subtranslator decided to not use the variables we created for it, he is technically
-        #  allowed to create new ones, but he must update the `out_var_names` list.
-        #  We will now test if the mapping was updated correctly.
-        for expectedSDFGName, jax_var in zip(out_var_names, eqn.outvars, strict=False):
+        # In case a subtranslator decided to not use the variables we created for it, which is allowed
+        #  but he must update the `out_var_names` list correctly, we will now verify this.
+        if len(out_var_names) != len(eqn.outvars):
+            raise RuntimeError(
+                f"Modified 'out_var_names'! Expected {len(eqn.outvars)} variables."
+                f" but found {len(out_var_names)}"
+            )
+        for expectedSDFGName, jax_var in zip(out_var_names, eqn.outvars, strict=True):
             mapped_sdfg_name = self.map_jax_var_to_sdfg(jax_var)
             jax_name = jutil.get_jax_var_name(jax_var)
             if mapped_sdfg_name != expectedSDFGName:
                 raise ValueError(
-                    f"Mapping inconsistency detected, expected that Jax variable '{jax_name}' maps to '{expectedSDFGName}' but it actually maps to '{mapped_sdfg_name}'."
+                    f"Mapping inconsistency detected, expected that Jax variable"
+                    f" '{jax_name}' maps to '{expectedSDFGName}' but it actually"
+                    f" maps to '{mapped_sdfg_name}'."
                 )
 
         # Views can only be used if there is a direct connection, between source, view and destination (place of usage)
         #  Because of the way how Jax works, it is impossible that an output variable is a View.
-        #  Thus we now make the check if this is the case.
-        for outVarName, jax_var in zip(out_var_names, eqn.outvars, strict=False):
+        for outVarName, jax_var in zip(out_var_names, eqn.outvars, strict=True):
             sdfg_var = self.get_array(outVarName)
             if isinstance(sdfg_var, (dace.data.Array, dace.data.Scalar)):
                 pass
             elif isinstance(sdfg_var, dace.data.View):
                 raise TypeError(
-                    f"For the Jax variable '{jutil.get_jax_var_name(jax_var)}' (SDFG: '{outVarName}'), which is an output, you used a View, which is not possible."
-                    + " It must either be an array or a scalar."
+                    f"For the Jax variable '{jutil.get_jax_var_name(jax_var)}' (SDFG: '{outVarName}'),"
+                    f" which is an output, you used a View, which is not possible."
+                    " It must either be an array or a scalar."
                 )
             else:
                 raise NotImplementedError(
-                    f"The output variable '{jutil.get_jax_var_name(jax_var)}' (SDFG: '{outVarName}') is of type '{type(sdfg_var).__name__}' which I does not know how to handle."
+                    f"The output variable '{jutil.get_jax_var_name(jax_var)}' (SDFG: '{outVarName}')"
+                    f" is of type '{type(sdfg_var).__name__}' which I does not know how to handle."
                 )
 
         # Modify terminal head state of 'self'
@@ -1108,8 +1096,6 @@ class JaxprTranslationDriver:
         """Performs the actual translation of the Jaxpr into an SDFG.
 
         The function assumes that the context is already allocated and the initial variables are already created.
-        The function will ignore, i.e. not translate, any state whose output variables name only consists of `_`.
-
         The function will store the internal state of `self` into a memento and return it.
         However, it will not deallocate the context of `self`, thus `self` and the memento share the same context in memory.
 
@@ -1118,13 +1104,15 @@ class JaxprTranslationDriver:
 
         Notes:
             The function will unconditionally handle empty Jaxpr.
-            Jax uses a variable with name `_` to indicate that this value is never read.
-                It is included by some transformations such as `grad()`.
+            Jax uses a variable with name `_` to indicate that this value is never read,
+                this is used by Jax to indicate that they are never read.
+                Such variables are included by some transformations such as `grad()`.
         """
         assert isinstance(jaxpr, jcore.ClosedJaxpr)
         assert self.is_allocated()
 
         nb_translated_eqn: int = 0
+        out_var_names: Sequence[str] = []
         for eqn in jaxpr.jaxpr.eqns:  # Translate the equations one by one.
             assert len(eqn.effects) == 0
             if len(eqn.outvars) == 0:  # Do we need this special case.
@@ -1137,12 +1125,10 @@ class JaxprTranslationDriver:
             _, out_var_names = self._translate_single_eqn(jaxpr=jaxpr, eqn=eqn)
             nb_translated_eqn += 1
 
-        if nb_translated_eqn != 0:
-            # Equations where translated so set the output variables.
-            self._sdfg_out_names = tuple(out_var_names)
-        else:
-            # No equations were translated, i.e. no equation at all or all outputs had name '_'
-            self._handle_null_jaxpr(jaxpr)
+        if nb_translated_eqn == 0:
+            # There were no equation, so handle the copying of input to output.
+            out_var_names = self._handle_null_jaxpr(jaxpr)
+        self._sdfg_out_names = tuple(out_var_names)
 
         return self._export_memento()
 
@@ -1153,10 +1139,8 @@ class JaxprTranslationDriver:
         Thus the memento and `self` share the same context in memory.
         """
         assert self.is_allocated()
-        assert len(self._sdfg_in_names) > 0
-        assert all(isinstance(x, str) for x in self._sdfg_in_names)
-        assert len(self._sdfg_out_names) > 0
-        assert all(isinstance(x, str) for x in self._sdfg_out_names)
+        assert all((isinstance(x, str) and (len(x) > 0)) for x in self._sdfg_in_names)
+        assert all((isinstance(x, str) and (len(x) > 0)) for x in self._sdfg_out_names)
 
         return jtrutil.JaCeTranslationMemento(
             sdfg=self._sdfg,
@@ -1170,28 +1154,21 @@ class JaxprTranslationDriver:
     def _handle_null_jaxpr(
         self,
         jaxpr: jcore.ClosedJaxpr,
-    ) -> JaxprTranslationDriver:
+    ) -> Sequence[str]:
         """This function is called in case a `Jaxpr` with zero equations is encountered.
 
-        Notes:
-            This function will fill the internal list of outputs.
+        A function with zero equation might still have output, in which case an input is copied to an output.
+        This function will handle the copying from the input into the corresponding output variable.
+
+        Returns:
+            The function returns a list denoting the SDFG variables that refers to the output.
+            The order of the list is the same as in `jaxpr.jaxpr.outvars`.
         """
         if len(jaxpr.eqns) != 0:
             raise NotImplementedError("'_handle_null_jaxpr()' was called for a non empty Jaxpr.")
-        if (
-            len(jaxpr.out_avals) == 0
-        ):  # There is not output so we do not have to copy anything around.
-            self._sdfg_out_names = ()
-            return self
-        if self.is_head_translator():
-            # In this case there is nothing to do, because input is already the output.
-            #  However, this is only possible if we are the head translator.
-            self._sdfg_out_names = tuple(
-                self.map_jax_var_to_sdfg(jax_out_var) for jax_out_var in jaxpr.jaxpr.outvars
-            )
-            raise NotImplementedError("Please test me.")
-            return self  # type: ignore[unreachable] # reminder
-        #
+        if len(jaxpr.out_avals) == 0:
+            # There is not output so we do not have to copy anything around.
+            return ()
         assert self._term_sdfg_state is self._init_sdfg_state
         assert len(self._sdfg_in_names) > 0
         assert len(self._sdfg_out_names) == 0
@@ -1237,10 +1214,7 @@ class JaxprTranslationDriver:
                     jax_inp_name, self.get_array(self.map_jax_var_to_sdfg(jax_inp_name))
                 ),
             )
-        # We also have to update the list of outputs.
-        #  This is needed for making the exporter aware of what we are doing.
-        self._sdfg_out_names = tuple(out_var_names)
-        return self
+        return tuple(out_var_names)
 
     # fmt: off
     _forbidden_names: Final[set[str]] = {

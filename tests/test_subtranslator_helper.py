@@ -199,19 +199,19 @@ def test_subtranslatior_managing():
 
     #
 
-    # Thest the initial conditions
+    # Test the initial conditions
     init_sub_trans_list = _get_subtranslators_cls(builtins=False)
-    init_built_in = _get_subtranslators_cls(with_external=False)
+    init_built_in = _get_subtranslators_cls(with_external=False)  # noqa: F841  # Not finished
     assert (
         len(init_sub_trans_list) == 0
     ), f"Expected no external subtranslators but found: {init_sub_trans_list}"
 
     # Now we add the valid subtranslator interface
     assert add_subtranslator(ValidSubTrans), "Failed to add the `ValidSubTrans`"
-    first_sub_trans = _get_subtranslators_cls(builtins=False)
+    first_sub_trans = _get_subtranslators_cls(builtins=False)  # noqa: F841  # Not finished
 
     # Should not include the
-    subTrans = _get_subtranslators_cls(with_external=False)
+    subTrans = _get_subtranslators_cls(with_external=False)  # noqa: F841  # Not finished
 
     assert not add_subtranslator(ValidSubTrans), "Could add `ValidSubTrans` twice"
     raise AssertionError("NOT FINISHED YET")

@@ -10,9 +10,8 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Final, Type
+from typing import Final
 
-import jace
 from jace import translator as jtrans
 
 from .alu_translator import ALUTranslator
