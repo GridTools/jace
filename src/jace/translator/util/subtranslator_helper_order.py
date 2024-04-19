@@ -57,24 +57,22 @@ class _SubtranslatorOrderingHelper:
         # Default priority means that it will always go to the end.
         if self._sub.has_default_priority():
             return False  # 'self' has default priority, so it must go to the end.
-        elif other._sub.has_default_priority():
+        if other._sub.has_default_priority():
             return True  # 'self' does not have default prio, thus it _must_ go before 'other'.
-        # Get the priorities of the subtranslators.
-        prio_self = self._sub.get_priority()
+        prio_self = self._sub.get_priority()  # Get the priorities of the subtranslators.
         prio_other = other._sub.get_priority()
         if all(prio is NotImplemented for prio in (prio_self, prio_other)):
-            # Both does not have an explicit priority, thus 'self' should decide if it should go first.
+            # None has a prio, 'self' should decide if it should go first.
             x = self._sub.__lt__(other._sub)
             assert isinstance(x, bool)
             return x
-        # In case only one has a priority, we change the order such that the one that implements a custom '__lt__()' goes first.
-        #  This is consistent with the description of the interface telling that such translators are biased towards lower priorities.
+        # In case only one has a priority, we change the order such that the one that implements
+        #  a '__lt__()' goes first.
         if prio_self is NotImplemented:
             assert isinstance(prio_other, int)
             return True
-        elif prio_other is NotImplemented:
+        if prio_other is NotImplemented:
             assert isinstance(prio_self, int)
             return False
-        # Both have a priority
         assert all(isinstance(prio, int) for prio in (prio_other, prio_self))
         return prio_self < prio_other

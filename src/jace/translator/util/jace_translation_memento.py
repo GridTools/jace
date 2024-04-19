@@ -65,13 +65,9 @@ class JaCeTranslationMemento:
         """Compares the underlying SDFG object with 'rhs'."""
         if isinstance(other, JaCeTranslationMemento):
             return bool(self.sdfg == other.sdfg)
-        elif hasattr(other, "__sdfg__"):
+        if hasattr(other, "__sdfg__"):
             other = other.__sdfg__()
-        elif isinstance(other, dace.SDFG):
-            pass
-        else:
+        elif not isinstance(other, dace.SDFG):
             return NotImplemented
-        #
-
         x: bool = self.sdfg.__eq__(other)
         return x

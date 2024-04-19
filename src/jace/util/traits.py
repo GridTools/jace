@@ -25,7 +25,7 @@ def is_str(
     """
     if len(args) == 0:
         return False
-    elif allow_empty:
+    if allow_empty:
         for x in args:
             if not isinstance(x, str):
                 return False  # Not a string

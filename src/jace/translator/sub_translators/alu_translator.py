@@ -241,9 +241,9 @@ class ALUTranslator(jtranslator.JaCeSubTranslatorInterface):
                 # Literal: No input needed.
                 tskl_inputs.append((None, None))
                 continue
-            elif inp_scalars[i]:
+            if inp_scalars[i]:
                 # We have a scalar argument.
-                i_memlet: dace.Memlet = dace.Memlet.from_array(
+                i_memlet = dace.Memlet.from_array(
                     in_var_names[i], driver.get_sdfg().arrays[in_var_names[i]]
                 )
             else:
