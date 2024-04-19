@@ -597,9 +597,7 @@ class JaxprTranslationDriver:
                 )
             alt_name = jutil.get_jax_var_name(arg)
         if name_prefix is not None:
-            assert isinstance(name_prefix, str) and (
-                len(name_prefix) > 0
-            ), f"Invalid 'name_prefix': '{name_prefix}'."
+            assert isinstance(name_prefix, str) and (len(name_prefix) > 0)
             if alt_name is not None:
                 raise ValueError("Specified 'name_prefix' and 'alt_name' which is not possible.")
 

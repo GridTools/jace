@@ -153,13 +153,11 @@ class ALUTranslator(jtranslator.JaCeSubTranslatorInterface):
         inp_scalars = [len(Inp.aval.shape) == 0 for i, Inp in enumerate(eqn.invars)]
         has_scalars_as_inputs = any(inp_scalars)
         only_scalars_as_inputs = all(inp_scalars)
-        has_some_literals = any([x is None for x in in_var_names])
-        only_literals_as_inputs = all([x is None for x in in_var_names])
+        has_some_literals = any(x is None for x in in_var_names)
+        only_literals_as_inputs = all(x is None for x in in_var_names)
         inps_same_shape = all(
-            [
                 eqn.invars[0].aval.shape == eqn.invars[i].aval.shape
                 for i in range(1, len(eqn.invars))
-            ]
         )
 
         # We will now look which dimensions have to be broadcasted on which operator.
