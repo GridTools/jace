@@ -395,7 +395,7 @@ class JaxprTranslationDriver:
                     "Invalid allocation state: All context variables except the reserved name list are allocated."
                 )
             return True
-        elif all((x is None) for x in small_ctx):
+        if all((x is None) for x in small_ctx):
             return False
         raise RuntimeError("Invalid allocation state: Translation context is mixed allocated.")
 
@@ -481,7 +481,7 @@ class JaxprTranslationDriver:
             raise KeyError(
                 f"Tried to create the mapping '{jax_name} -> {sdfg_name}', but '{sdfg_name}' is not a known SDFG variable."
             )
-        elif sdfg_name in self._forbidden_names:
+        if sdfg_name in self._forbidden_names:
             raise NameError(  # This is actually an internal error
                 f"Tried to create the mapping '{jax_name} -> {sdfg_name}', but '{sdfg_name}' is forbidden."
             )
@@ -498,7 +498,7 @@ class JaxprTranslationDriver:
 
         if reserved_names is None:
             return self
-        elif isinstance(reserved_names, str):
+        if isinstance(reserved_names, str):
             reserved_names = [reserved_names]
         elif isinstance(reserved_names, Collection):
             pass
