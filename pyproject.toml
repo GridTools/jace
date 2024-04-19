@@ -115,6 +115,7 @@ extend-select = [
   "NPY"  # NumPy specific rules
 ]
 ignore = [
+  'B905',  # [zip-without-explicit-strict]
   'E501',  # [line-too-long]
   'UP038'  # [non-pep604-isinstance]
 ]
