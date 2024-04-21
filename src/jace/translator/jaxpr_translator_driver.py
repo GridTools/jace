@@ -473,7 +473,8 @@ class JaxprTranslationDriver:
         if not isinstance(dcd_type, dace.dtypes.typeclass):
             raise TypeError(
                 f"Expected that '{nameof_dtype}' would map to a 'dace.typeclass'"
-                f"but it mapped to a '{type(dcd_type).__name__}'.")
+                f"but it mapped to a '{type(dcd_type).__name__}'."
+            )
 
         return dcd_type
 
@@ -503,7 +504,8 @@ class JaxprTranslationDriver:
                 return self
             raise ValueError(
                 f"Tried to create the mapping '{jax_name} -> {sdfg_name}', but '{jax_name}'"
-                f" already points to '{self.map_jax_var_to_sdfg(jax_name)}'.")
+                f" already points to '{self.map_jax_var_to_sdfg(jax_name)}'."
+            )
         if sdfg_name not in self.get_arrays():
             raise KeyError(f"Mapping '{jax_name} -> {sdfg_name}': SDFG target unknown.")
         if sdfg_name in self._forbidden_names:

@@ -32,7 +32,7 @@ class JaCeSubTranslatorInterface:
 
     Subtranslators are rather simple objects that only have to perform
     the translation. The translation process itself is managed by a driver
-    object, which owns and manage the subtranslators.   
+    object, which owns and manage the subtranslators.
     In the end this implements the delegation pattern.
 
     A subtranslator uses its `get_handled_primitives()` function to indicate
