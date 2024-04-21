@@ -22,7 +22,7 @@ _BUILTIN_SUBTRANSLATORS: Final[list[type[jtrans.JaCeSubTranslatorInterface]]] = 
     ALUTranslator,
 ]
 
-# List of the externally supplied subtranslator implementation.
+# All externally supplied subtranslator implementation.
 #  It is a `dict` to do fast access and remember the order, value is always `None`.
 #  The list is manipulated through `{add,rm}_subtranslator()`.
 _EXTERNAL_SUBTRANSLATORS: dict[type[jtrans.JaCeSubTranslatorInterface], None] = {}
@@ -31,7 +31,7 @@ _EXTERNAL_SUBTRANSLATORS: dict[type[jtrans.JaCeSubTranslatorInterface], None] = 
 def add_subtranslator(
     subtrans: type[jtrans.JaCeSubTranslatorInterface],
 ) -> bool:
-    """Add `subtrans` to the internal list of externally supplied subtranslators.
+    """Add `subtrans` to the externally defined subtranslators.
 
     The function returns `True` if it was added and `False` is not.
     """
@@ -51,7 +51,7 @@ def rm_subtranslator(
     subtrans: type[jtrans.JaCeSubTranslatorInterface],
     strict: bool = False,
 ) -> bool:
-    """Removes subtranslator `subtrans` from the list of known subtranslators.
+    """Remove `subtrans` as externally defined subtranslators.
 
     If `subtrans` is not known no error is generated unless `strict` is set to `True`.
     """
@@ -67,17 +67,26 @@ def _get_subtranslators_cls(
     with_external: bool = True,
     builtins: bool = True,
 ) -> Sequence[type[jtrans.JaCeSubTranslatorInterface]]:
-    """Returns a list of all subtranslator classes in JaCe.
+    """Returns the list of all subtranslator known to JaCe.
 
     Args:
         with_external:  Include the translators that were externally supplied.
         builtins:       Include the build in translators.
+
+    Notes:
+        If the externally defined subtranslators are requested they will be
+            first and ordered as FILO order.
     """
+    # It is important that the externally defined are ordered before the builtins
+    #  and are ordered in FILO order, especuially if multiple subtranslator per
+    #  primitive are registered. Because this way they are inserted first
+    #  into the internal list of the driver, and furthermore since `sorted()`
+    #  is stable they will tend to end up more to the front.
     ret: list[type[jtrans.JaCeSubTranslatorInterface]] = []
+    if with_external:
+        ret.extend(reversed(_EXTERNAL_SUBTRANSLATORS.keys()))
     if builtins:
         ret.extend(_BUILTIN_SUBTRANSLATORS)
-    if with_external:
-        ret.extend(_EXTERNAL_SUBTRANSLATORS.keys())
     return ret
 
 

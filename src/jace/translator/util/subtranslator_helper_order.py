@@ -38,8 +38,8 @@ def sort_subtranslators(
 class _SubtranslatorOrderingHelper:
     """Helper class used by `JaxprTranslationDriver` to bring the subtranslators in the correct order.
 
-    Essentially it is a wrapper that contains the additional logic that is needed for sorting.
-    This way subclasses does not need to implement it themselves.
+    Essentially it is a wrapper that contains the additional logic that is
+    needed for sorting. This way subclasses does not need to implement it themselves.
 
     Notes:
         This class does not implement the other comparison function as requested by PEP8.

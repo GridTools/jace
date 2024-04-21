@@ -150,7 +150,7 @@ class JaCeSubTranslatorInterface:
         - The driver will create a new terminal state and pass it as
             `eqn_state` argument. This state is guaranteed to be empty and
             `translator.get_terminal_sdfg_state() is eqn_state` holds.
-        
+
         Then the subtranslator is called. Usually a subtranslator should
         construct the dataflow graph inside it. It is allowed that the
         subtranslators creates more states if needed, but this state machine
@@ -159,7 +159,6 @@ class JaCeSubTranslatorInterface:
         If the function returns `None` the driver will assume that
         subtranslator was able to fully construct the dataflow graph
         within `eqn_state`.
-
 
         While a subtranslator is forbidden from meddling with the input
         variables mentioned in `in_var_names` in any way, it is allowed to
