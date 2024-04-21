@@ -16,15 +16,17 @@ import dace
 
 @dataclass(init=True, repr=True, eq=False, frozen=True, kw_only=True, slots=True)
 class JaCeTranslationMemento:
-    """Encapsulates the result of a translation run of the 'JaxprTranslationDriver' object.
+    """Encapsulates the result of a translation run of the `JaxprTranslationDriver` object.
 
     It defines the following members:
-    - 'sdfg' the SDFG object that was created.
-    - 'start_state' the first state in the SDFG state machine.
-    - 'terminal_state' the last state in the state machine.
-    - 'jax_name_map' a 'dict' that maps every Jax name to its corresponding SDFG variable name.
-    - 'inp_names' a 'list' of the SDFG variables that are used as input, in the same order as 'Jaxpr.invars'.
-    - 'out_names' a 'list' of the SDFG variables that are used as output, in the same order as 'Jaxpr.outvars'.
+    - `sdfg` the SDFG object that was created.
+    - `start_state` the first state in the SDFG state machine.
+    - `terminal_state` the last state in the state machine.
+    - `jax_name_map` a `dict` that maps every Jax name to its corresponding SDFG variable name.
+    - `inp_names` a `list` of the SDFG variables that are used as input,
+            in the same order as `Jaxpr.invars`.
+    - `out_names` a `list` of the SDFG variables that are used as output,
+            in the same order as `Jaxpr.outvars`.
     """
 
     sdfg: dace.SDFG
@@ -37,7 +39,8 @@ class JaCeTranslationMemento:
     def validate(self) -> bool:
         """Validate the underlying SDFG."""
 
-        # To prevent the 'non initialized' data warnings we have to temporary promote the input arguments as global.
+        # To prevent the 'non initialized' data warnings we have to temporary promote the
+        #  input arguments as global.
         org_trans_state: dict[str, bool] = {}
         for var in self.inp_names:
             org_trans_state[var] = self.sdfg.arrays[var].transient

@@ -15,7 +15,7 @@ def ensure_iterability(
     x: Any,
     ign_str: bool = True,
 ) -> Iterable[Any]:
-    """Ensures that 'x' is iterable.
+    """Ensures that `x` is iterable.
 
     By default strings are _not_ considered iterable.
 

@@ -7,7 +7,8 @@
 
 """Implements all utility functions that are related to Jax.
 
-Most of the functions defined here allow an unified access to Jax' internals in a consistent and centralized way.
+Most of the functions defined here allow an unified access to Jax' internals
+in a consistent and stable way.
 """
 
 from __future__ import annotations
