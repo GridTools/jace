@@ -100,22 +100,24 @@ extend-select = [
   "G",  # flake8-logging-format
   "C4",  # flake8-comprehensions
   "PT",  # flake8-pytest-style
-  "UP",  # pyupgrade  # TODO: evaluate and remove if needed
+  "UP",  # pyupgrade       # TODO: in evaluation
   "ARG",  # flake8-unused-arguments
   "ERA",  # eradicate
   "ICN",  # flake8-import-conventions
   "PGH",  # pygrep-hooks
   "PIE",  # flake8-pie
   "PTH",  # flake8-use-pathlib
-  "RET",  # flake8-return  # TODO: evaluate and remove if needed
+  "RET",  # flake8-return   # TODO: in evaluation
   "RUF",  # Ruff-specific
-  "SIM",  # flake8-simplify  # TODO: evaluate and remove if needed
+  "SIM",  # flake8-simplify # TODO: in evaluation
   "T10",  # flake8-debugger
-  "T20",  # flake8-print  # TODO: evaluate and remove if needed
+  "T20",  # flake8-print    # TODO: in evaluation
   "NPY"  # NumPy specific rules
 ]
 ignore = [
-  'E501'  # [line-too-long]
+  'B905',  # [zip-without-explicit-strict]
+  'E501',  # [line-too-long]
+  'UP038'  # [non-pep604-isinstance]
 ]
 ignore-init-module-imports = true
 unfixable = []
@@ -144,5 +146,6 @@ section-order = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"noxfile.py" = ["T20"]
-"tests/**" = ["T10", "T20"]
+"!tests/**.py" = ["PT"]  # Ignore `flake8-pytest-style` everywhere except in `tests/`
+"noxfile.py" = ["T20"]  # Ignore `flake8-print`
+"tests/**" = ["T10", "T20"]  # Ignore `flake8-debugger` and `flake8-print`
