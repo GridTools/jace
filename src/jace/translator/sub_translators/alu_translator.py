@@ -24,7 +24,7 @@ from jace.translator import util as jtutil
 class ALUTranslator(jtranslator.JaCeSubTranslatorInterface):
     """This translator handles all arithmetic and logical operations."""
 
-    __slots__ = ("_unary_ops", "_binary_ops")
+    __slots__ = ()
 
     # Contains all translation templates for unarry operations.
     _unary_ops: Final[dict[str, str]] = {
@@ -239,7 +239,7 @@ class ALUTranslator(jtranslator.JaCeSubTranslatorInterface):
             tskl_tasklet = eqn_state.add_tasklet(
                 tskl_name,
                 jtutil.list_to_dict(tskl_inputs).keys(),
-                jtutil.list_to_dict(tskl_outputs).keys(),
+                jtutil.list_to_dict([tskl_outputs]).keys(),
                 tskl_code,
             )
             for in_var, (in_connector, in_memlet) in zip(in_var_names, tskl_inputs, strict=False):
@@ -265,7 +265,7 @@ class ALUTranslator(jtranslator.JaCeSubTranslatorInterface):
                 map_ranges=jtutil.list_to_dict(tskl_map_ranges),
                 inputs=jtutil.list_to_dict(tskl_inputs),
                 code=tskl_code,
-                outputs=jtutil.list_to_dict(tskl_outputs),
+                outputs=jtutil.list_to_dict([tskl_outputs]),
                 external_edges=True,
             )
 

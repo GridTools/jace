@@ -16,9 +16,9 @@ import jax
 from dace import data as ddata, properties as dprop
 from jax import core as jcore
 
-from jace import translator as jtrans
+from jace import translator as jtrans, util as jutil
 from jace.translator import sub_translators as jtsubt, util as jtrutil
-from jace.util import jax as jutil
+
 
 class JaxprTranslationDriver:
     """Internal driver class for creating an SDFG equivalent of a `Jaxpr` instance.
@@ -73,7 +73,7 @@ class JaxprTranslationDriver:
     )
     # Variables that are shared among the instances of a family.
     __shared_slots__ = (
-        "_reserved_names",  # Part of the context.
+        "_reserved_names",  # Part of the context, but is copied.
         "_sub_translators",
         "_rev_manager",  # This is the revision counter manager
     )
@@ -237,6 +237,11 @@ class JaxprTranslationDriver:
             It is important that a clone instance should not be reused,
                 instead you should fork it again.
         """
+        from copy import copy as scpy
+
+        if not self.is_allocated():
+            raise RuntimeError("Only allocated driver can fork.")
+
         # Create a new (empty) driver instance; prevent allocation to make it cheep
         dolly: JaxprTranslationDriver = JaxprTranslationDriver(_no_shared_alloc=True)
 
@@ -247,6 +252,11 @@ class JaxprTranslationDriver:
         # Handle the special members and initialize them.
         dolly._rev_idx = dolly._rev_manager.assign_revision()
         assert not dolly.is_head_translator()
+
+        # We will now copy the reserved name list
+        #  Although they are shared, only their content is shared.
+        #  This prevents a feedback from the child to the parent.
+        dolly._reserved_names = scpy(self._reserved_names)
 
         return dolly
 
@@ -290,6 +300,8 @@ class JaxprTranslationDriver:
         modify_term_state: bool = False
         if (prev_state is self._term_sdfg_state) or (prev_state is None):
             modify_term_state = True
+            app_state = self._term_sdfg_state
+        else:
             app_state = prev_state
 
         new_state = self._sdfg.add_state(label, is_start_block=False)
@@ -399,9 +411,11 @@ class JaxprTranslationDriver:
         small_ctx: Sequence[Any] = [
             # for the proper implementation of forking the reserved names are handled special.
             getattr(self, x)
-            for x in self.__shared_slots__
-            if x != "_reserved_names"
+            for x in self.__private_slots__
+            if x != "_rev_idx"
         ]
+        assert isinstance(self._rev_idx, int)
+        assert isinstance(self._sub_translators, dict)
         if all((x is not None) for x in small_ctx):
             if self._reserved_names is None:
                 raise RuntimeError("Invalid allocation state: Reserved names not allocated.")
@@ -432,7 +446,6 @@ class JaxprTranslationDriver:
         if not isinstance(other, JaxprTranslationDriver):
             return NotImplemented  # type: ignore[unreachable]
         if all(getattr(self, x) is getattr(self, x) for x in self.__shared_slots__):
-            assert (self if (self._rev_idx < other._rev_idx) else other).is_allocated()
             return True
         assert not any(getattr(self, x) is getattr(self, x) for x in self.__shared_slots__)
 
