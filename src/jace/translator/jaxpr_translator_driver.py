@@ -630,60 +630,83 @@ class JaxprTranslationDriver:
         is_scalar: bool = shape == ()
         dtype = self.translate_dtype(arg.aval.dtype)
 
-        if (alt_name is not None) and (not re.fullmatch("[a-zA-Z_][a-zA-Z0-9_]*", alt_name)):
-            raise ValueError(f"The passed name 'alt_name' '{alt_name}' is invalid.")
-        if force_jax_name:
-            if alt_name is not None:
-                raise ValueError("Specified 'force_jax_name' but passed  'alt_name'.")
-            alt_name = jutil.get_jax_var_name(arg)
+        if alt_name is not None:
+            assert isinstance(alt_name, str)
+            find_new_name = False  # If a name was given, then use it no matter what.
+            if len(alt_name) == 0:
+                raise ValueError("Passed an empty 'alt_name'.")
+            if alt_name in self._forbidden_names:
+                raise ValueError("'alt_name' is a forbidden name.")
+            if not re.fullmatch("[a-zA-Z_][a-zA-Z0-9_]*", alt_name):
+                raise ValueError(f"The passed name 'alt_name' '{alt_name}' is invalid.")
+            if force_jax_name:
+                raise ValueError("Specified 'force_jax_name' but passed 'alt_name'.")
             if name_prefix is not None:
-                assert isinstance(name_prefix, str)
-                alt_name = name_prefix + alt_name
+                raise ValueError(
+                    f"Specified 'name_prefix' ('{name_prefix}') but passed '{alt_name}' as 'alt_name'."
+                )
+            if alt_name in self._sdfg.arrays:
+                raise ValueError(f"Variable '{alt_name}' already exists.")
         if name_prefix is not None:
             assert isinstance(name_prefix, str)
-            if alt_name is not None:
-                raise ValueError("Specified 'name_prefix' and 'alt_name' which is not possible.")
-        if (symb_strides is None) and (strides is None):
-            symb_strides = False if (len(shape) <= 1) else False
+            if len(name_prefix) == 0:
+                raise ValueError("Specified an empty 'name_prefix'.")
         if as_view and (not as_transient):
             raise ValueError("You tried to create a global view, which is not allowed.")
 
-        if isinstance(arg, jcore.Var):
+        if (symb_strides is None) and (strides is None):
+            def_symb_stride = False  # default value for symbolic strides
+            symb_strides = False if (len(shape) <= 1) else def_symb_stride  # Keep for the future
+        elif (symb_strides is not None) and (strides is not None):
+            raise ValueError("Specified 'symb_strides' and 'stride at the same time.")
+        elif strides is not None:
+            if len(strides) != len(shape):
+                raise ValueError(
+                    f"'strides' has length {len(strides)}, but array rank is {len(shape)}."
+                )
+        else:
+            assert isinstance(symb_strides, bool)
+
+        # SDFG variable name
+        if force_jax_name:
+            alt_name = jutil.get_jax_var_name(arg)
+            if name_prefix is not None:
+                alt_name = name_prefix + alt_name
+
+        elif alt_name is not None:
+            prop_name = alt_name  # Just for completion: will be ignored later
+
+        elif isinstance(arg, jcore.Var):
             prop_name = jutil.get_jax_var_name(arg)
-            if (alt_name is None) and prop_name.startswith("__"):
+            if prop_name.startswith("__"):
                 raise ValueError(
                     f"You tried to create the variable '{prop_name}' which"
                     "starts with two underscores, use 'alt_name' for that."
                 )
-            if isinstance(name_prefix, str):
+            if name_prefix is not None:
                 prop_name = name_prefix + prop_name
+
         elif isinstance(arg, jcore.Literal):
             if not allow_literals:
                 raise NotImplementedError("Jax Literals are not supported.")
             if alt_name is None:
                 raise ValueError(f"Passed literal '{arg}', but not specified a name to use.")
+
         else:
             raise TypeError(f"Does not know how to handle '{type(arg).__name__}'.")
 
         if alt_name is None:
             # If we are the root translator, then we will use `prop_name` directly;
-            #  if not we will append the revision of `self` to the name.
+            #  otherwise we will append the revision of `self` to the name.
             arg_name = prop_name + ("" if self.is_head_translator() else f"_rev_idx{self._rev_idx}")
         else:
             arg_name = str(alt_name)
-            find_new_name = False  # If a name was given, then use it no matter what.
-            if arg_name in self._forbidden_names:
-                raise ValueError(f"You used 'alt_name' to create the forbidden name '{alt_name}'.")
-            if arg_name in self._sdfg.arrays:
-                raise ValueError(
-                    f"Tried to create a variable with name '{arg_name}'"
-                    " explicitly, but it is already known."
-                )
+
         if find_new_name is None:
+            # Determine if we should look for a new name or not, if nothing was specified
             find_new_name = (arg_name in self._forbidden_names) or (
                 arg_name in self._reserved_names
             )
-
         if find_new_name:
             # We have to find a new name.
             name_tmpl = "_jax_variable__" + arg_name + "__{}"
@@ -700,11 +723,11 @@ class JaxprTranslationDriver:
             else:
                 raise ValueError(f"Failed to find a replacement name for '{arg_name}'")
             del iCounter, _arg_name
-        if arg_name in self._forbidden_names:
-            raise ValueError(f"Can not create variable '{arg_name}', name is forbidden.")
-        if arg_name in self._sdfg.arrays:
-            raise ValueError(f"Can not create variable '{arg_name}', variable is already created.")
-        if not re.fullmatch("[a-zA-Z_][a-zA-Z0-9_]*", arg_name):
+        elif arg_name in self._forbidden_names:
+            raise ValueError(f"Can't create variable '{arg_name}', name is forbidden.")
+        elif arg_name in self._sdfg.arrays:
+            raise ValueError(f"Can't create variable '{arg_name}', variable is already created.")
+        elif not re.fullmatch("[a-zA-Z_][a-zA-Z0-9_]*", arg_name):
             raise ValueError(f"The requested variable name '{arg_name}' is invalid.")
 
         # Promotion of scalar to array.
@@ -714,15 +737,10 @@ class JaxprTranslationDriver:
             strides = None
             is_scalar = False
 
+        # Set the stride if we have to change.
         if strides is not None:
-            if symb_strides:
-                raise ValueError("Specified 'symb_strides' and 'stride at the same time.")
-            if len(strides) != len(shape):
-                raise ValueError(
-                    f"'strides' was '{strides}' it had length {len(strides)},"
-                    f" but the array has rank {len(shape)}."
-                )
             strides = tuple(strides)
+            assert len(strides) == len(shape)
 
         elif (symb_strides is True) and (not is_scalar):
             strides = [
