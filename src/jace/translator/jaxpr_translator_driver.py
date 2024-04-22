@@ -20,7 +20,6 @@ from jace import translator as jtrans
 from jace.translator import sub_translators as jtsubt, util as jtrutil
 from jace.util import jax as jutil
 
-
 class JaxprTranslationDriver:
     """Internal driver class for creating an SDFG equivalent of a `Jaxpr` instance.
 
