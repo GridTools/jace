@@ -460,36 +460,6 @@ class JaxprTranslationDriver:
         """
         return self._rev_idx
 
-    @staticmethod
-    def translate_dtype(dtype: Any) -> dace.typeclass:
-        """Turns a Jax datatype into a DaCe datatype.
-
-        Todo:
-            Improve.
-        """
-        nameof_dtype = str(dtype)
-
-        # Make some basic checks if the datatype is okay
-        if (not jax.config.read("jax_enable_x64")) and (nameof_dtype == "float64"):
-            raise ValueError("Found a 'float64' type but 'x64' support is disabled.")
-        if nameof_dtype.startswith("complex"):
-            raise NotImplementedError("Support for complecx computation is not implemented.")
-
-        # Now extract the datatype from dace, this is extremely ugly.
-        if not hasattr(dace.dtypes, nameof_dtype):
-            raise TypeError(
-                f"Could not find the type '{nameof_dtype}' ({type(dtype).__name__}) in 'dace'."
-            )
-        dcd_type = getattr(dace.dtypes, nameof_dtype)
-
-        if not isinstance(dcd_type, dace.dtypes.typeclass):
-            raise TypeError(
-                f"Expected that '{nameof_dtype}' would map to a 'dace.typeclass'"
-                f"but it mapped to a '{type(dcd_type).__name__}'."
-            )
-
-        return dcd_type
-
     def add_jax_name_mapping(
         self,
         jax_var: str | jcore.Atom,
@@ -646,7 +616,7 @@ class JaxprTranslationDriver:
             if dtype is not None:
                 raise ValueError(f"Specified 'arg', but also passed a dtype: '{dtype}'")
             shape: Sequence[int] = arg.aval.shape  # Shape of the array
-            dtype = self.translate_dtype(arg.aval.dtype)
+            dtype = jutil.translate_dtype(arg.aval.dtype)
         offset = None  # i.e. no offset
         storage: dace.StorageType = dace.StorageType.Default  # Set at later stages (optimization)
         is_scalar: bool = shape == ()
