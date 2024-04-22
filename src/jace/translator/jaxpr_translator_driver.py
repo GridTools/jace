@@ -556,6 +556,8 @@ class JaxprTranslationDriver:
         force_array: bool = False,
         as_view: bool = False,
         strides: Sequence[int | dace.symbol | str] | None = None,
+        shape: Sequence[int | dace.symbol | str] | None = None,
+        dtype: dace.typeclass | None = None,
         symb_strides: bool | None = None,
         find_new_name: bool | None = None,
         allow_literals: bool = False,
@@ -603,6 +605,8 @@ class JaxprTranslationDriver:
             as_view:            Creates a view instead of an array, if it is a scalar
                                     it is silently ignored.
             strides:            Instead of the default strides use these values.
+            shape:              Use this shape; only in conjunction with `dtype`, `alt_name` and `arg is None`.
+            dtype:              Use this dtype; only in conjunction with `shape`, `alt_name` and `arg is None`.
             symb_strides:       Create symbols and use them for fully symbolic strides.
             find_new_name:      The translator will try to find a new name if the designated
                                     is already occupied. This does not work if the name
@@ -624,11 +628,28 @@ class JaxprTranslationDriver:
                 `jutil.get_jax_var_name(arg)` as `alt_name`.
         """
         assert all(x is not None for x in (self._sdfg, self._jax_name_map))
-        shape: Sequence[int] = arg.aval.shape  # Shape of the array
+
+        if arg is None:
+            if not isinstance(dtype, dace.typeclass):
+                raise ValueError(
+                    f"'arg' was 'None' but 'dtype' was not a type, instead '{type(dtype).__name__}'."
+                )
+            if not isinstance(shape, Sequence):
+                raise ValueError(f"'arg' was 'None' but 'shape' was invalid, got '{shape}'.")
+            if not all(isinstance(x, (int | dace.symbol | str)) for x in shape):
+                raise ValueError(f"'arg' was 'None' but 'shape' was invalid, got '{shape}'.")
+            if alt_name is None:
+                raise ValueError("'arg' was 'None' but 'alt_name' was not specified.")
+        else:
+            if shape is not None:
+                raise ValueError(f"Specified 'arg', but also passed a shape: '{shape}'")
+            if dtype is not None:
+                raise ValueError(f"Specified 'arg', but also passed a dtype: '{dtype}'")
+            shape: Sequence[int] = arg.aval.shape  # Shape of the array
+            dtype = self.translate_dtype(arg.aval.dtype)
         offset = None  # i.e. no offset
         storage: dace.StorageType = dace.StorageType.Default  # Set at later stages (optimization)
         is_scalar: bool = shape == ()
-        dtype = self.translate_dtype(arg.aval.dtype)
 
         if alt_name is not None:
             assert isinstance(alt_name, str)
