@@ -96,15 +96,29 @@ class ALUTranslator(jtranslator.JaCeSubTranslatorInterface):
         """
         is_scalar: bool = len(eqn.outvars[0].aval.shape) == 0
         prim_name: str = eqn.primitive.name
-        if prim_name in self._unary_ops:
-            assert len(eqn.invars) == 1
-        elif prim_name in self._binary_ops:
-            assert len(eqn.invars) == 2
-        elif out_var_names[0] is None or (not is_scalar) and all(x is None for x in in_var_names):
+        if len(eqn.invars) == 1:
+            if prim_name not in self._unary_ops:
+                return False
+        elif len(eqn.invars) == 2:
+            if prim_name not in self._binary_ops:
+                return False
+        else:
             return False
-        if all(x is None for x in in_var_names):
+        if out_var_names[0] is None:
+            raise RuntimeError(f"Encountered a litteral output '{eqn}'.")
+        if len(eqn.outvars) != 1:
+            return False
+        if (not is_scalar) and all(x is None for x in in_var_names):
+            # Only literals as input are only allowed if we are scalar.
             return False
         if len(eqn.effects) != 0:
+            return False
+        if not all(
+            invar.aval.shape == ()
+            for invar, inname in zip(eqn.invars, in_var_names)
+            if inname is None
+        ):
+            # All literals must be scalars
             return False
         return True
 
@@ -131,30 +145,11 @@ class ALUTranslator(jtranslator.JaCeSubTranslatorInterface):
             eqn_state:      State into which the primitive's SDFG representation is constructed.
         """
 
-        # All this checks are done to capture corner cases that Jax might do but are not implemented.
-        #  If you find out that Jax will never create something, then remove it.
-        if not all(
-            invar.aval.shape == ()
-            for invar, x in zip(eqn.invars, in_var_names, strict=False)
-            if x is None
-        ):
-            raise NotImplementedError("Can not handle Literals that are not scalars.")
-        if in_var_names[0] is None:
-            raise NotImplementedError(
-                "Literal can only not be on the right hand side of the operation."
-            )
-        if not any(invar.aval.shape == eqn.outvars[0].aval.shape for invar in eqn.invars):
-            raise NotImplementedError("At least input must have the same shape as the output.")
-        if len(eqn.outvars) != 1:
-            raise NotImplementedError(f"Can only handle one output (Eq: '{eqn}'.")
-
         # Determine what kind of input we got and how we should proceed.
         is_scalar = len(eqn.outvars[0].aval.shape) == 0
         inp_scalars = [len(Inp.aval.shape) == 0 for i, Inp in enumerate(eqn.invars)]
         has_scalars_as_inputs = any(inp_scalars)
-        only_scalars_as_inputs = all(inp_scalars)
         has_some_literals = any(x is None for x in in_var_names)
-        only_literals_as_inputs = all(x is None for x in in_var_names)
         inps_same_shape = all(
             eqn.invars[0].aval.shape == eqn.invars[i].aval.shape for i in range(1, len(eqn.invars))
         )
@@ -164,22 +159,12 @@ class ALUTranslator(jtranslator.JaCeSubTranslatorInterface):
         dims_to_bcastl: list[int] = []
         dims_to_bcastr: list[int] = []
 
-        # Determine if and if yes how we have to broadcast.
-        if is_scalar:
-            # The output is a scalar, in which case we must have only scalar input as well.
-            #  Furthermore, we can have the situation that only Literals are the input.
-            assert (not is_scalar) or only_scalars_as_inputs
-            assert (not is_scalar) or only_literals_as_inputs
-
-        elif only_literals_as_inputs:
-            raise NotImplementedError("Only literals an input is only allowed for the scalar case.")
-
-        elif inps_same_shape:
+        # Determine if and how we have to broadcast.
+        if inps_same_shape or is_scalar:
             pass
 
         elif has_some_literals or has_scalars_as_inputs:
-            # This is essentially array plus scalar, but in two possibilities.
-            #  We either have a scalar variable or we have a scalar literal.
+            # This is essentially an array plus a scalar, that is eitehr a literal or a variable.
             assert (not has_some_literals) or all(
                 invar.aval.shape == eqn.outvars[0].aval.shape
                 for (invar, x) in zip(eqn.invars, in_var_names, strict=False)
@@ -191,92 +176,64 @@ class ALUTranslator(jtranslator.JaCeSubTranslatorInterface):
                 if x is not None
             )
 
-        elif len(in_var_names) != 2:
-            raise ValueError("Can only do broadcasting if there are two operands.")
-
         else:
             # This is the general broadcasting case
             #  We assume that both inputs and the output have the same rank but different sizes in each dimension.
             #  It seems that Jax ensures this.
             #  We further assume that if the size in a dimension differs then one must have size 1.
             #  This is the size we broadcast over, i.e. conceptually replicated.
-            out_shp = tuple(eqn.outvars[0].aval.shape)  # Shape of the output.
+            out_shps = tuple(eqn.outvars[0].aval.shape)  # Shape of the output
             inp_shpl = tuple(eqn.invars[0].aval.shape)  # Shape of the left/first input
-            inp_shpr = tuple(
-                eqn.invars[1].aval.shape
-            )  # Shape of the right/second input; this must be "expanded"
+            inp_shpr = tuple(eqn.invars[1].aval.shape)  # Shape of the right/second input
 
-            if not ((len(inp_shpl) == len(inp_shpr)) and (len(out_shp) == len(inp_shpr))):
+            if not ((len(inp_shpl) == len(inp_shpr)) and (len(out_shps) == len(inp_shpr))):
                 raise NotImplementedError("Can not broadcast over different ranks.")
 
-            for dim in reversed(range(len(out_shp))):
-                shp_lft = inp_shpl[dim]
-                shp_rgt = inp_shpr[dim]
-
+            for dim, (shp_lft, shp_rgt, out_shp) in enumerate(zip(inp_shpl, inp_shpr, out_shps)):
                 if shp_lft == shp_rgt:
-                    assert out_shp[dim] == shp_lft
+                    assert out_shp == shp_lft
                 elif shp_lft == 1:
-                    assert shp_rgt == out_shp[dim]
+                    assert shp_rgt == out_shp
                     dims_to_bcastl.append(dim)
                 elif shp_rgt == 1:
-                    assert shp_lft == out_shp[dim]
+                    assert shp_lft == out_shp
                     dims_to_bcastr.append(dim)
                 else:
                     raise ValueError(f"Invalid shapes in dimension {dim} for broadcasting.")
 
-        # Now we create the Tasklet into which we solve the equation.
+        # Now we create the Tasklet in which the calculation is performed.
         tskl_code: str = self._writeTaskletCode(in_var_names, eqn)
         tskl_name: str = eqn.primitive.name
         tskl_map_ranges: list[tuple[str, str]] = [
             (f"__i{dim}", f"0:{N}") for dim, N in enumerate(eqn.outvars[0].aval.shape)
         ]
-        tskl_outputs: list[tuple[str, dace.Memlet]] = []
+        tskl_outputs: tuple[str, dace.Memlet] = None
         tskl_inputs: list[tuple[str, dace.Memlet] | tuple[None, None]] = []
 
         # Generate the Memlets for the input.
-        for i, dims_to_bcast in zip(
-            range(len(eqn.invars)), [dims_to_bcastl, dims_to_bcastr], strict=False
-        ):
-            if in_var_names[i] is None:
-                # Literal: No input needed.
+        for i, dims_to_bcast in enumerate([dims_to_bcastl, dims_to_bcastr]):
+            if in_var_names[i] is None:  # Literal: No input needed.
                 tskl_inputs.append((None, None))
                 continue
-            if inp_scalars[i]:
-                # We have a scalar argument.
-                i_memlet = dace.Memlet.from_array(
-                    in_var_names[i], driver.get_sdfg().arrays[in_var_names[i]]
-                )
-            else:
-                # We have an array argument.
+            if inp_scalars[i]:  # Scalar
+                assert len(dims_to_bcast) == 0
+                i_memlet = dace.Memlet.simple(in_var_names[i], "0")
+            else:  # Array: We may have to broadcast
                 inputs_: list[str] = []
                 for dim, (map_var, _) in enumerate(tskl_map_ranges):
                     if dim in dims_to_bcast:
                         inputs_.append("0")
                     else:
-                        inputs_.append(str(map_var))
+                        inputs_.append(map_var)
                 i_memlet = dace.Memlet.simple(in_var_names[i], ", ".join(inputs_))
                 del inputs_
             tskl_inputs.append((f"__in{i}", i_memlet))
 
-        # Now generate the Memlets for the outputs
-        if is_scalar:
-            tskl_outputs.append(
-                (
-                    f"__out{i}",
-                    dace.Memlet.from_array(
-                        out_var_names[0], driver.get_sdfg().arrays[out_var_names[i]]
-                    ),
-                )
-            )
-        else:
-            tskl_outputs.append(
-                (
-                    f"__out{i}",
-                    dace.Memlet.simple(
-                        out_var_names[0], ", ".join([X[0] for X in tskl_map_ranges])
-                    ),
-                )
-            )
+        # Now generate the Memlets for the output
+        tskl_output = (
+            "__out0",
+            dace.Memlet.simple(out_var_names[0], ", ".join([X[0] for X in tskl_map_ranges])),
+        )
 
         if is_scalar:
             tskl_tasklet = eqn_state.add_tasklet(
@@ -285,9 +242,9 @@ class ALUTranslator(jtranslator.JaCeSubTranslatorInterface):
                 jtutil.list_to_dict(tskl_outputs).keys(),
                 tskl_code,
             )
-            for in_var, (in_connector, in_memlet) in filter(
-                lambda X: X[0] is not None, zip(in_var_names, tskl_inputs, strict=False)
-            ):
+            for in_var, (in_connector, in_memlet) in zip(in_var_names, tskl_inputs, strict=False):
+                if in_var is None:  # So access node for literal
+                    continue
                 eqn_state.add_edge(
                     eqn_state.add_read(in_var),
                     None,
@@ -295,16 +252,13 @@ class ALUTranslator(jtranslator.JaCeSubTranslatorInterface):
                     in_connector,
                     in_memlet,
                 )
-            for out_var, (out_connector, out_memlet) in zip(
-                out_var_names, tskl_outputs, strict=False
-            ):
-                eqn_state.add_edge(
-                    tskl_tasklet,
-                    out_connector,
-                    eqn_state.add_write(out_var),
-                    None,
-                    out_memlet,
-                )
+            eqn_state.add_edge(
+                tskl_tasklet,
+                tskl_output[0],
+                eqn_state.add_write(out_var_names[0]),
+                None,
+                tskl_output[1],
+            )
         else:
             eqn_state.add_mapped_tasklet(
                 name=tskl_name,
