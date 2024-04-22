@@ -105,7 +105,7 @@ class ALUTranslator(jtranslator.JaCeSubTranslatorInterface):
         else:
             return False
         if out_var_names[0] is None:
-            raise RuntimeError(f"Encountered a litteral output '{eqn}'.")
+            raise RuntimeError(f"Encountered a literal output '{eqn}'.")
         if len(eqn.outvars) != 1:
             return False
         if (not is_scalar) and all(x is None for x in in_var_names):
