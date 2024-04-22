@@ -9,12 +9,15 @@
 
 from __future__ import annotations
 
-from .jax import get_jax_var_name, translate_dtype
+from .jax import JaCeVar, get_jax_var_dtype, get_jax_var_name, get_jax_var_shape, translate_dtype
 from .util import ensure_iterability
 
 
 __all__ = [
     "get_jax_var_name",
+    "get_jax_var_shape",
+    "get_jax_var_dtype",
     "ensure_iterability",
     "translate_dtype",
+    "JaCeVar",
 ]

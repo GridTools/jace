@@ -13,14 +13,33 @@ in a consistent and stable way.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from typing import Any
+
+import dace
 import jax
 import jax.core as jcore
 
-import dace
+
+@dataclass(init=True, repr=True, eq=True, frozen=True, slots=True)
+class JaCeVar:
+    """Substitute class for Jax' `Var` instance.
+
+    This class is similar to a `jax.core.Var` class, but much simpler.
+    It is only a container for a name, shape and a datatype.
+    All extractor functions `get_jax_var{name, shape, dtype}()` will accept it,
+    as well as multiple functions of the driver.
+
+    Notes:
+        Main intention is to test functionality.
+    """
+
+    name: str
+    shape: tuple[int | dace.symbol | str]
+    dtype: dace.typeclass
 
 
-
-def get_jax_var_name(jax_var: jcore.Atom | str) -> str:
+def get_jax_var_name(jax_var: jcore.Atom | JaCeVar | str) -> str:
     """Returns the name of the Jax variable as a string.
 
     Args:
@@ -31,6 +50,8 @@ def get_jax_var_name(jax_var: jcore.Atom | str) -> str:
     """
     if isinstance(jax_var, jcore.DropVar):
         return "_"
+    if isinstance(jax_var, JaCeVar):
+        return jax_var.name
     if isinstance(jax_var, jcore.Atom):
         jax_name = str(jax_var)  # This only works up to some version
     elif isinstance(jax_var, str):
@@ -48,11 +69,33 @@ def get_jax_var_name(jax_var: jcore.Atom | str) -> str:
     return jax_var
 
 
-def translate_dtype(dtype: Any) -> dace.typeclass:
-    """Turns a Jax datatype into a DaCe datatype.
-    """
+def get_jax_var_shape(jax_var: jcore.Atom) -> tuple[int, ...]:
+    """Returns the shape of a Jax variable.
 
-    if(isinstance(dtype, dace.typeclass)):
+    Args:
+        jax_var:     The variable to process
+    """
+    if isinstance(jax_var, jcore.Atom):
+        return jax_var.aval.shape
+    if isinstance(jax_var, JaCeVar):
+        assert isinstance(jax_var.shape, tuple)
+        return jax_var.shape
+    raise TypeError(f"'get_jax_var_shape()` is not implemented for '{type(jax_var)}'.")
+
+
+def get_jax_var_dtype(jax_var: jcore.Atom) -> dace.typeclass:
+    """Returns the DaCe equivalent of `jax_var`s datatype."""
+    if isinstance(jax_var, jcore.Atom):
+        return translate_dtype(jax_var.aval.dtype)
+    if isinstance(jax_var, JaCeVar):
+        return translate_dtype(jax_var.dtype)
+    raise TypeError(f"'get_jax_var_dtype()` is not implemented for '{type(jax_var)}'.")
+
+
+def translate_dtype(dtype: Any) -> dace.typeclass:
+    """Turns a Jax datatype into a DaCe datatype."""
+
+    if isinstance(dtype, dace.typeclass):
         return dtype
 
     # Make some basic checks if the datatype is okay
@@ -72,5 +115,3 @@ def translate_dtype(dtype: Any) -> dace.typeclass:
             f"'{name_of_dtype}' does not map to a 'dace.typeclass' but to a '{type(dcd_type).__name__}'."
         )
     return dcd_type
-
-

@@ -327,7 +327,7 @@ class JaxprTranslationDriver:
 
     def get_array(
         self,
-        name: str | jcore.Atom,
+        name: str | jcore.Atom | jutil.JaCeVar,
     ) -> ddata.Data:
         """Returns the SDFG `Data` object `name` referees to.
 
@@ -338,7 +338,7 @@ class JaxprTranslationDriver:
 
         if isinstance(name, str):
             pass
-        elif isinstance(name, jcore.Atom):
+        elif isinstance(name, (jcore.Atom, jutil.JaCeVar)):
             name = self.map_jax_var_to_sdfg(name)
         else:
             raise TypeError(f"Does not know how to handle '{type(name).__name__}'.")
@@ -350,19 +350,19 @@ class JaxprTranslationDriver:
     @overload
     def map_jax_var_to_sdfg(
         self,
-        jax_var: str | jcore.Atom,
+        jax_var: str | jcore.Atom | jutil.JaCeVar,
     ) -> str: ...
 
     @overload
     def map_jax_var_to_sdfg(
         self,
-        jax_var: str | jcore.Atom,
+        jax_var: str | jcore.Atom | jutil.JaCeVar,
         allow_fail: bool,
     ) -> str | None: ...
 
     def map_jax_var_to_sdfg(
         self,
-        jax_var: str | jcore.Atom,
+        jax_var: str | jcore.Atom | jutil.JaCeVar,
         allow_fail: bool = False,
     ) -> str | None:
         """Returns the name of the SDFG variable that the Jax variable `jax_var` is referring to.
@@ -372,7 +372,7 @@ class JaxprTranslationDriver:
             allow_fail:     If mapping is not known return `None` instead of raise `KeyError`.
         """
         assert self._jax_name_map is not None
-        assert isinstance(jax_var, (jcore.Atom, str))
+        assert isinstance(jax_var, (jcore.Atom, str, jutil.JaCeVar))
 
         jax_var = jutil.get_jax_var_name(jax_var)
         if jax_var not in self._jax_name_map:
@@ -462,7 +462,7 @@ class JaxprTranslationDriver:
 
     def add_jax_name_mapping(
         self,
-        jax_var: str | jcore.Atom,
+        jax_var: str | jcore.Atom | jutil.JaCeVar,
         sdfg_name: str,
     ) -> JaxprTranslationDriver:
         """Creates a mapping between `jax_var` to `sdfg_name`.
@@ -477,7 +477,7 @@ class JaxprTranslationDriver:
             sdfg_name:   The name of the corresponding SDFG variable.
         """
         assert self._jax_name_map is not None
-        assert isinstance(jax_var, (jcore.Atom, str))
+        assert isinstance(jax_var, (jcore.Atom, str, jutil.JaCeVar))
         assert isinstance(sdfg_name, str)
 
         jax_name = jutil.get_jax_var_name(jax_var)
@@ -518,7 +518,7 @@ class JaxprTranslationDriver:
 
     def add_array(
         self,
-        arg: jcore.Atom,
+        arg: jcore.Atom | jutil.JaCeVar,
         *,
         as_transient: bool = True,
         alt_name: str | None = None,
@@ -526,8 +526,6 @@ class JaxprTranslationDriver:
         force_array: bool = False,
         as_view: bool = False,
         strides: Sequence[int | dace.symbol | str] | None = None,
-        shape: Sequence[int | dace.symbol | str] | None = None,
-        dtype: dace.typeclass | None = None,
         symb_strides: bool | None = None,
         find_new_name: bool | None = None,
         allow_literals: bool = False,
@@ -575,8 +573,6 @@ class JaxprTranslationDriver:
             as_view:            Creates a view instead of an array, if it is a scalar
                                     it is silently ignored.
             strides:            Instead of the default strides use these values.
-            shape:              Use this shape; only in conjunction with `dtype`, `alt_name` and `arg is None`.
-            dtype:              Use this dtype; only in conjunction with `shape`, `alt_name` and `arg is None`.
             symb_strides:       Create symbols and use them for fully symbolic strides.
             find_new_name:      The translator will try to find a new name if the designated
                                     is already occupied. This does not work if the name
@@ -596,27 +592,13 @@ class JaxprTranslationDriver:
             Specifying `alt_name` implies `find_new_name=False`.
             The effect of specifying `force_jax_name` is as passing
                 `jutil.get_jax_var_name(arg)` as `alt_name`.
+            If you need to create a special array, you can use `jace.util.JaCeVar`
+                to create a pseudo Jax variable.
         """
-        assert all(x is not None for x in (self._sdfg, self._jax_name_map))
+        assert self.is_allocated()
 
-        if arg is None:
-            if not isinstance(dtype, dace.typeclass):
-                raise ValueError(
-                    f"'arg' was 'None' but 'dtype' was not a type, instead '{type(dtype).__name__}'."
-                )
-            if not isinstance(shape, Sequence):
-                raise ValueError(f"'arg' was 'None' but 'shape' was invalid, got '{shape}'.")
-            if not all(isinstance(x, (int | dace.symbol | str)) for x in shape):
-                raise ValueError(f"'arg' was 'None' but 'shape' was invalid, got '{shape}'.")
-            if alt_name is None:
-                raise ValueError("'arg' was 'None' but 'alt_name' was not specified.")
-        else:
-            if shape is not None:
-                raise ValueError(f"Specified 'arg', but also passed a shape: '{shape}'")
-            if dtype is not None:
-                raise ValueError(f"Specified 'arg', but also passed a dtype: '{dtype}'")
-            shape: Sequence[int] = arg.aval.shape  # Shape of the array
-            dtype = jutil.translate_dtype(arg.aval.dtype)
+        shape: Sequence[int] = jutil.get_jax_var_shape(arg)
+        dtype = jutil.get_jax_var_dtype(arg)
         offset = None  # i.e. no offset
         storage: dace.StorageType = dace.StorageType.Default  # Set at later stages (optimization)
         is_scalar: bool = shape == ()
@@ -667,7 +649,7 @@ class JaxprTranslationDriver:
         elif alt_name is not None:
             prop_name = alt_name  # Just for completion: will be ignored later
 
-        elif isinstance(arg, jcore.Var):
+        elif isinstance(arg, (jcore.Var, jutil.JaCeVar)):
             prop_name = jutil.get_jax_var_name(arg)
             if prop_name.startswith("__"):
                 raise ValueError(
@@ -677,7 +659,7 @@ class JaxprTranslationDriver:
             if name_prefix is not None:
                 prop_name = name_prefix + prop_name
 
-        elif isinstance(arg, jcore.Literal):
+        elif isinstance(arg, jcore.Literal):  # type: ignore[unreachable]
             if not allow_literals:
                 raise NotImplementedError("Jax Literals are not supported.")
             if alt_name is None:
@@ -770,7 +752,7 @@ class JaxprTranslationDriver:
 
     def create_jax_var_list(
         self,
-        jax_var_list: Sequence[jcore.Atom],
+        jax_var_list: Sequence[jcore.Atom | jutil.JaCeVar],
         prevent_creation: bool = False,
         only_creation: bool = False,
         **kwargs: Any,
@@ -803,7 +785,7 @@ class JaxprTranslationDriver:
                 if only_creation:
                     raise ValueError(f"Requested 'only_creation', but '{jax_var}' is a 'Literal'.")
                 ret_list.append(None)
-            elif isinstance(jax_var, jcore.jax_var):
+            elif isinstance(jax_var, (jcore.Var, jutil.JaCeVar)):
                 mapped_sdfg_name: str | None = self.map_jax_var_to_sdfg(jax_var, allow_fail=True)
                 if (mapped_sdfg_name is None) and prevent_creation:
                     raise ValueError(f"prevent_creation' given but have to create '{jax_var}'.")
