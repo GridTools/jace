@@ -8,7 +8,7 @@
 from __future__ import annotations
 
 from collections.abc import Collection, Sequence
-from typing import TYPE_CHECKING, Any, Final, final
+from typing import TYPE_CHECKING, Any
 
 import dace
 from jax import core as jcore
@@ -36,39 +36,12 @@ class JaCeSubTranslatorInterface:
     In the end this implements the delegation pattern.
 
     A subtranslator uses its `get_handled_primitives()` function to indicate
-    for which Jax primitives it want to register. It is important that a
-    subtranslator can register for as many primitive it wants. At the same
-    time, it is possible that multiple subtranslators have registered for a
-    single primitive.
-
-    If multiple subtranslator have registered for the same primitive they
-    will be ordered by driver. There are two ways how a subtranslator can
-    influence this order. The first one is by implementing `get_priority()`,
-    the driver will then put them in ascending order.
-    I.e. the lower its priority the earlier a subtranslator is checked.
-    However, if a subtranslator returns the special value
-    `JaCeSubTranslatorInterface.DEFAULT_PRIORITY` it will be always put at the
-    end, in unspecific order if multiple translator are involved.
-
-    The second possibility is to override the '__lt__()' function,
-    and establish a strict weak order. If a subtranslator overrides this
-    function it should also override `get_priority()` to return `NotImplemented`.
-
-    To decide which subtranslator should be used for a specific equation
-    the driver will use their 'can_translate_jaxeqn()' function.
-    The first subtranslator that returns 'True' will then be used.
-
-    Todo:
-        Also come up with a way how to avoid that instances are allowed to access
-            some private members of the driver; Possibly by composition.
-        Come up with a better way of ordering; maybe introduce fixed priority level.
-            And then allows to sort them according to `__lt__()` within the level.
+    for which Jax primitives it want to register. It is important that there
+    is no limits on the number of primitives a subtranslator can register itself.
+    However, only one subtranslator can be registered for a primitive.
     """
 
     __slots__ = ()
-
-    # Default value for the priority of primitive translators.
-    DEFAULT_PRIORITY: Final = int("1" * 64, base=2)
 
     def __init__(
         self,
@@ -84,46 +57,13 @@ class JaCeSubTranslatorInterface:
         """Returns the names of all Jax primitives that `self` is able to handle.
 
         There is no limit on the number of primitives for which a subtranslator
-        can register. It is possible that several translators can be registered
-        for the same name.
-
-        See Also:
-            `self.can_translate_jaxeqn()` and `self.get_priority()`.
+        can register.
 
         Notes:
             In case a string is returned it is interpreted as 1 element collection.
         """
         raise NotImplementedError(
             "Class '{type(self).__name__}' does not implement 'get_handled_primitives()'."
-        )
-
-    def can_translate_jaxeqn(
-        self,
-        driver: JaxprTranslationDriver,
-        in_var_names: Sequence[str | None],
-        out_var_names: Sequence[str],
-        eqn: jcore.JaxprEqn,
-    ) -> bool:
-        """Tests if `self` is able to translate the Jax primitive passed as `eqn`.
-
-        This function is used by the driver to determine which of the subtranslators,
-        that have registered for a certain type of primitive, should be used.
-        For a more detailed description of the arguments see
-        `self.translate_jaxeqn()` function.
-
-        Args:
-            driver:         The driver object of the translation.
-            in_var_names:   Names of the SDFG variables used as inputs for the primitive.
-            out_var_names:  Names of the SDFG variables used as outputs for the primitive.
-            eqn:            The `jcore.JaxprEqn` instance that is currently being handled.
-
-        Notes:
-            In case there is only one subtranslator registered for a certain primitive,
-                it is unspecific if this function will be called at all `self.translate_jaxeqn()`.
-            This function will never be called for a primitive for which it has not registered itself.
-        """
-        raise NotImplementedError(
-            "Class '{type(self).__name__}' does not implement 'can_translate_jaxeqn()'."
         )
 
     def translate_jaxeqn(
@@ -152,7 +92,7 @@ class JaCeSubTranslatorInterface:
             `translator.get_terminal_sdfg_state() is eqn_state` holds.
 
         Then the subtranslator is called. Usually a subtranslator should
-        construct the dataflow graph inside it. It is allowed that the
+        construct the dataflow graph inside `eqn_state`. It is allowed that the
         subtranslators creates more states if needed, but this state machine
         has to have a single terminal state, which must be returned
         and reachable from `eqn_state`.
@@ -185,55 +125,6 @@ class JaCeSubTranslatorInterface:
             "Class '{type(self).__name__}' does not implement 'translate_jaxeqn()'."
         )
 
-    def get_priority(self) -> int:
-        """Returns the priority of this translator.
-
-        The value returned by this function is used by the driver to order the
-        subtranslators that have registered for the same primitive.
-        The _smaller_ the value the earlier it is checked.
-
-        See Also:
-            `self.can_translate_jaxeqn()` and `self.get_handled_primitives()`.
-
-        Notes:
-            By default the function returns `self.DEFAULT_PRIORITY`, which is
-                handled specially, i.e. it is put at the end.
-            If a subtranslator instead overrides `__lt__()` this function
-                should return `NotImplemented`.
-        """
-        return self.DEFAULT_PRIORITY
-
-    def has_default_priority(self) -> bool:
-        """Checks if `self` has default priority.
-
-        Notes:
-            It is allowed, but not advised to override this function.
-                However, it has to be consistent with `self.get_priority()`.
-        """
-        try:
-            x = self.get_priority()
-        except NotImplementedError:
-            return False
-        if x is NotImplemented:
-            return False
-        return x == self.DEFAULT_PRIORITY
-
-    def __lt__(
-        self,
-        other: JaCeSubTranslatorInterface,
-    ) -> bool:
-        """Tests if `self` should be checked before `other` in the selection process.
-
-        As outlined in the class description this is the second possibility to
-        influence the order of the subtranslator. This function should return
-        `True` if `self` should be checked for applicability _before_ `other`.
-
-        Notes:
-            If this function is overridden `get_priority()` should return `NotImplemented`.
-            This function is never called if either `self` or `other` have default priority.
-        """
-        return self.get_priority() < other.get_priority()
-
     def __eq__(
         self,
         other: Any,
@@ -241,12 +132,7 @@ class JaCeSubTranslatorInterface:
         """Tests if two subtranslators are equal.
 
         The default implementation checks if `self` and `other` have the same
-        type. However, if the behaviour of a subtranslator strongly depend on
-        its configuration this function should be overridden.
-
-        Notes:
-            If you override this function you should also override
-                `self.__hash__()` to make the two consistent.
+        type.
         """
         if not isinstance(other, JaCeSubTranslatorInterface):
             return NotImplemented
@@ -258,37 +144,5 @@ class JaCeSubTranslatorInterface:
         The default implementation return a hash that is based on the class.
         Thus all instances of a particular subtranslator will have the same
         hash value.
-
-        Notes:
-            If you override this function you should also override
-                `self.__eq__()` to make the two consistent.
         """
         return id(self.__class__)
-
-    @final
-    def __ne__(
-        self,
-        other: Any,
-    ) -> bool:
-        return NotImplemented
-
-    @final
-    def __le__(
-        self,
-        other: Any,
-    ) -> bool:
-        return NotImplemented
-
-    @final
-    def __ge__(
-        self,
-        other: Any,
-    ) -> bool:
-        return NotImplemented
-
-    @final
-    def __gt__(
-        self,
-        other: Any,
-    ) -> bool:
-        return NotImplemented

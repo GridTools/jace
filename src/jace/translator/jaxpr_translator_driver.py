@@ -102,10 +102,9 @@ class JaxprTranslationDriver:
 
         # Contains all the subtranslators that we need.
         #  They are partitioned by the names of the primitive they have registered for.
-        #  Inside a partition they are ordered by priority, lowest first, more important.
         #  This member is allocated by '_init_sub_translators()' and remains allocated
         #  during the lifetime of the object.
-        self._sub_translators: dict[str, list[jtrans.JaCeSubTranslatorInterface]] = None  # type: ignore[assignment]
+        self._sub_translators: dict[str, jtrans.JaCeSubTranslatorInterface] = None  # type: ignore[assignment]
 
         # The SDFG object that we are currently constructing.
         #  Only allocated during an ongoing translation.
@@ -923,36 +922,29 @@ class JaxprTranslationDriver:
 
     def _init_sub_translators(
         self,
-        kwargs: Mapping[str, Any],
+        subtrans_args: Mapping[str, Any],
     ) -> JaxprTranslationDriver:
         """This function initializes the subtranslator.
 
         The function forwards `kwargs` to the constructor of the subtranslators.
         However, it will remove all arguments starting with an underscore.
         """
-        if isinstance(self._sub_translators, dict):
-            raise RuntimeError("Tried to allocate the internal subtranslators twice.")
-        assert self._sub_translators is None  # type: ignore[unreachable]
+        assert self._sub_translators is None
 
-        kwargs = {k: v for k, v in kwargs.items() if not k.startswith("_")}
+        subtrans_args = {k: v for k, v in subtrans_args.items() if not k.startswith("_")}  # type: ignore[unreachable]
 
-        # First we will create all subtranslators and partition them.
-        subtranslators: dict[str, list[jtrans.JaCeSubTranslatorInterface]] = {}
-        for subtranslator_cls in jtsubt._get_subtranslators_cls():
-            subtranslator: jtrans.JaCeSubTranslatorInterface = subtranslator_cls(**kwargs)
+        sub_translators: dict[str, jtrans.JaCeSubTranslatorInterface] = {}
+        for sub_translator_cls in jtsubt._get_subtranslators_cls():
+            sub_translator: jtrans.JaCeSubTranslatorInterface = sub_translator_cls(**subtrans_args)
             handled_primitives: Iterable[str] = jutil.ensure_iterability(
-                subtranslator.get_handled_primitives()
+                sub_translator.get_handled_primitives()
             )
-
-            # Now add the subtranslator to the primitives it requests, we will sort them later into the correct order.
             for handled_primitive in handled_primitives:
-                subtranslators.setdefault(handled_primitive, []).append(subtranslator)
+                if handled_primitive in sub_translators:
+                    raise RuntimeError(f"Multiple sub_translators for '{handled_primitive}' found.")
+                sub_translators[handled_primitive] = sub_translator
+        self._sub_translators = sub_translators
 
-        # Now we order the subtranslators for the primitives.
-        self._sub_translators = {
-            prim_name: jtrutil.sort_subtranslators(primSubTranslators)
-            for prim_name, primSubTranslators in subtranslators.items()
-        }
         return self
 
     def _clear_translation_ctx(self) -> JaxprTranslationDriver:
@@ -992,41 +984,16 @@ class JaxprTranslationDriver:
 
     def _find_sub_translator_for(
         self,
-        in_var_names: Sequence[str | None],
-        out_var_names: Sequence[str],
         eqn: jcore.JaxprEqn,
     ) -> jtrans.JaCeSubTranslatorInterface:
-        """Returns the appropriate subtranslator for equation `eqn`.
-
-        The subtranslators are checked for applicability in the order of their priority.
-        The fist one that accepts the translation will be taken.
-
-        Notes:
-            The arguments are the same as for `JaCeSubTranslatorInterface.can_translate_jaxeqn()`.
-        """
+        """Returns the appropriate subtranslator for equation `eqn`."""
         assert self._sub_translators is not None
 
         prim_name: str = eqn.primitive.name
         if prim_name not in self._sub_translators:
             raise NotImplementedError(f"No subtranslators known to handle '{prim_name}'.")
-        subtranslator_canidates = self._sub_translators[prim_name]
-        assert len(subtranslator_canidates) > 0
 
-        subtranslator: jtrans.JaCeSubTranslatorInterface = None  # type: ignore[assignment]
-        if len(subtranslator_canidates) == 1:
-            subtranslator = next(iter(subtranslator_canidates))
-            assert subtranslator.can_translate_jaxeqn(
-                in_var_names=in_var_names, out_var_names=out_var_names, driver=self, eqn=eqn
-            )
-        else:
-            for subtranslatorCanidate in subtranslator_canidates:
-                if subtranslatorCanidate.can_translate_jaxeqn(
-                    driver=self, in_var_names=in_var_names, out_var_names=out_var_names, eqn=eqn
-                ):
-                    subtranslator = subtranslatorCanidate
-            else:
-                raise NotImplementedError(f"No subtranslator found for handling '{eqn}'.")
-        return subtranslator
+        return self._sub_translators[prim_name]
 
     def _translate_single_eqn(
         self,
@@ -1044,7 +1011,6 @@ class JaxprTranslationDriver:
         Returns:
             The SDFG names that were used as input and output are returned.
             The inputs might contain `None` which indicates that that input was a Jax Literal.
-            For more information see `JaCeSubTranslatorInterface.can_translate_jaxeqn()`.
 
         Notes:
             While `jaxpr` must be a `ClosedJaxpr`, `eqn` must come from the unclosed instance.
@@ -1070,24 +1036,20 @@ class JaxprTranslationDriver:
         )
 
         # Find the subtranslator
-        subtranslator: jtrans.JaCeSubTranslatorInterface = self._find_sub_translator_for(
-            in_var_names=in_var_names,
-            out_var_names=out_var_names,
-            eqn=eqn,
-        )
+        subtranslator: jtrans.JaCeSubTranslatorInterface = self._find_sub_translator_for(eqn)
 
         # Create the state into which the equation should be translated
         last_term_state: dace.SDFGState = self.get_terminal_sdfg_state()  # noqa: F841 # Will be used later
         eqn_state = self.append_new_state(
             label=f"{eqn.primitive.name}_{out_var_names[0]}",
-            prev_state=None,
+            prev_state=None,  # forces terminal state
         )
 
         # Now perform the actual translation of the equation.
         new_sdfg_term_state = subtranslator.translate_jaxeqn(
             driver=self,
             in_var_names=in_var_names,
-            out_var_names=out_var_names,  # Might be modified by subtranslator!
+            out_var_names=out_var_names,  # Might be modified by the subtranslator!
             eqn=eqn,
             eqn_state=eqn_state,
         )
