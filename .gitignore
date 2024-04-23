@@ -153,6 +153,9 @@ src/*/_version.py
 ehthumbs.db
 Thumbs.db
 
+# DaCe
+.dacecache/
+
 # Common editor files
 *~
 *.swp

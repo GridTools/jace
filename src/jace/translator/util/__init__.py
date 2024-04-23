@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+from .debug import _jace_run, run_memento
 from .jace_translation_memento import JaCeTranslationMemento
 from .revision_counter import RevisionCounterManager
 from .util import list_to_dict
@@ -19,4 +20,6 @@ __all__ = [
     "JaCeTranslationMemento",
     "RevisionCounterManager",
     "list_to_dict",
+    "run_memento",
+    "_jace_run",
 ]

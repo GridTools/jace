@@ -14,9 +14,13 @@ from typing import Final
 
 from jace import translator as jtrans
 
+from .alu_translator import ALUTranslator
+
 
 # List of all subtranslators that ships with JaCe.
-_BUILTIN_SUBTRANSLATORS: Final[list[type[jtrans.JaCeSubTranslatorInterface]]] = []
+_BUILTIN_SUBTRANSLATORS: Final[list[type[jtrans.JaCeSubTranslatorInterface]]] = [
+    ALUTranslator,
+]
 
 # All externally supplied subtranslator implementation.
 #  It is a `dict` to do fast access and remember the order, value is always `None`.

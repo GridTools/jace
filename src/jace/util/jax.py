@@ -13,6 +13,7 @@ in a consistent and stable way.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -44,15 +45,12 @@ def get_jax_var_name(jax_var: jcore.Atom | JaCeVar | str) -> str:
 
     Args:
         jax_var:     The variable to stringify.
-
-    Todos:
-        Implement a regex check for the name.
     """
     if isinstance(jax_var, jcore.DropVar):
         return "_"
     if isinstance(jax_var, JaCeVar):
-        return jax_var.name
-    if isinstance(jax_var, jcore.Atom):
+        jax_name = jax_var.name
+    elif isinstance(jax_var, jcore.Atom):
         jax_name = str(jax_var)  # This only works up to some version
     elif isinstance(jax_var, str):
         jax_name = jax_var
@@ -60,13 +58,10 @@ def get_jax_var_name(jax_var: jcore.Atom | JaCeVar | str) -> str:
         raise TypeError(
             f"Does not know how to transform '{jax_var}' (type: '{type(jax_var).__name__}') into a string."
         )
-    # TODO(phimuell): Add regex to ensure that the name is legit.
     assert isinstance(jax_name, str)
-    if len(jax_name) == 0:
-        raise ValueError(
-            f"Failed to translate the Jax variable '{jax_var}' into a name, the result was empty."
-        )
-    return jax_var
+    if not re.fullmatch("[a-zA-Z_][a-zA-Z_]*", jax_name):
+        raise ValueError(f"Deduced Jax name '{jax_name}' is invalid.")
+    return jax_name
 
 
 def get_jax_var_shape(jax_var: jcore.Atom) -> tuple[int, ...]:

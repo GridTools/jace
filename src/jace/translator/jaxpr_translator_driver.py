@@ -621,7 +621,9 @@ class JaxprTranslationDriver:
                 )
             alt_name = jutil.get_jax_var_name(arg)
         if alt_name is not None:
-            assert isinstance(alt_name, str)
+            assert isinstance(
+                alt_name, str
+            ), f"Got '{type(alt_name)}' instead of 'str' for 'alt_name'."
             find_new_name = False  # If a name was given, then use it no matter what.
             if len(alt_name) == 0:
                 raise ValueError("Passed an empty 'alt_name'.")
@@ -629,8 +631,6 @@ class JaxprTranslationDriver:
                 raise ValueError("'alt_name' is a forbidden name.")
             if not re.fullmatch("[a-zA-Z_][a-zA-Z0-9_]*", alt_name):
                 raise ValueError(f"The passed name 'alt_name' '{alt_name}' is invalid.")
-            if force_jax_name:
-                raise ValueError("Specified 'force_jax_name' but passed 'alt_name'.")
             if name_prefix is not None:
                 raise ValueError(
                     f"Specified 'name_prefix' ('{name_prefix}') but passed '{alt_name}' as 'alt_name'."

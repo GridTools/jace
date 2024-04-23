@@ -5,9 +5,7 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""
-JaCe: JAX jit using DaCe (Data Centric Parallel Programming)
-"""
+"""Python library for translating Jax programs into SDFG."""
 
 from __future__ import annotations
 
