@@ -35,7 +35,7 @@ class JaCeVar:
     """
 
     name: str
-    shape: tuple[int | dace.symbol | str]
+    shape: tuple[int | dace.symbol | str, ...] | int | dace.symbol | str | tuple[()]
     dtype: dace.typeclass
 
 

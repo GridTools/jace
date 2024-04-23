@@ -589,6 +589,7 @@ class JaxprTranslationDriver:
                 the function will always look for a new name, even if the initial
                 name was fine. If it is `False` the function will never look for
                 a new new, thus if the name is unavailable an error is generated.
+                However, this excluds variable names that are known.
             Specifying `alt_name` implies `find_new_name=False`.
             The effect of specifying `force_jax_name` is as passing
                 `jutil.get_jax_var_name(arg)` as `alt_name`.
@@ -603,6 +604,23 @@ class JaxprTranslationDriver:
         storage: dace.StorageType = dace.StorageType.Default  # Set at later stages (optimization)
         is_scalar: bool = shape == ()
 
+        if (alt_name is None) and (self.map_jax_var_to_sdfg(arg, allow_fail=True) is not None):
+            # Maybe the test could be more robust, but it will check if we try to create
+            #  a variable for a second time. It is, however, okay to use one as template,
+            #  if another name is specified from the beginning.
+            raise ValueError(
+                f"Tried to create variable '{arg}' again, without specifying an alternative name.."
+            )
+        if force_jax_name:
+            if alt_name is not None:
+                raise ValueError(
+                    f"Specified 'force_jax_name', but passed '{alt_name}' as 'alt_name'."
+                )
+            if name_prefix is not None:
+                raise ValueError(
+                    f"Specified 'force_jax_name', but passed '{name_prefix}' as 'name_prefix'."
+                )
+            alt_name = jutil.get_jax_var_name(arg)
         if alt_name is not None:
             assert isinstance(alt_name, str)
             find_new_name = False  # If a name was given, then use it no matter what.
@@ -627,6 +645,7 @@ class JaxprTranslationDriver:
         if as_view and (not as_transient):
             raise ValueError("You tried to create a global view, which is not allowed.")
 
+        # Checking the strides.
         if (symb_strides is None) and (strides is None):
             def_symb_stride = False  # default value for symbolic strides
             symb_strides = False if (len(shape) <= 1) else def_symb_stride  # Keep for the future
@@ -640,15 +659,10 @@ class JaxprTranslationDriver:
         else:
             assert isinstance(symb_strides, bool)
 
-        # SDFG variable name
-        if force_jax_name:
-            alt_name = jutil.get_jax_var_name(arg)
-            if name_prefix is not None:
-                alt_name = name_prefix + alt_name
-
-        elif alt_name is not None:
+        # Now we determine the proposed name of the variable.
+        #  Depending on the situation, we will further manipulate it.
+        if alt_name is not None:
             prop_name = alt_name  # Just for completion: will be ignored later
-
         elif isinstance(arg, (jcore.Var, jutil.JaCeVar)):
             prop_name = jutil.get_jax_var_name(arg)
             if prop_name.startswith("__"):
@@ -658,16 +672,13 @@ class JaxprTranslationDriver:
                 )
             if name_prefix is not None:
                 prop_name = name_prefix + prop_name
-
         elif isinstance(arg, jcore.Literal):  # type: ignore[unreachable]
             if not allow_literals:
                 raise NotImplementedError("Jax Literals are not supported.")
             if alt_name is None:
                 raise ValueError(f"Passed literal '{arg}', but not specified a name to use.")
-
         else:
             raise TypeError(f"Does not know how to handle '{type(arg).__name__}'.")
-
         if alt_name is None:
             # If we are the root translator, then we will use `prop_name` directly;
             #  otherwise we will append the revision of `self` to the name.
@@ -675,11 +686,13 @@ class JaxprTranslationDriver:
         else:
             arg_name = str(alt_name)
 
+        # Determine if we should look for a new name or not, if nothing was specified
         if find_new_name is None:
-            # Determine if we should look for a new name or not, if nothing was specified
-            find_new_name = (arg_name in self._forbidden_names) or (
-                arg_name in self._reserved_names
-            )
+            if arg_name in self._reserved_names:
+                find_new_name = True
+            if arg_name in self._forbidden_names:
+                find_new_name = True
+
         if find_new_name:
             # We have to find a new name.
             name_tmpl = "_jax_variable__" + arg_name + "__{}"
@@ -696,11 +709,13 @@ class JaxprTranslationDriver:
             else:
                 raise ValueError(f"Failed to find a replacement name for '{arg_name}'")
             del iCounter, _arg_name
-        elif arg_name in self._forbidden_names:
+
+        # Final name check
+        if arg_name in self._forbidden_names:
             raise ValueError(f"Can't create variable '{arg_name}', name is forbidden.")
-        elif arg_name in self._sdfg.arrays:
+        if arg_name in self._sdfg.arrays:
             raise ValueError(f"Can't create variable '{arg_name}', variable is already created.")
-        elif not re.fullmatch("[a-zA-Z_][a-zA-Z0-9_]*", arg_name):
+        if not re.fullmatch("[a-zA-Z_][a-zA-Z0-9_]*", arg_name):
             raise ValueError(f"The requested variable name '{arg_name}' is invalid.")
 
         # Promotion of scalar to array.
