@@ -9,9 +9,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 import dace
+import jax
 
 from jace.translator import util as jtrutil
 
@@ -29,7 +31,7 @@ def run_memento(
     from dace.data import Data, Scalar, make_array_from_descriptor
 
     # This is a simplification that makes our life simply
-    if len(memento.sdfg.used_symbols) != 0:
+    if len(memento.sdfg.free_symbols) != 0:
         raise ValueError("No externally defined symbols are allowed.")
     if len(memento.inp_names) != len(args):
         raise ValueError(
@@ -50,11 +52,13 @@ def run_memento(
     # Canonical SDFGs do not have global memory, so we must transform it.
     #  We will afterwards undo it.
     for glob_name in memento.inp_names + memento.out_names:  # type: ignore[operator]  # concatenation
-        memento.sdfg.arrays[glob_name].transient = True
+        memento.sdfg.arrays[glob_name].transient = False
 
     try:
         csdfg: dace.CompiledSDFG = memento.sdfg.compile()
-        csdfg(**call_args)
+        with dace.config.temporary_config():
+            dace.Config.set("compiler", "allow_view_arguments", value=True)
+            csdfg(**call_args)
 
         if len(memento.out_names) == 0:
             return None
@@ -64,5 +68,18 @@ def run_memento(
         return ret_val
 
     finally:
-        for name, tstate in memento.inp_names + memento.out_names:  # type: ignore[operator]  # concatenation
-            memento.sdfg.arrays[name].transient = tstate
+        for name in memento.inp_names + memento.out_names:  # type: ignore[operator]  # concatenation
+            memento.sdfg.arrays[name].transient = True
+
+
+def _jace_run(
+    fun: Callable,
+    *args: Any,
+) -> Any:
+    """Traces and run function `fun` using `Jax | DaCe`."""
+    from jace.translator import JaxprTranslationDriver
+
+    jaxpr = jax.make_jaxpr(fun)(*args)
+    driver = JaxprTranslationDriver()
+    memento = driver.translate_jaxpr(jaxpr)
+    return run_memento(memento, *args)
