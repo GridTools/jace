@@ -11,7 +11,6 @@ from __future__ import annotations
 
 from .jace_translation_memento import JaCeTranslationMemento
 from .revision_counter import RevisionCounterManager
-from .subtranslator_helper_order import sort_subtranslators
 from .util import list_to_dict
 
 
@@ -20,5 +19,4 @@ __all__ = [
     "JaCeTranslationMemento",
     "RevisionCounterManager",
     "list_to_dict",
-    "sort_subtranslators",
 ]

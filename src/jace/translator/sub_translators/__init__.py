@@ -77,13 +77,9 @@ def _get_subtranslators_cls(
         If the externally defined subtranslators are requested they will be
             first and ordered as FILO order.
     """
-    # It is important that the externally defined are ordered before the builtins
-    #  and are ordered in FILO order, especuially if multiple subtranslator per
-    #  primitive are registered. Because this way they are inserted first
-    #  into the internal list of the driver, and furthermore since `sorted()`
-    #  is stable they will tend to end up more to the front.
     ret: list[type[jtrans.JaCeSubTranslatorInterface]] = []
     if with_external:
+        # Guarantees that we get them in FIFO order.
         ret.extend(reversed(_EXTERNAL_SUBTRANSLATORS.keys()))
     if builtins:
         ret.extend(_BUILTIN_SUBTRANSLATORS)
