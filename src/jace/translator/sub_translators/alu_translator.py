@@ -74,53 +74,10 @@ class ALUTranslator(jtranslator.JaCeSubTranslatorInterface):
         """Initialize the `ALUTranslator`."""
         super().__init__(**kwargs)
 
-    # end def: __init__
-
     @override
     def get_handled_primitives(self) -> Collection[str] | str:
         """Returns the list of all known primitives."""
         return set(self._unary_ops.keys()).union(self._binary_ops.keys())
-
-    @override
-    def can_translate_jaxeqn(
-        self,
-        driver: jtranslator.JaxprTranslationDriver,
-        in_var_names: Sequence[str | None],
-        out_var_names: Sequence[str],
-        eqn: jcore.JaxprEqn,
-    ) -> bool:
-        """Tests if the translator can handle the primitive.
-
-        Notes:
-            A user can generally expect that this function returns `True`.
-        """
-        is_scalar: bool = len(eqn.outvars[0].aval.shape) == 0
-        prim_name: str = eqn.primitive.name
-        if len(eqn.invars) == 1:
-            if prim_name not in self._unary_ops:
-                return False
-        elif len(eqn.invars) == 2:
-            if prim_name not in self._binary_ops:
-                return False
-        else:
-            return False
-        if out_var_names[0] is None:
-            raise RuntimeError(f"Encountered a literal output '{eqn}'.")
-        if len(eqn.outvars) != 1:
-            return False
-        if (not is_scalar) and all(x is None for x in in_var_names):
-            # Only literals as input are only allowed if we are scalar.
-            return False
-        if len(eqn.effects) != 0:
-            return False
-        if not all(
-            invar.aval.shape == ()
-            for invar, inname in zip(eqn.invars, in_var_names)
-            if inname is None
-        ):
-            # All literals must be scalars
-            return False
-        return True
 
     @override
     def translate_jaxeqn(
