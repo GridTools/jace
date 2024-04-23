@@ -164,7 +164,7 @@ class ALUTranslator(jtranslator.JaCeSubTranslatorInterface):
         tskl_map_ranges: list[tuple[str, str]] = [
             (f"__i{dim}", f"0:{N}") for dim, N in enumerate(eqn.outvars[0].aval.shape)
         ]
-        tskl_outputs: tuple[str, dace.Memlet] = None
+        tskl_output: tuple[str, dace.Memlet] = None
         tskl_inputs: list[tuple[str, dace.Memlet] | tuple[None, None]] = []
 
         # Generate the Memlets for the input.
@@ -199,7 +199,7 @@ class ALUTranslator(jtranslator.JaCeSubTranslatorInterface):
             tskl_tasklet = eqn_state.add_tasklet(
                 tskl_name,
                 jtutil.list_to_dict(tskl_inputs).keys(),
-                jtutil.list_to_dict([tskl_outputs]).keys(),
+                jtutil.list_to_dict([tskl_output]).keys(),
                 tskl_code,
             )
             for in_var, (in_connector, in_memlet) in zip(in_var_names, tskl_inputs, strict=False):
@@ -225,7 +225,7 @@ class ALUTranslator(jtranslator.JaCeSubTranslatorInterface):
                 map_ranges=jtutil.list_to_dict(tskl_map_ranges),
                 inputs=jtutil.list_to_dict(tskl_inputs),
                 code=tskl_code,
-                outputs=jtutil.list_to_dict([tskl_outputs]),
+                outputs=jtutil.list_to_dict([tskl_output]),
                 external_edges=True,
             )
 
