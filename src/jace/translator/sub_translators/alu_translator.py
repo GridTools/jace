@@ -26,7 +26,7 @@ class ALUTranslator(jtranslator.JaCeSubTranslatorInterface):
 
     __slots__ = ()
 
-    # Contains all translation templates for unarry operations.
+    # Contains all translation templates for unary operations.
     _unary_ops: Final[dict[str, str]] = {
         "pos": "__out0 = +(__in0)",
         "neg": "__out0 = -(__in0)",
@@ -187,10 +187,13 @@ class ALUTranslator(jtranslator.JaCeSubTranslatorInterface):
             tskl_inputs.append((f"__in{i}", i_memlet))
 
         # Now generate the Memlets for the output
-        tskl_output = (
-            "__out0",
-            dace.Memlet.simple(out_var_names[0], ", ".join([X[0] for X in tskl_map_ranges])),
-        )
+        if is_scalar:
+            tskl_output = ("__out0", dace.Memlet.simple(out_var_names[0], "0"))
+        else:
+            tskl_output = (
+                "__out0",
+                dace.Memlet.simple(out_var_names[0], ", ".join([X[0] for X in tskl_map_ranges])),
+            )
 
         if is_scalar:
             tskl_tasklet = eqn_state.add_tasklet(
