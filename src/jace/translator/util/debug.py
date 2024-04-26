@@ -75,11 +75,17 @@ def run_memento(
 def _jace_run(
     fun: Callable,
     *args: Any,
+    **kwargs: Any,
 ) -> Any:
-    """Traces and run function `fun` using `Jax | DaCe`."""
+    """Traces and run function `fun` using `Jax | DaCe`.
+
+    Args:
+        *args:      Forwarded to the tracing and final execution of the SDFG.
+        **kwargs:   Used to construct the driver.
+    """
     from jace.translator import JaxprTranslationDriver
 
     jaxpr = jax.make_jaxpr(fun)(*args)
-    driver = JaxprTranslationDriver()
+    driver = JaxprTranslationDriver(**kwargs)
     memento = driver.translate_jaxpr(jaxpr)
     return run_memento(memento, *args)
