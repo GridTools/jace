@@ -9,11 +9,14 @@
 
 Most of the functions defined here allow an unified access to Jax' internals
 in a consistent and stable way.
+It is important that this module is different from the `jace.jax` module, which
+mimics the full `jax` package itself.
 """
 
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -93,6 +96,46 @@ def get_jax_var_dtype(jax_var: jcore.Atom) -> dace.typeclass:
     if isinstance(jax_var, JaCeVar):
         return translate_dtype(jax_var.dtype)
     raise TypeError(f"'get_jax_var_dtype()` is not implemented for '{type(jax_var)}'.")
+
+
+def is_tracing_ongoing(
+    *args: Any,
+    **kwargs: Any,
+) -> bool:
+    """Test if tracing is ongoing.
+
+    While a return value `True` guarantees that a translation is ongoing,
+    a value of `False` does not guarantees that no tracing is active.
+
+    Raises:
+        RuntimeError: If the function fails to make a detection.
+    """
+    from itertools import chain
+
+    # The current implementation only checks the arguments if it contains tracers.
+    if (len(args) == 0) and (len(kwargs) == 0):
+        raise RuntimeError("Failed to determine if tracing is ongoing.")
+    return any(isinstance(x, jcore.Tracer) for x in chain(args, kwargs.values()))
+
+
+def is_jaxified(obj: Any) -> bool:
+    """Tests if `obj` is a "jaxified" object.
+
+    A "jexified" object is an object that was processed by Jax.
+    While a return value of `True` guarantees a jaxified object,
+    `False` might not proof the contrary.
+    """
+    from jax._src import pjit as jaxpjit
+    import jaxlib
+
+    # These are all types we consider as jaxify
+    jaxify_types: Sequence[type] = (
+        jcore.Primitive,
+        # jstage.Wrapped, # Not runtime chakable
+        jaxpjit.JitWrapped,
+        jaxlib.xla_extension.PjitFunction
+    )
+    return isinstance(obj, jaxify_types)
 
 
 def translate_dtype(dtype: Any) -> dace.typeclass:
