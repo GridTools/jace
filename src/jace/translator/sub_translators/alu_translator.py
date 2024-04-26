@@ -164,11 +164,11 @@ class ALUTranslator(jtranslator.JaCeSubTranslatorInterface):
         tskl_map_ranges: list[tuple[str, str]] = [
             (f"__i{dim}", f"0:{N}") for dim, N in enumerate(eqn.outvars[0].aval.shape)
         ]
-        tskl_output: tuple[str, dace.Memlet] = None
+        tskl_output: tuple[str, dace.Memlet] = None  # type: ignore[assignment]
         tskl_inputs: list[tuple[str, dace.Memlet] | tuple[None, None]] = []
 
         # Generate the Memlets for the input.
-        for i, dims_to_bcast in enumerate([dims_to_bcastl, dims_to_bcastr]):
+        for i, dims_to_bcast in zip(range(len(in_var_names)), [dims_to_bcastl, dims_to_bcastr]):
             if in_var_names[i] is None:  # Literal: No input needed.
                 tskl_inputs.append((None, None))
                 continue
