@@ -50,16 +50,24 @@ def get_jax_var_name(jax_var: jcore.Atom | JaCeVar | str) -> str:
         return "_"
     if isinstance(jax_var, JaCeVar):
         jax_name = jax_var.name
-    elif isinstance(jax_var, jcore.Atom):
-        jax_name = str(jax_var)  # This only works up to some version
+    elif isinstance(jax_var, jcore.Var):
+        # This stopped working after version 0.20.4, because of some changes in Jax
+        #  See `https://github.com/google/jax/pull/10573` for more information.
+        #  The following implementation will generate stable names, but decouples
+        #  them from pretty printed Jaxpr, we maybe need a pretty print context somewhere.
+        jax_name = f"jax{jax_var.count}{jax_var.suffix}"
+    elif isinstance(jax_var, jcore.Literal):
+        raise TypeError("Can not translate a Jax Literal to a variable name.")
     elif isinstance(jax_var, str):
         jax_name = jax_var
     else:
         raise TypeError(
-            f"Does not know how to transform '{jax_var}' (type: '{type(jax_var).__name__}') into a string."
+            f"Can not transform '{jax_var}' (type: '{type(jax_var).__name__}') not a name."
         )
     assert isinstance(jax_name, str)
-    if not re.fullmatch("[a-zA-Z_][a-zA-Z_]*", jax_name):
+    if not (
+        re.fullmatch("jax[1-9][0-9]*", jax_name) or re.fullmatch("[a-zA-Z][a-zA-Z]*", jax_name)
+    ):
         raise ValueError(f"Deduced Jax name '{jax_name}' is invalid.")
     return jax_name
 
