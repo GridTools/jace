@@ -28,11 +28,13 @@ def run_memento(
         Currently the SDFG must not have any undefined symbols, i.e. no undefined sizes.
         The function either returns a value or a tuple of values, i.e. no tree.
     """
-    from dace.data import Data, Scalar, make_array_from_descriptor
+    from dace.data import Array, Data, Scalar, make_array_from_descriptor
 
     # This is a simplification that makes our life simply
     if len(memento.sdfg.free_symbols) != 0:
-        raise ValueError("No externally defined symbols are allowed.")
+        raise ValueError(
+            f"No externally defined symbols are allowed, found: {memento.sdfg.free_symbols}"
+        )
     if len(memento.inp_names) != len(args):
         raise ValueError(
             f"Wrong numbers of arguments expected {len(memento.inp_names)} got {len(args)}."
@@ -44,10 +46,16 @@ def run_memento(
         call_args[in_name] = in_val
     for out_name in memento.out_names:
         sarray: Data = memento.sdfg.arrays[out_name]
-        if isinstance(sarray, Scalar):
-            raise NotImplementedError("Do not support non array in return value.")
         assert out_name not in call_args
-        call_args[out_name] = make_array_from_descriptor(sarray)
+
+        if (out_name == "__return") or (out_name.startswith("__return_")):
+            continue
+        if isinstance(sarray, Scalar):
+            raise NotImplementedError("Scalars as return values are not supported.")
+        if isinstance(sarray, Array):
+            call_args[out_name] = make_array_from_descriptor(sarray)
+        else:
+            raise NotImplementedError(f"Can not handle '{type(sarray).__name__}' as output.")
 
     # Canonical SDFGs do not have global memory, so we must transform it.
     #  We will afterwards undo it.
