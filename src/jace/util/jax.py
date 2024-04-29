@@ -18,8 +18,11 @@ from dataclasses import dataclass
 from typing import Any
 
 import dace
-import jax
 import jax.core as jcore
+
+
+# Used by `get_jax_var_name()` to test if a name for a jax variable is valid.
+_VALID_JAX_NAME_PATTERN: re.Pattern = re.compile("[a-zA-Z_][a-zA-Z0-9_]*")
 
 
 @dataclass(init=True, repr=True, eq=True, frozen=True, slots=True)
@@ -46,67 +49,69 @@ def get_jax_var_name(jax_var: jcore.Atom | JaCeVar | str) -> str:
     Args:
         jax_var:     The variable to stringify.
     """
-    if isinstance(jax_var, jcore.DropVar):
-        return "_"
-    if isinstance(jax_var, JaCeVar):
-        jax_name = jax_var.name
-    elif isinstance(jax_var, jcore.Atom):
-        jax_name = str(jax_var)  # This only works up to some version
-    elif isinstance(jax_var, str):
-        jax_name = jax_var
-    else:
-        raise TypeError(
-            f"Does not know how to transform '{jax_var}' (type: '{type(jax_var).__name__}') into a string."
-        )
+    match jax_var:
+        case jcore.DropVar():
+            return "_"
+
+        case JaCeVar():
+            jax_name = jax_var.name
+
+        case jcore.Var():
+            # Does only work for jax 0.4.20; will be reworked later.
+            jax_name = str(jax_var)
+
+        case jcore.Literal():
+            raise TypeError("Can not derive a name from a Jax Literal.")
+
+        case str():
+            jax_name = jax_var
+
+        case _:
+            raise TypeError(
+                f"Does not know how to transform '{jax_var}' (type: '{type(jax_var).__name__}') into a string."
+            )
     assert isinstance(jax_name, str)
-    if not re.fullmatch("[a-zA-Z_][a-zA-Z_]*", jax_name):
+
+    if not _VALID_JAX_NAME_PATTERN.fullmatch(jax_name):
         raise ValueError(f"Deduced Jax name '{jax_name}' is invalid.")
     return jax_name
 
 
-def get_jax_var_shape(jax_var: jcore.Atom) -> tuple[int, ...]:
+def get_jax_var_shape(jax_var: jcore.Atom | JaCeVar) -> tuple[int, ...]:
     """Returns the shape of a Jax variable.
 
     Args:
         jax_var:     The variable to process
     """
-    if isinstance(jax_var, jcore.Atom):
-        return jax_var.aval.shape
-    if isinstance(jax_var, JaCeVar):
-        assert isinstance(jax_var.shape, tuple)
-        return jax_var.shape
-    raise TypeError(f"'get_jax_var_shape()` is not implemented for '{type(jax_var)}'.")
+    match jax_var:
+        case jcore.Var() | jcore.Literal():
+            return jax_var.aval.shape
+
+        case JaCeVar():
+            return jax_var.shape
+
+        case _:
+            raise TypeError(f"'get_jax_var_shape()` is not implemented for '{type(jax_var)}'.")
 
 
-def get_jax_var_dtype(jax_var: jcore.Atom) -> dace.typeclass:
+def get_jax_var_dtype(jax_var: jcore.Atom | JaCeVar) -> dace.typeclass:
     """Returns the DaCe equivalent of `jax_var`s datatype."""
-    if isinstance(jax_var, jcore.Atom):
-        return translate_dtype(jax_var.aval.dtype)
-    if isinstance(jax_var, JaCeVar):
-        return translate_dtype(jax_var.dtype)
-    raise TypeError(f"'get_jax_var_dtype()` is not implemented for '{type(jax_var)}'.")
+    match jax_var:
+        case jcore.Var() | jcore.Literal():
+            return translate_dtype(jax_var.aval.dtype)
+
+        case JaCeVar():
+            return translate_dtype(jax_var.dtype)
+
+        case _:
+            raise TypeError(f"'get_jax_var_dtype()` is not implemented for '{type(jax_var)}'.")
 
 
 def translate_dtype(dtype: Any) -> dace.typeclass:
     """Turns a Jax datatype into a DaCe datatype."""
-
     if isinstance(dtype, dace.typeclass):
         return dtype
-
-    # Make some basic checks if the datatype is okay
-    name_of_dtype = str(dtype)
-    if (not jax.config.read("jax_enable_x64")) and (name_of_dtype == "float64"):
-        raise ValueError("Found a 'float64' type but 'x64' support is disabled.")
-    if name_of_dtype.startswith("complex"):
-        raise NotImplementedError("Support for complecx computation is not implemented yet.")
-
-    # Now extract the datatype from dace, this is extremely ugly.
-    if not hasattr(dace.dtypes, name_of_dtype):
-        raise TypeError(f"Could not find '{name_of_dtype}' ({type(dtype).__name__}) in 'dace'.")
-    dcd_type = getattr(dace.dtypes, name_of_dtype)
-
-    if not isinstance(dcd_type, dace.dtypes.typeclass):
-        raise TypeError(
-            f"'{name_of_dtype}' does not map to a 'dace.typeclass' but to a '{type(dcd_type).__name__}'."
-        )
-    return dcd_type
+    if dtype is None:
+        # Special behaviour of `dtype_to_typeclass()`
+        raise NotImplementedError()
+    return dace.dtype_to_typeclass(dtype)
