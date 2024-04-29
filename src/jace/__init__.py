@@ -5,7 +5,7 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Python library for translating Jax programs into SDFG."""
+"""JaCe - JAX Just-In-Time compilation using DaCe."""
 
 from __future__ import annotations
 
