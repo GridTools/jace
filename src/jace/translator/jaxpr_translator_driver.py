@@ -118,9 +118,11 @@ class JaxprTranslationDriver:
         #  Only allocated during an ongoing translation.
         self._init_sdfg_state: dace.SDFGState = None
 
-        # This is the mapping, that maps the Jax name to the name that is used inside the SDFG.
+        # Maps a Jax variable to the name of its SDFG equivalent.
+        #  As an extension it is also able to map JaCe Variables.
+        #  In case the key (Jax Variable) is a Literal, the mapped value is None.
         #  Only allocated during an ongoing translation.
-        self._jax_name_map: dict[str, str] = None  # type: ignore[assignment]
+        self._jax_name_map: dict[jcore.Var | jutil.JaCeVar, str | None] = None  # type: ignore[assignment]
 
         # These names can not be used for the automatic naming of Jax variables.
         #  They differ from the forbidden names, that they denote valid SDFG names.
@@ -340,15 +342,14 @@ class JaxprTranslationDriver:
         assert self._sdfg is not None
 
         if isinstance(name, str):
-            pass
-        elif isinstance(name, (jcore.Atom, jutil.JaCeVar)):
-            name = self.map_jax_var_to_sdfg(name)
+            sdfg_name: str = name
+        elif isinstance(name, (jcore.Var, jutil.JaCeVar)):
+            sdfg_name = self.map_jax_var_to_sdfg(name)
         else:
             raise TypeError(f"Does not know how to handle '{type(name).__name__}'.")
-        if name not in self._sdfg.arrays:
+        if sdfg_name not in self._sdfg.arrays:
             raise KeyError(f"Requested the SDFG array '{name}' but it is not known.")
-
-        return self._sdfg.arrays[name]
+        return self._sdfg.arrays[sdfg_name]
 
     @overload
     def map_jax_var_to_sdfg(
@@ -368,22 +369,37 @@ class JaxprTranslationDriver:
         jax_var: str | jcore.Atom | jutil.JaCeVar,
         allow_fail: bool = False,
     ) -> str | None:
-        """Returns the name of the SDFG variable that the Jax variable `jax_var` is referring to.
+        """Get the _name_ of the SDFG variable to which `jax_var` is referring to.
+
+        For convenient this function will consider a string as input to be already an SDFG variable name.
 
         Args:
             jax_var:        The Jax variable to look up.
             allow_fail:     If mapping is not known return `None` instead of raise `KeyError`.
+
+        Notes:
+            Despite the fact that Jax literals can be added to the internal variable mapping 
+                it is an error to pass a Jax `Literal` object as `jax_var`.
         """
         assert self._jax_name_map is not None
         assert isinstance(jax_var, (jcore.Atom, str, jutil.JaCeVar))
 
-        jax_var = jutil.get_jax_var_name(jax_var)
-        if jax_var not in self._jax_name_map:
-            if allow_fail:
-                return None
+        if(isinstance(jax_var, str)):
+            sdfg_name: str = jax_var
+        elif(isinstance(jax_var, jcore.Literal)):
+            raise RuntimeError("There is no SDFG variable for literal '{jax_var}'.")
+        elif(jax_var in self._jax_name_map):
+            sdfg_name: str = self._jax_name_map[jax_var]
+            assert isinstance(sdfg_name, str)
+        elif(allow_fail):
+            return None
+        else:
             KeyError(f"The Jax variable '{jax_var}' was never registered.")
 
-        return self._jax_name_map[jax_var]
+        if(sdfg_name not in self._sdfg.arrays):
+            raise KeyError(f"Jax variable '{jax_var}' was supposed to map to '{sdfg_name}',"
+                            "but no such SDFG variable is known.")
+        return sdfg_name
 
     def get_sdfg(self) -> dace.SDFG:
         """Returns the SDFG that is currently constructed.
@@ -430,8 +446,7 @@ class JaxprTranslationDriver:
     def is_head_translator(self) -> bool:
         """Tests if `self` is a head translator.
 
-        A head translator is a translator/driver that was created explicitly,
-        i.e. not by `self.fork()`.
+        A head translator is a translator/driver that was created explicitly, i.e. not by `self.fork()`.
         """
         assert self._rev_manager is not None
         assert self._rev_idx is not None
@@ -443,10 +458,8 @@ class JaxprTranslationDriver:
     ) -> bool:
         """Test if `self` and `other` belongs to the same family of driver/translators.
 
-        A driver is either explicitly created, i.e. head translator, or created
-        by a call to `fork()`. All drivers that descend from the same head translator
-        from a family.
-
+        A driver is either explicitly created, i.e. head translator, or created by a call to `fork()`.
+        All drivers that descend from the same head translator from a family.
         """
         if not isinstance(other, JaxprTranslationDriver):
             return NotImplemented  # type: ignore[unreachable]
@@ -459,16 +472,31 @@ class JaxprTranslationDriver:
     def get_rev_idx(self) -> int:
         """Returns the revision index of `self`.
 
-        To distinguish members of same family every diver has a unique identifier,
-        known as revision. However, the revision is only unique within a single
-        family and during an ongoing translation.
+        To distinguish members of same family every diver has a unique identifier, known as revision.
+        However, the revision is only unique within a single family and during an ongoing translation.
         """
         return self._rev_idx
 
+    @overload
     def add_jax_name_mapping(
         self,
-        jax_var: str | jcore.Atom | jutil.JaCeVar,
+        jax_var: jcore.Var | jutil.JaCeVar,
         sdfg_name: str,
+    ) -> JaxprTranslationDriver:
+        ...
+
+    @overload
+    def add_jax_name_mapping(
+        self,
+        jax_var: jcore.Literal,
+        sdfg_name: None,
+    ) -> JaxprTranslationDriver:
+        ...
+
+    def add_jax_name_mapping(
+        self,
+        jax_var: jcore.Atom | jutil.JaCeVar,
+        sdfg_name: str | None,
     ) -> JaxprTranslationDriver:
         """Creates a mapping between `jax_var` to `sdfg_name`.
 
@@ -482,12 +510,20 @@ class JaxprTranslationDriver:
             sdfg_name:   The name of the corresponding SDFG variable.
         """
         assert self._jax_name_map is not None
-        assert isinstance(jax_var, (jcore.Atom, str, jutil.JaCeVar))
-        assert isinstance(sdfg_name, str)
+        assert isinstance(jax_var, (jcore.Atom, jutil.JaCeVar))
 
-        jax_name = jutil.get_jax_var_name(jax_var)
-        if jax_name in self._jax_name_map:
-            if self._jax_name_map[jax_name] == sdfg_name:  # We consider this as no ops.
+        # Adding literals to the variable map.
+        #  The only reason why we allow to add literals to the map is because
+        #  we need them in the proposing of Jax names, see `_propose_jax_name()`.
+        if(isinstance(jax_var, jcore.Literal)):
+            assert sdfg_name is None
+            self._jax_name_map[jax_var] = None
+            return self
+
+        assert isinstance(sdfg_name, str) and (len(sdfg_name) > 0)
+
+        if jax_var in self._jax_name_map:
+            if self._jax_name_map[jax_var] == sdfg_name:  # noops.
                 return self
             raise ValueError(
                 f"Tried to create the mapping '{jax_name} -> {sdfg_name}', but '{jax_name}'"
@@ -498,7 +534,7 @@ class JaxprTranslationDriver:
         if sdfg_name in self._forbidden_names:
             raise NameError(f"Mapping '{jax_name} -> {sdfg_name}': Forbidden name.")
 
-        self._jax_name_map[jax_name] = sdfg_name
+        self._jax_name_map[jax_var] = sdfg_name
         return self
 
     def add_reserved_names(
@@ -596,8 +632,6 @@ class JaxprTranslationDriver:
                 a new new, thus if the name is unavailable an error is generated.
                 However, this excluds variable names that are known.
             Specifying `alt_name` implies `find_new_name=False`.
-            The effect of specifying `force_jax_name` is as passing
-                `jutil.get_jax_var_name(arg)` as `alt_name`.
             If you need to create a special array, you can use `jace.util.JaCeVar`
                 to create a pseudo Jax variable.
         """
@@ -625,7 +659,7 @@ class JaxprTranslationDriver:
                 raise ValueError(
                     f"Specified 'force_jax_name', but passed '{name_prefix}' as 'name_prefix'."
                 )
-            alt_name = jutil.get_jax_var_name(arg)
+            alt_name = jutil._propose_jax_name(arg, self._jax_name_map)
         if alt_name is not None:
             assert isinstance(
                 alt_name, str
@@ -669,7 +703,7 @@ class JaxprTranslationDriver:
         if alt_name is not None:
             prop_name = alt_name  # Just for completion: will be ignored later
         elif isinstance(arg, (jcore.Var, jutil.JaCeVar)):
-            prop_name = jutil.get_jax_var_name(arg)
+            prop_name = jutil._propose_jax_name(arg, self._jax_name_map)
             if prop_name.startswith("__"):
                 raise ValueError(
                     f"You tried to create the variable '{prop_name}' which"
@@ -779,11 +813,10 @@ class JaxprTranslationDriver:
     ) -> list[None | str]:
         """Creates SDFG variables for the listed Jax variables and returns their SDFG names.
 
-        Before the function will create a variable, by using `add_array()` with
-        `update_var_mapping=True`, it will check if the variable is known and if
-        so no new variable is created. Instead the name of the previously created
-        variable is added to the list. In case the Jax Atom denotes a Jax Literal,
-        no variable will be created, instead `None` will be added to the list.
+        Before the function will create a variable, by using `add_array()` with `update_var_mapping=True`,
+        it will check if the variable is known and if so no new variable is created.
+        Instead the name of the previously created variable is added to the list.
+        In case the Jax Atom denotes a Jax Literal, no variable will be created, instead `None` will be added to the list.
 
         Args:
             jax_var_list:       The list of Jax variables that should be transformed to SDFG names.
@@ -793,9 +826,10 @@ class JaxprTranslationDriver:
 
         Notes:
             If `only_creation` is set, then literals will cause an error.
-            It is an error to pass the `update_var_mapping` argument.
+            It is an error to pass the `update_var_mapping` argument to this function.
         """
         assert self._jax_name_map is not None
+        assert "update_var_mapping" in kwargs
         if only_creation and prevent_creation:
             raise ValueError("Specified both 'only_creation' and 'prevent_creation'.")
 
@@ -804,6 +838,7 @@ class JaxprTranslationDriver:
             if isinstance(jax_var, jcore.Literal):
                 if only_creation:
                     raise ValueError(f"Requested 'only_creation', but '{jax_var}' is a 'Literal'.")
+                # SOMEHOW TO UPDATE
                 ret_list.append(None)
             elif isinstance(jax_var, (jcore.Var, jutil.JaCeVar)):
                 mapped_sdfg_name: str | None = self.map_jax_var_to_sdfg(jax_var, allow_fail=True)

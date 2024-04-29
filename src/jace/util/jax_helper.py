@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Mapping, Optional
 
 import dace
 import jax.core as jcore
@@ -28,22 +28,34 @@ import numpy as np
 _VALID_JAX_NAME_PATTERN: re.Pattern = re.compile("[a-zA-Z_][a-zA-Z0-9_]*")
 
 
-@dataclass(init=True, repr=True, eq=True, frozen=True, slots=True)
+@dataclass(init=True, repr=True, frozen=True, slots=True)
 class JaCeVar:
     """Substitute class for Jax' `Var` instance.
 
     This class is similar to a `jax.core.Var` class, but much simpler.
     It is only a container for a name, shape and a datatype.
-    All extractor functions `get_jax_var{name, shape, dtype}()` will accept it,
-    as well as multiple functions of the driver.
+    All extractor functions `get_jax_var{name, shape, dtype}()` will accept it, as well as multiple functions of the driver.
 
     Notes:
         Main intention is to test functionality.
+        While for a Jax `Var` object the name is rather irrelevant, `JaCeVar` use their name.
     """
 
     name: str
     shape: tuple[int | dace.symbol | str, ...] | int | dace.symbol | str | tuple[()]
     dtype: dace.typeclass
+
+    def __hash__(self) -> int:
+        return hash(self.name)
+
+    def __eq__(
+        self,
+        other: Any
+    ) -> bool:
+        if(not isinstance(other, JaCeVar)):
+            return NotImplemented
+        return self.name == other.name
+
 
 
 def get_jax_var_name(jax_var: jcore.Atom | JaCeVar | str) -> str:
@@ -51,6 +63,10 @@ def get_jax_var_name(jax_var: jcore.Atom | JaCeVar | str) -> str:
 
     Args:
         jax_var:     The variable to stringify.
+
+    Notes:
+        Due to some modification in Jax itself, this function is unable to return "proper" variable names.
+        This function is subject for removal.
     """
     match jax_var:
         case jcore.DropVar():
@@ -62,8 +78,8 @@ def get_jax_var_name(jax_var: jcore.Atom | JaCeVar | str) -> str:
         case jcore.Var():
             # This stopped working after version 0.20.4, because of some changes in Jax
             #  See `https://github.com/google/jax/pull/10573` for more information.
-            #  The following implementation will generate stable names, but decouples
-            #  them from pretty printed Jaxpr, we maybe need a pretty print context somewhere.
+            #  The following implementation will generate stable names, however, they will be decoupled
+            #  from output of the pretty printed Jaxpr
             jax_name = f"jax{jax_var.count}{jax_var.suffix}"
 
         case jcore.Literal():
@@ -177,3 +193,61 @@ def translate_dtype(dtype: Any) -> dace.typeclass:
         if hasattr(np, dtype_name):
             dtype = getattr(np, dtype)
             return dace.dtype_to_typeclass(dtype)
+
+
+def is_drop_var(jax_var: jcore.Atom | JaCeVar) -> bool:
+    """Tests if `jax_var` is a drop variable.
+    """
+
+    if(isinstance(jax_var, jcore.DropVar)):
+        return True
+    if(isinstance(jax_var, JaCeVar)):
+        return jax_var.name == '_'
+    return False
+
+
+def _propose_jax_name(
+        jax_var: jcore.Atom | JaCeVar,
+        jax_name_map: Optional[Mapping[jcore.Var | JaCeVar, Any]] = None,
+) -> str:
+    """Proposes a variable name for `jax_var`.
+
+    There are two modes for proposing new names.
+    In the first mode, `get_jax_var_name()` is used to derive a name.
+    The second mode, proposes a name based on all names that are already known,
+    this leads to names similar to the ones used by Jax.
+
+    Args:
+        jax_var:        The variable for which a name to propose.
+        jax_name_map:   A mapping of all Jax variables that were already named.
+
+    Notes:
+        The second mode is activated by passing `jax_name_map` as argument.
+        The naming of variables are only consistent with the inner most Jaxpr a variable is defined in.
+        Dropped variables will always be named `'_'`.
+    """
+    if(is_drop_var(jax_var)):
+        return "_"
+    if(isinstance(jax_var, jcore.Literal)):
+        raise TypeError(f"Can not propose a name for literal '{jax_var}'.")
+    if(jax_var in jax_name_map):
+        raise RuntimeError(
+            f"Can not propose a second name for '{jax_var}', it already known as '{jax_name_map[jax_var]}'."
+        )
+    if(jax_name_map is None):
+        return get_jax_var_name(jax_var)
+    if(isinstance(jax_var, JaCeVar)):
+        return jax_var.name
+    assert isinstance(jax_var, jcore.Atom)
+
+    c = len(jax_name_map)
+    jax_name = ""
+    while len(jax_name) == 0 or c == 0:
+        c, i = c // 26, c % 26
+        jax_name = chr(97 + i % 26) + jax_name
+    return jax_name
+
+
+
+
+

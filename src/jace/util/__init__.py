@@ -18,12 +18,15 @@ from .jax_helper import (
     is_jaxified,
     is_tracing_ongoing,
     translate_dtype,
+    is_drop_var,
+    _propose_jax_name,
 )
 from .util import ensure_iterability, is_jaceified
 
 
 __all__ = [
     "ensure_iterability",
+    "is_drop_var",
     "is_tracing_ongoing",
     "is_jaceified",
     "is_jaxified",
@@ -34,4 +37,5 @@ __all__ = [
     "translate_dtype",
     "run_memento",
     "_jace_run",
+    "_propose_jax_name",
 ]
