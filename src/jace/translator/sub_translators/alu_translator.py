@@ -17,7 +17,7 @@ import numpy as np
 from jax import core as jcore
 from typing_extensions import override
 
-from jace import translator as jtranslator, util as jutil
+from jace import translator as jtranslator
 
 
 class ALUTranslator(jtranslator.JaCeSubTranslatorInterface):
@@ -163,7 +163,7 @@ class ALUTranslator(jtranslator.JaCeSubTranslatorInterface):
         tskl_map_ranges: list[tuple[str, str]] = [
             (f"__i{dim}", f"0:{N}") for dim, N in enumerate(eqn.outvars[0].aval.shape)
         ]
-        tskl_output: tuple[str, dace.Memlet] = None
+        tskl_output: tuple[str, dace.Memlet] = None  # type: ignore[assignment]
         tskl_inputs: list[tuple[str, dace.Memlet] | tuple[None, None]] = []
 
         # Generate the Memlets for the input.
@@ -197,8 +197,8 @@ class ALUTranslator(jtranslator.JaCeSubTranslatorInterface):
         if is_scalar:
             tskl_tasklet = eqn_state.add_tasklet(
                 tskl_name,
-                jutil.list_to_dict(tskl_inputs).keys(),
-                jutil.list_to_dict([tskl_output]).keys(),
+                _list_to_dict(tskl_inputs).keys(),
+                _list_to_dict([tskl_output]).keys(),
                 tskl_code,
             )
             for in_var, (in_connector, in_memlet) in zip(in_var_names, tskl_inputs, strict=False):
@@ -221,10 +221,10 @@ class ALUTranslator(jtranslator.JaCeSubTranslatorInterface):
         else:
             eqn_state.add_mapped_tasklet(
                 name=tskl_name,
-                map_ranges=jutil.list_to_dict(tskl_map_ranges),
-                inputs=jutil.list_to_dict(tskl_inputs),
+                map_ranges=_list_to_dict(tskl_map_ranges),
+                inputs=_list_to_dict(tskl_inputs),
                 code=tskl_code,
-                outputs=jutil.list_to_dict([tskl_output]),
+                outputs=_list_to_dict([tskl_output]),
                 external_edges=True,
             )
 
@@ -289,3 +289,11 @@ class ALUTranslator(jtranslator.JaCeSubTranslatorInterface):
             t_code = t_code.format(**eqn.params)
 
         return t_code
+
+
+def _list_to_dict(inp: Sequence[tuple[None | Any, Any]]) -> dict[Any, Any]:
+    """This method turns a `list` of pairs into a `dict` and applies a `None` filter.
+
+    The function will only include pairs whose key, i.e. first element is not `None`.
+    """
+    return {k: v for k, v in inp if k is not None}
