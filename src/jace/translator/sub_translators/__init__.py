@@ -10,9 +10,11 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Final
+from typing import TYPE_CHECKING, Final
 
-from jace import translator as jtrans
+
+if TYPE_CHECKING:
+    from jace import translator as jtrans
 
 from .alu_translator import ALUTranslator
 
@@ -37,11 +39,13 @@ def add_subtranslator(
     """
     from inspect import isclass
 
+    from jace.translator import PrimitiveTranslator  # Import cycle
+
     if subtrans in _EXTERNAL_SUBTRANSLATORS:
         return False
     if not isclass(subtrans):
         return False
-    if not issubclass(subtrans, jtrans.PrimitiveTranslator):
+    if not issubclass(subtrans, PrimitiveTranslator):
         return False
     _EXTERNAL_SUBTRANSLATORS[subtrans] = None
     return True

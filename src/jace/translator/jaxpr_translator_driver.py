@@ -18,7 +18,6 @@ from dace import data as ddata, properties as dprop
 from jax import core as jcore
 
 from jace import translator as jtrans, util as jutil
-from jace.translator import sub_translators as jtsubt
 
 
 class JaxprTranslationDriver:
@@ -936,12 +935,13 @@ class JaxprTranslationDriver:
         The function forwards `kwargs` to the constructor of the subtranslators.
         However, it will remove all arguments starting with an underscore.
         """
+        from jace.translator.sub_translators import _get_subtranslators_cls  # Avoid import cycle
+
         assert self._sub_translators is None
 
         subtrans_args = {k: v for k, v in subtrans_args.items() if not k.startswith("_")}  # type: ignore[unreachable]
-
         sub_translators: dict[str, jtrans.PrimitiveTranslator] = {}
-        for sub_translator_cls in jtsubt._get_subtranslators_cls():
+        for sub_translator_cls in _get_subtranslators_cls():
             sub_translator: jtrans.PrimitiveTranslator = sub_translator_cls(**subtrans_args)
             handled_primitives: Iterable[str] = jutil.ensure_iterability(
                 sub_translator.get_handled_primitive()

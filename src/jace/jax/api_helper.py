@@ -15,8 +15,7 @@ from typing import Any
 import dace
 import jax
 
-from jace import util as jutil
-from jace.translator import util as jtrutil
+from jace import translator as jtrans, util as jutil
 
 
 class JitWrapped:
@@ -80,16 +79,15 @@ class JitWrapped:
         Notes:
             Currently no caching of the compiled object is done.
         """
-        from jace.translator.util import debug as jtrudebug
 
-        memento: jtrutil.JaCeTranslationMemento = self._get_memento(*args, **kwargs)
-        return jtrudebug.run_memento(memento, *args)
+        memento: jtrans.JaCeTranslationMemento = self._get_memento(*args, **kwargs)
+        return jutil.run_memento(memento, *args)
 
     def _get_memento(
         self,
         *args: Any,
         **kwargs: Any,
-    ) -> jtrutil.JaCeTranslationMemento:
+    ) -> jtrans.JaCeTranslationMemento:
         """This function returns the Memento.
 
         The function will transform its arguments into `_ArgInfo` versions.
@@ -111,7 +109,7 @@ class JitWrapped:
         self,
         *args: _ArgInfo,
         **kwargs: Any,
-    ) -> jtrutil.JaCeTranslationMemento:
+    ) -> jtrans.JaCeTranslationMemento:
         """Generates the SDFG from
 
         Todo:

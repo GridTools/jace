@@ -10,12 +10,14 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import dace
 import jax
 
-from jace import translator as jtrans
+
+if TYPE_CHECKING:
+    from jace import translator as jtrans
 
 
 def run_memento(
