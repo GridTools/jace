@@ -57,8 +57,11 @@ def get_jax_var_name(jax_var: jcore.Atom | JaCeVar | str) -> str:
             jax_name = jax_var.name
 
         case jcore.Var():
-            # Does only work for jax 0.4.20; will be reworked later.
-            jax_name = str(jax_var)
+            # This stopped working after version 0.20.4, because of some changes in Jax
+            #  See `https://github.com/google/jax/pull/10573` for more information.
+            #  The following implementation will generate stable names, but decouples
+            #  them from pretty printed Jaxpr, we maybe need a pretty print context somewhere.
+            jax_name = f"jax{jax_var.count}{jax_var.suffix}"
 
         case jcore.Literal():
             raise TypeError("Can not derive a name from a Jax Literal.")
