@@ -9,13 +9,13 @@
 
 from __future__ import annotations
 
-from .jace_subtranslator_interface import JaCeSubTranslatorInterface
+from .primitive_translator import PrimitiveTranslator
 from .jace_translation_memento import JaCeTranslationMemento
 from .jaxpr_translator_driver import JaxprTranslationDriver
 
 
 __all__ = [
-    "JaCeSubTranslatorInterface",
+    "PrimitiveTranslator",
     "JaxprTranslationDriver",
     "JaCeTranslationMemento",
 ]

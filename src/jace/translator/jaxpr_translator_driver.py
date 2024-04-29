@@ -43,7 +43,7 @@ class JaxprTranslationDriver:
     The actual translation is not handled by the driver instead a so called
     subtranslator object is used. A subtranslator is specialized to translate
     one type of primitive. For more information on the subtranslators see the
-    documentation of `JaCeSubTranslatorInterface`.
+    documentation of `PrimitiveTranslator`.
 
     To support nested Jaxpr expressions the driver provides the possibility to
     clone/fork itself, see `self.fork()` for more. Every clone, i.e. return
@@ -105,7 +105,7 @@ class JaxprTranslationDriver:
         #  They are partitioned by the names of the primitive they have registered for.
         #  This member is allocated by '_init_sub_translators()' and remains allocated
         #  during the lifetime of the object.
-        self._sub_translators: dict[str, jtrans.JaCeSubTranslatorInterface] = None  # type: ignore[assignment]
+        self._sub_translators: dict[str, jtrans.PrimitiveTranslator] = None  # type: ignore[assignment]
 
         # The SDFG object that we are currently constructing.
         #  Only allocated during an ongoing translation.
@@ -940,9 +940,9 @@ class JaxprTranslationDriver:
 
         subtrans_args = {k: v for k, v in subtrans_args.items() if not k.startswith("_")}  # type: ignore[unreachable]
 
-        sub_translators: dict[str, jtrans.JaCeSubTranslatorInterface] = {}
+        sub_translators: dict[str, jtrans.PrimitiveTranslator] = {}
         for sub_translator_cls in jtsubt._get_subtranslators_cls():
-            sub_translator: jtrans.JaCeSubTranslatorInterface = sub_translator_cls(**subtrans_args)
+            sub_translator: jtrans.PrimitiveTranslator = sub_translator_cls(**subtrans_args)
             handled_primitives: Iterable[str] = jutil.ensure_iterability(
                 sub_translator.get_handled_primitive()
             )
@@ -992,7 +992,7 @@ class JaxprTranslationDriver:
     def _find_sub_translator_for(
         self,
         eqn: jcore.JaxprEqn,
-    ) -> jtrans.JaCeSubTranslatorInterface:
+    ) -> jtrans.PrimitiveTranslator:
         """Returns the appropriate subtranslator for equation `eqn`."""
         assert self._sub_translators is not None
 
@@ -1043,7 +1043,7 @@ class JaxprTranslationDriver:
         )
 
         # Find the subtranslator
-        subtranslator: jtrans.JaCeSubTranslatorInterface = self._find_sub_translator_for(eqn)
+        subtranslator: jtrans.PrimitiveTranslator = self._find_sub_translator_for(eqn)
 
         # Create the state into which the equation should be translated
         last_term_state: dace.SDFGState = self.get_terminal_sdfg_state()  # noqa: F841 # Will be used later

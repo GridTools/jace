@@ -20,7 +20,7 @@ from typing_extensions import override
 from jace import translator as jtranslator
 
 
-class ALUTranslator(jtranslator.JaCeSubTranslatorInterface):
+class ALUTranslator(jtranslator.PrimitiveTranslator):
     """This translator handles all arithmetic and logical operations."""
 
     __slots__ = ()

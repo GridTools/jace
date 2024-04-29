@@ -25,11 +25,11 @@ def test_subtranslatior_managing():
         rm_subtranslator,
     )
 
-    class ValidSubTrans(jtrans.JaCeSubTranslatorInterface):
+    class ValidSubTrans(jtrans.PrimitiveTranslator):
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
 
-    class ValidSubTrans2(jtrans.JaCeSubTranslatorInterface):
+    class ValidSubTrans2(jtrans.PrimitiveTranslator):
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
 

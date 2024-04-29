@@ -8,7 +8,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 import dace
 from jax import core as jcore
@@ -18,7 +18,8 @@ if TYPE_CHECKING:
     from .jaxpr_translator_driver import JaxprTranslationDriver
 
 
-class JaCeSubTranslatorInterface:
+@runtime_checkable
+class PrimitiveTranslator(Protocol):
     """Interface for all Jax primitive subtranslators.
 
     A translator for a primitive translates a single equation of a Jaxpr into its SDFG equivalent.
