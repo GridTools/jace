@@ -17,7 +17,7 @@ from dace import data as ddata, properties as dprop
 from jax import core as jcore
 
 from jace import translator as jtrans, util as jutil
-from jace.translator import sub_translators as jtsubt, util as jtrutil
+from jace.translator import sub_translators as jtsubt
 
 
 class JaxprTranslationDriver:
@@ -137,7 +137,7 @@ class JaxprTranslationDriver:
         # This is the manager for the revision counter.
         #  It is shared among all children.
         #  Might be overwritten if we are in the context of 'fork()'.
-        self._rev_manager: jtrutil.RevisionCounterManager = jtrutil.RevisionCounterManager()
+        self._rev_manager: jutil.RevisionCounterManager = jutil.RevisionCounterManager()
 
         # This is the revision of self.
         #  Unlike the manager it is not shared and private.
@@ -158,7 +158,7 @@ class JaxprTranslationDriver:
         reserved_names: str | Collection[str] | None = None,
         allow_empty_jaxpr: bool = False,
         **kwargs: Any,
-    ) -> jtrutil.JaCeTranslationMemento:
+    ) -> jtrans.JaCeTranslationMemento:
         """Perform the translation of a Jaxpr description into a SDFG.
 
         Returns:
@@ -208,7 +208,7 @@ class JaxprTranslationDriver:
         self._create_constants(
             jaxpr=jaxpr,
         )
-        memento: jtrutil.JaCeTranslationMemento = self._translate_jaxpr_internal(jaxpr)
+        memento: jtrans.JaCeTranslationMemento = self._translate_jaxpr_internal(jaxpr)
 
         # If the translation context is not cleared `self` and `memento` will share the same data.
         #  There is some legitimate use for that.
@@ -1109,7 +1109,7 @@ class JaxprTranslationDriver:
     def _translate_jaxpr_internal(
         self,
         jaxpr: jcore.ClosedJaxpr,
-    ) -> jtrutil.JaCeTranslationMemento:
+    ) -> jtrans.JaCeTranslationMemento:
         """Performs the actual translation of the Jaxpr into an SDFG.
 
         The function assumes that the context is already allocated and the initial
@@ -1151,7 +1151,7 @@ class JaxprTranslationDriver:
 
         return self._export_memento()
 
-    def _export_memento(self) -> jtrutil.JaCeTranslationMemento:
+    def _export_memento(self) -> jtrans.JaCeTranslationMemento:
         """Encapsulate the translation context of `self` into a memento.
 
         This function will not deallocate the internal context of `self`.
@@ -1161,7 +1161,7 @@ class JaxprTranslationDriver:
         assert all((isinstance(x, str) and (len(x) > 0)) for x in self._sdfg_in_names)
         assert all((isinstance(x, str) and (len(x) > 0)) for x in self._sdfg_out_names)
 
-        return jtrutil.JaCeTranslationMemento(
+        return jtrans.JaCeTranslationMemento(
             sdfg=self._sdfg,
             start_state=self._init_sdfg_state,
             terminal_state=self._term_sdfg_state,

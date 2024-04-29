@@ -7,7 +7,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from typing import Any
 
 
@@ -28,3 +28,11 @@ def ensure_iterability(
     elif isinstance(x, Iterable):
         pass
     return x
+
+
+def list_to_dict(inp: Sequence[tuple[None | Any, Any]]) -> dict[Any, Any]:
+    """This method turns a `list` of pairs into a `dict` and applies a `None` filter.
+
+    The function will only include pairs whose key, i.e. first element is not `None`.
+    """
+    return {k: v for k, v in inp if k is not None}

@@ -15,11 +15,11 @@ from typing import Any
 import dace
 import jax
 
-from jace.translator import util as jtrutil
+from jace import translator as jtrans
 
 
 def run_memento(
-    memento: jtrutil.JaCeTranslationMemento,
+    memento: jtrans.JaCeTranslationMemento,
     *args: Any,
 ) -> tuple[Any, ...] | Any:
     """Calls the SDFG with the supplied arguments.

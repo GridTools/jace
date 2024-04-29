@@ -17,8 +17,7 @@ import numpy as np
 from jax import core as jcore
 from typing_extensions import override
 
-from jace import translator as jtranslator
-from jace.translator import util as jtutil
+from jace import translator as jtranslator, util as jutil
 
 
 class ALUTranslator(jtranslator.JaCeSubTranslatorInterface):
@@ -198,8 +197,8 @@ class ALUTranslator(jtranslator.JaCeSubTranslatorInterface):
         if is_scalar:
             tskl_tasklet = eqn_state.add_tasklet(
                 tskl_name,
-                jtutil.list_to_dict(tskl_inputs).keys(),
-                jtutil.list_to_dict([tskl_output]).keys(),
+                jutil.list_to_dict(tskl_inputs).keys(),
+                jutil.list_to_dict([tskl_output]).keys(),
                 tskl_code,
             )
             for in_var, (in_connector, in_memlet) in zip(in_var_names, tskl_inputs, strict=False):
@@ -222,10 +221,10 @@ class ALUTranslator(jtranslator.JaCeSubTranslatorInterface):
         else:
             eqn_state.add_mapped_tasklet(
                 name=tskl_name,
-                map_ranges=jtutil.list_to_dict(tskl_map_ranges),
-                inputs=jtutil.list_to_dict(tskl_inputs),
+                map_ranges=jutil.list_to_dict(tskl_map_ranges),
+                inputs=jutil.list_to_dict(tskl_inputs),
                 code=tskl_code,
-                outputs=jtutil.list_to_dict([tskl_output]),
+                outputs=jutil.list_to_dict([tskl_output]),
                 external_edges=True,
             )
 
