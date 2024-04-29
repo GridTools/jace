@@ -205,12 +205,12 @@ class JaxprTranslationDriver:
             name=name,
             reserved_names=reserved_names,
         )
+        self._create_constants(
+            jaxpr=jaxpr,
+        )
         self._create_initial_input(
             jaxpr=jaxpr,
             inp_scalar_as_array=inp_scalar_as_array,
-        )
-        self._create_constants(
-            jaxpr=jaxpr,
         )
         memento: jtrans.JaCeTranslationMemento = self._translate_jaxpr_internal(jaxpr)
 
