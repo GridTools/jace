@@ -21,6 +21,7 @@ from typing import Any
 
 import dace
 import jax.core as jcore
+import numpy as np
 
 
 # Used by `get_jax_var_name()` to test if a name for a jax variable is valid.
@@ -161,4 +162,18 @@ def translate_dtype(dtype: Any) -> dace.typeclass:
     if dtype is None:
         # Special behaviour of `dtype_to_typeclass()`
         raise NotImplementedError()
-    return dace.dtype_to_typeclass(dtype)
+
+    # For reasons unknown to me we have to do the dtype conversion this way.
+    #  It is not possible to simply call `dace.typeclass(dtype)` or pass it to
+    #  `dace.dtype_to_typeclass()`, it will generate an error.
+    #  We keep the `dtype_to_typeclass()` function call, in order to handle
+    #  NumPy types as DaCe intended them to be handled.
+    try:
+        return dace.dtype_to_typeclass(dtype)
+    except KeyError:
+        dtype_name = str(dtype)
+        if hasattr(dace.dtypes, dtype_name):
+            return getattr(dace.dtypes, dtype_name)
+        if hasattr(np, dtype_name):
+            dtype = getattr(np, dtype)
+            return dace.dtype_to_typeclass(dtype)
