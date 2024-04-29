@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import itertools
 import re
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from typing import Any, Final, cast, overload
@@ -134,20 +135,24 @@ class JaxprTranslationDriver:
         self._sdfg_in_names: Sequence[str] = None  # type: ignore[assignment]
         self._sdfg_out_names: Sequence[str] = None  # type: ignore[assignment]
 
-        # This is the manager for the revision counter.
-        #  It is shared among all children.
-        #  Might be overwritten if we are in the context of 'fork()'.
-        self._rev_manager: jutil.RevisionCounterManager = jutil.RevisionCounterManager()
+        # Shared revision counter manager.
+        #  This object produces the revision indexes we need for the children.
+        #  It is only allocated for head translators and shared between
+        self._rev_manager: itertools.count[int] = None  # type: ignore[assignment]
 
         # This is the revision of self.
         #  Unlike the manager it is not shared and private.
-        #  Might be overwritten in the context of a fork.
-        self._rev_idx: int = self._rev_manager.assign_revision()
-        assert self.is_head_translator()
+        self._rev_idx: int = None  # type: ignore[assignment]
 
         # If requested we will now allocate some internal state
         if allocate_shared_parts:
+            # Creating of the subtranslators.
             self._init_sub_translators(kwargs)
+
+            # Creating of the revision indexes and manager.
+            self._rev_manager = itertools.count(0, 1)
+            self._rev_idx = next(self._rev_manager)
+            assert self.is_head_translator()
 
     def translate_jaxpr(
         self,
@@ -249,7 +254,7 @@ class JaxprTranslationDriver:
             setattr(dolly, slot_name, getattr(self, slot_name))
 
         # Handle the special members and initialize them.
-        dolly._rev_idx = dolly._rev_manager.assign_revision()
+        dolly._rev_idx = next(self._rev_manager)
         assert not dolly.is_head_translator()
 
         # We will now copy the reserved name list
@@ -429,7 +434,9 @@ class JaxprTranslationDriver:
         A head translator is a translator/driver that was created explicitly,
         i.e. not by `self.fork()`.
         """
-        return self._rev_manager.is_root_revision(self._rev_idx)
+        assert self._rev_manager is not None
+        assert self._rev_idx is not None
+        return self._rev_idx == 0
 
     def same_family(
         self,
@@ -974,7 +981,7 @@ class JaxprTranslationDriver:
             #  Since this function is only called at the very end, we know that the translation
             #  process as a whole has finished. We reset the state that the numbers are small
             #  again when we start anew.
-            self._rev_manager._reset_state()
+            self._rev_manager = itertools.count(0, 1)
 
             # Freeing the reserved names only for heads make it more safe in case a child
             #  translator is reused.c On the other hand reusing a child translator is

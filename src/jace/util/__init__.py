@@ -11,12 +11,10 @@ from __future__ import annotations
 
 from .debug import _jace_run, run_memento
 from .jax import JaCeVar, get_jax_var_dtype, get_jax_var_name, get_jax_var_shape, translate_dtype
-from .revision_counter import RevisionCounterManager
 from .util import ensure_iterability, list_to_dict
 
 
 __all__ = [
-    "RevisionCounterManager",
     "JaCeVar",
     "get_jax_var_name",
     "get_jax_var_shape",

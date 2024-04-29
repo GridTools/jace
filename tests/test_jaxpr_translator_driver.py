@@ -107,7 +107,6 @@ def test_driver_fork() -> None:
     driver._clear_translation_ctx()
     assert not driver.is_allocated()
     assert driver.is_head_translator()
-    assert driver._rev_manager._next_revision == dolly_rev
     assert driver._reserved_names is None
 
 
