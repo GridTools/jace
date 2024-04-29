@@ -9,7 +9,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Collection, Sequence
+from collections.abc import Sequence
 from typing import Any, Final, cast
 
 import dace
@@ -75,9 +75,9 @@ class ALUTranslator(jtranslator.JaCeSubTranslatorInterface):
         super().__init__(**kwargs)
 
     @override
-    def get_handled_primitives(self) -> Collection[str] | str:
+    def get_handled_primitive(self) -> Sequence[str]:
         """Returns the list of all known primitives."""
-        return set(self._unary_ops.keys()).union(self._binary_ops.keys())
+        return list(self._unary_ops.keys()) + list(self._binary_ops.keys())
 
     @override
     def translate_jaxeqn(

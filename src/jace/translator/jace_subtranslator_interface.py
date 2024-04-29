@@ -7,7 +7,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Collection, Sequence
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
 import dace
@@ -19,26 +19,25 @@ if TYPE_CHECKING:
 
 
 class JaCeSubTranslatorInterface:
-    """Interface for all Jax primitive/intrinsic subtranslators.
+    """Interface for all Jax primitive subtranslators.
 
-    A translator for a primitive, sometimes also called intrinsic, translates
-    a single equation of a Jaxpr into its SDFG equivalent. A type that
-    implements this interface must fulfil the following properties:
+    A translator for a primitive translates a single equation of a Jaxpr into its SDFG equivalent.
+    A type that implements this interface must fulfil the following properties:
     - It must be stateless.
         It is still possible and explicitly allowed to have an
         immutable configuration state.
     - All subclasses has to accept `**kwargs` arguments and must
         forward all unconsumed arguments to the base.
 
-    Subtranslators are rather simple objects that only have to perform
-    the translation. The translation process itself is managed by a driver
-    object, which owns and manage the subtranslators.
+    Subtranslators are simple, but highly specialized objects that are only able to perform the translation of a single primitive.
+    The overall translation process itself is managed by a driver object, which also owns and manage the subtranslators.
     In the end this implements the delegation pattern.
 
-    A subtranslator uses its `get_handled_primitives()` function to indicate
-    for which Jax primitives it want to register. It is important that there
-    is no limits on the number of primitives a subtranslator can register itself.
-    However, only one subtranslator can be registered for a primitive.
+    After instantiation a driver calls the subtranslator's `get_handled_primitive()` method.
+    This function returns the name of the Jax primitive the subtranslator is able to handle.
+    In case a subtranslator is able to handle multiple primitives, it should return a list with their names.
+    While there is no limit to the numbers of primitive a subtranslator can register itself for,
+    only one subtranslator can be register for any primitive.
     """
 
     __slots__ = ()
@@ -53,17 +52,13 @@ class JaCeSubTranslatorInterface:
         It is required that subclasses calls this method during initialization.
         """
 
-    def get_handled_primitives(self) -> Collection[str] | str:
-        """Returns the names of all Jax primitives that `self` is able to handle.
+    def get_handled_primitive(self) -> str | Sequence[str]:
+        """Returns the names of the Jax primitive that `self` is able to handle.
 
-        There is no limit on the number of primitives for which a subtranslator
-        can register.
-
-        Notes:
-            In case a string is returned it is interpreted as 1 element collection.
+        In case `self` can handle multiple primitives, it should return a list with these names.
         """
         raise NotImplementedError(
-            "Class '{type(self).__name__}' does not implement 'get_handled_primitives()'."
+            "Class '{type(self).__name__}' does not implement 'get_handled_primitive()'."
         )
 
     def translate_jaxeqn(
@@ -124,25 +119,3 @@ class JaCeSubTranslatorInterface:
         raise NotImplementedError(
             "Class '{type(self).__name__}' does not implement 'translate_jaxeqn()'."
         )
-
-    def __eq__(
-        self,
-        other: Any,
-    ) -> bool:
-        """Tests if two subtranslators are equal.
-
-        The default implementation checks if `self` and `other` have the same
-        type.
-        """
-        if not isinstance(other, JaCeSubTranslatorInterface):
-            return NotImplemented
-        return type(self) == type(other)
-
-    def __hash__(self) -> int:
-        """Computes the hash of the subtranslator.
-
-        The default implementation return a hash that is based on the class.
-        Thus all instances of a particular subtranslator will have the same
-        hash value.
-        """
-        return id(self.__class__)
