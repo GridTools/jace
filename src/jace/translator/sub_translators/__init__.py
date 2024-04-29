@@ -18,18 +18,18 @@ from .alu_translator import ALUTranslator
 
 
 # List of all subtranslators that ships with JaCe.
-_BUILTIN_SUBTRANSLATORS: Final[list[type[jtrans.JaCeSubTranslatorInterface]]] = [
+_BUILTIN_SUBTRANSLATORS: Final[list[type[jtrans.PrimitiveTranslator]]] = [
     ALUTranslator,
 ]
 
 # All externally supplied subtranslator implementation.
 #  It is a `dict` to do fast access and remember the order, value is always `None`.
 #  The list is manipulated through `{add,rm}_subtranslator()`.
-_EXTERNAL_SUBTRANSLATORS: dict[type[jtrans.JaCeSubTranslatorInterface], None] = {}
+_EXTERNAL_SUBTRANSLATORS: dict[type[jtrans.PrimitiveTranslator], None] = {}
 
 
 def add_subtranslator(
-    subtrans: type[jtrans.JaCeSubTranslatorInterface],
+    subtrans: type[jtrans.PrimitiveTranslator],
 ) -> bool:
     """Add `subtrans` to the externally defined subtranslators.
 
@@ -41,14 +41,14 @@ def add_subtranslator(
         return False
     if not isclass(subtrans):
         return False
-    if not issubclass(subtrans, jtrans.JaCeSubTranslatorInterface):
+    if not issubclass(subtrans, jtrans.PrimitiveTranslator):
         return False
     _EXTERNAL_SUBTRANSLATORS[subtrans] = None
     return True
 
 
 def rm_subtranslator(
-    subtrans: type[jtrans.JaCeSubTranslatorInterface],
+    subtrans: type[jtrans.PrimitiveTranslator],
     strict: bool = False,
 ) -> bool:
     """Remove `subtrans` as externally defined subtranslators.
@@ -66,7 +66,7 @@ def rm_subtranslator(
 def _get_subtranslators_cls(
     with_external: bool = True,
     builtins: bool = True,
-) -> Sequence[type[jtrans.JaCeSubTranslatorInterface]]:
+) -> Sequence[type[jtrans.PrimitiveTranslator]]:
     """Returns the list of all subtranslator known to JaCe.
 
     Args:
@@ -77,7 +77,7 @@ def _get_subtranslators_cls(
         If the externally defined subtranslators are requested they will be
             first and ordered as FILO order.
     """
-    ret: list[type[jtrans.JaCeSubTranslatorInterface]] = []
+    ret: list[type[jtrans.PrimitiveTranslator]] = []
     if with_external:
         # Guarantees that we get them in FIFO order.
         ret.extend(reversed(_EXTERNAL_SUBTRANSLATORS.keys()))

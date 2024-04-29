@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import itertools
 import re
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from typing import Any, Final, cast, overload
@@ -17,7 +18,7 @@ from dace import data as ddata, properties as dprop
 from jax import core as jcore
 
 from jace import translator as jtrans, util as jutil
-from jace.translator import sub_translators as jtsubt, util as jtrutil
+from jace.translator import sub_translators as jtsubt
 
 
 class JaxprTranslationDriver:
@@ -42,7 +43,7 @@ class JaxprTranslationDriver:
     The actual translation is not handled by the driver instead a so called
     subtranslator object is used. A subtranslator is specialized to translate
     one type of primitive. For more information on the subtranslators see the
-    documentation of `JaCeSubTranslatorInterface`.
+    documentation of `PrimitiveTranslator`.
 
     To support nested Jaxpr expressions the driver provides the possibility to
     clone/fork itself, see `self.fork()` for more. Every clone, i.e. return
@@ -104,7 +105,7 @@ class JaxprTranslationDriver:
         #  They are partitioned by the names of the primitive they have registered for.
         #  This member is allocated by '_init_sub_translators()' and remains allocated
         #  during the lifetime of the object.
-        self._sub_translators: dict[str, jtrans.JaCeSubTranslatorInterface] = None  # type: ignore[assignment]
+        self._sub_translators: dict[str, jtrans.PrimitiveTranslator] = None  # type: ignore[assignment]
 
         # The SDFG object that we are currently constructing.
         #  Only allocated during an ongoing translation.
@@ -134,20 +135,24 @@ class JaxprTranslationDriver:
         self._sdfg_in_names: Sequence[str] = None  # type: ignore[assignment]
         self._sdfg_out_names: Sequence[str] = None  # type: ignore[assignment]
 
-        # This is the manager for the revision counter.
-        #  It is shared among all children.
-        #  Might be overwritten if we are in the context of 'fork()'.
-        self._rev_manager: jtrutil.RevisionCounterManager = jtrutil.RevisionCounterManager()
+        # Shared revision counter manager.
+        #  This object produces the revision indexes we need for the children.
+        #  It is only allocated for head translators and shared between
+        self._rev_manager: itertools.count[int] = None  # type: ignore[assignment]
 
         # This is the revision of self.
         #  Unlike the manager it is not shared and private.
-        #  Might be overwritten in the context of a fork.
-        self._rev_idx: int = self._rev_manager.assign_revision()
-        assert self.is_head_translator()
+        self._rev_idx: int = None  # type: ignore[assignment]
 
         # If requested we will now allocate some internal state
         if allocate_shared_parts:
+            # Creating of the subtranslators.
             self._init_sub_translators(kwargs)
+
+            # Creating of the revision indexes and manager.
+            self._rev_manager = itertools.count(0, 1)
+            self._rev_idx = next(self._rev_manager)
+            assert self.is_head_translator()
 
     def translate_jaxpr(
         self,
@@ -158,7 +163,7 @@ class JaxprTranslationDriver:
         reserved_names: str | Collection[str] | None = None,
         allow_empty_jaxpr: bool = False,
         **kwargs: Any,
-    ) -> jtrutil.JaCeTranslationMemento:
+    ) -> jtrans.JaCeTranslationMemento:
         """Perform the translation of a Jaxpr description into a SDFG.
 
         Returns:
@@ -208,7 +213,7 @@ class JaxprTranslationDriver:
         self._create_constants(
             jaxpr=jaxpr,
         )
-        memento: jtrutil.JaCeTranslationMemento = self._translate_jaxpr_internal(jaxpr)
+        memento: jtrans.JaCeTranslationMemento = self._translate_jaxpr_internal(jaxpr)
 
         # If the translation context is not cleared `self` and `memento` will share the same data.
         #  There is some legitimate use for that.
@@ -249,7 +254,7 @@ class JaxprTranslationDriver:
             setattr(dolly, slot_name, getattr(self, slot_name))
 
         # Handle the special members and initialize them.
-        dolly._rev_idx = dolly._rev_manager.assign_revision()
+        dolly._rev_idx = next(self._rev_manager)
         assert not dolly.is_head_translator()
 
         # We will now copy the reserved name list
@@ -429,7 +434,9 @@ class JaxprTranslationDriver:
         A head translator is a translator/driver that was created explicitly,
         i.e. not by `self.fork()`.
         """
-        return self._rev_manager.is_root_revision(self._rev_idx)
+        assert self._rev_manager is not None
+        assert self._rev_idx is not None
+        return self._rev_idx == 0
 
     def same_family(
         self,
@@ -933,11 +940,11 @@ class JaxprTranslationDriver:
 
         subtrans_args = {k: v for k, v in subtrans_args.items() if not k.startswith("_")}  # type: ignore[unreachable]
 
-        sub_translators: dict[str, jtrans.JaCeSubTranslatorInterface] = {}
+        sub_translators: dict[str, jtrans.PrimitiveTranslator] = {}
         for sub_translator_cls in jtsubt._get_subtranslators_cls():
-            sub_translator: jtrans.JaCeSubTranslatorInterface = sub_translator_cls(**subtrans_args)
+            sub_translator: jtrans.PrimitiveTranslator = sub_translator_cls(**subtrans_args)
             handled_primitives: Iterable[str] = jutil.ensure_iterability(
-                sub_translator.get_handled_primitives()
+                sub_translator.get_handled_primitive()
             )
             for handled_primitive in handled_primitives:
                 if handled_primitive in sub_translators:
@@ -974,7 +981,7 @@ class JaxprTranslationDriver:
             #  Since this function is only called at the very end, we know that the translation
             #  process as a whole has finished. We reset the state that the numbers are small
             #  again when we start anew.
-            self._rev_manager._reset_state()
+            self._rev_manager = itertools.count(0, 1)
 
             # Freeing the reserved names only for heads make it more safe in case a child
             #  translator is reused.c On the other hand reusing a child translator is
@@ -985,7 +992,7 @@ class JaxprTranslationDriver:
     def _find_sub_translator_for(
         self,
         eqn: jcore.JaxprEqn,
-    ) -> jtrans.JaCeSubTranslatorInterface:
+    ) -> jtrans.PrimitiveTranslator:
         """Returns the appropriate subtranslator for equation `eqn`."""
         assert self._sub_translators is not None
 
@@ -1036,7 +1043,7 @@ class JaxprTranslationDriver:
         )
 
         # Find the subtranslator
-        subtranslator: jtrans.JaCeSubTranslatorInterface = self._find_sub_translator_for(eqn)
+        subtranslator: jtrans.PrimitiveTranslator = self._find_sub_translator_for(eqn)
 
         # Create the state into which the equation should be translated
         last_term_state: dace.SDFGState = self.get_terminal_sdfg_state()  # noqa: F841 # Will be used later
@@ -1109,7 +1116,7 @@ class JaxprTranslationDriver:
     def _translate_jaxpr_internal(
         self,
         jaxpr: jcore.ClosedJaxpr,
-    ) -> jtrutil.JaCeTranslationMemento:
+    ) -> jtrans.JaCeTranslationMemento:
         """Performs the actual translation of the Jaxpr into an SDFG.
 
         The function assumes that the context is already allocated and the initial
@@ -1151,7 +1158,7 @@ class JaxprTranslationDriver:
 
         return self._export_memento()
 
-    def _export_memento(self) -> jtrutil.JaCeTranslationMemento:
+    def _export_memento(self) -> jtrans.JaCeTranslationMemento:
         """Encapsulate the translation context of `self` into a memento.
 
         This function will not deallocate the internal context of `self`.
@@ -1161,7 +1168,7 @@ class JaxprTranslationDriver:
         assert all((isinstance(x, str) and (len(x) > 0)) for x in self._sdfg_in_names)
         assert all((isinstance(x, str) and (len(x) > 0)) for x in self._sdfg_out_names)
 
-        return jtrutil.JaCeTranslationMemento(
+        return jtrans.JaCeTranslationMemento(
             sdfg=self._sdfg,
             start_state=self._init_sdfg_state,
             terminal_state=self._term_sdfg_state,

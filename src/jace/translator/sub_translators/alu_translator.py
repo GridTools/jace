@@ -9,7 +9,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Collection, Sequence
+from collections.abc import Sequence
 from typing import Any, Final, cast
 
 import dace
@@ -18,10 +18,9 @@ from jax import core as jcore
 from typing_extensions import override
 
 from jace import translator as jtranslator
-from jace.translator import util as jtutil
 
 
-class ALUTranslator(jtranslator.JaCeSubTranslatorInterface):
+class ALUTranslator(jtranslator.PrimitiveTranslator):
     """This translator handles all arithmetic and logical operations."""
 
     __slots__ = ()
@@ -75,9 +74,9 @@ class ALUTranslator(jtranslator.JaCeSubTranslatorInterface):
         super().__init__(**kwargs)
 
     @override
-    def get_handled_primitives(self) -> Collection[str] | str:
+    def get_handled_primitive(self) -> Sequence[str]:
         """Returns the list of all known primitives."""
-        return set(self._unary_ops.keys()).union(self._binary_ops.keys())
+        return list(self._unary_ops.keys()) + list(self._binary_ops.keys())
 
     @override
     def translate_jaxeqn(
@@ -198,8 +197,8 @@ class ALUTranslator(jtranslator.JaCeSubTranslatorInterface):
         if is_scalar:
             tskl_tasklet = eqn_state.add_tasklet(
                 tskl_name,
-                jtutil.list_to_dict(tskl_inputs).keys(),
-                jtutil.list_to_dict([tskl_output]).keys(),
+                _list_to_dict(tskl_inputs).keys(),
+                _list_to_dict([tskl_output]).keys(),
                 tskl_code,
             )
             for in_var, (in_connector, in_memlet) in zip(in_var_names, tskl_inputs, strict=False):
@@ -222,10 +221,10 @@ class ALUTranslator(jtranslator.JaCeSubTranslatorInterface):
         else:
             eqn_state.add_mapped_tasklet(
                 name=tskl_name,
-                map_ranges=jtutil.list_to_dict(tskl_map_ranges),
-                inputs=jtutil.list_to_dict(tskl_inputs),
+                map_ranges=_list_to_dict(tskl_map_ranges),
+                inputs=_list_to_dict(tskl_inputs),
                 code=tskl_code,
-                outputs=jtutil.list_to_dict([tskl_output]),
+                outputs=_list_to_dict([tskl_output]),
                 external_edges=True,
             )
 
@@ -290,3 +289,11 @@ class ALUTranslator(jtranslator.JaCeSubTranslatorInterface):
             t_code = t_code.format(**eqn.params)
 
         return t_code
+
+
+def _list_to_dict(inp: Sequence[tuple[None | Any, Any]]) -> dict[Any, Any]:
+    """This method turns a `list` of pairs into a `dict` and applies a `None` filter.
+
+    The function will only include pairs whose key, i.e. first element is not `None`.
+    """
+    return {k: v for k, v in inp if k is not None}

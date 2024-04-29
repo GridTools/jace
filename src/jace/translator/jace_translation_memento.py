@@ -59,18 +59,3 @@ class JaCeTranslationMemento:
         if not hasattr(self, idx):
             raise KeyError(f"The key '{idx}' is not known.")
         return getattr(self, idx)
-
-    def __hash__(self) -> int:
-        """Computes the hash of the underlying SDFG object."""
-        return hash(self.sdfg)
-
-    def __eq__(self, other: Any) -> bool:
-        """Compares the underlying SDFG object with 'rhs'."""
-        if isinstance(other, JaCeTranslationMemento):
-            return bool(self.sdfg == other.sdfg)
-        if hasattr(other, "__sdfg__"):
-            other = other.__sdfg__()
-        elif not isinstance(other, dace.SDFG):
-            return NotImplemented
-        x: bool = self.sdfg.__eq__(other)
-        return x

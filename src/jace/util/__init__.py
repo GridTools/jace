@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+from .debug import _jace_run, run_memento
 from .jax_helper import (
     JaCeVar,
     get_jax_var_dtype,
@@ -31,4 +32,6 @@ __all__ = [
     "get_jax_var_shape",
     "get_jax_var_dtype",
     "translate_dtype",
+    "run_memento",
+    "_jace_run",
 ]

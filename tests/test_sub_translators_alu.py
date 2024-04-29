@@ -12,7 +12,7 @@ from __future__ import annotations
 import jax
 import numpy as np
 
-from jace.translator.util import debug as jtrudebug
+from jace import util as jutil
 
 
 def test_add():
@@ -26,7 +26,7 @@ def test_add():
     B = np.full((4, 3), 10, dtype=np.float64)
 
     ref = testee(A, B)
-    res = jtrudebug._jace_run(testee, A, B)
+    res = jutil._jace_run(testee, A, B)
 
     assert np.allclose(ref, res), f"Expected '{ref}' got '{res}'."
 
