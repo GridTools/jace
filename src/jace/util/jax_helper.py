@@ -16,7 +16,6 @@ mimics the full `jax` package itself.
 from __future__ import annotations
 
 import re
-from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -144,13 +143,15 @@ def is_jaxified(obj: Any) -> bool:
     from jax._src import pjit as jaxpjit
 
     # These are all types we consider as jaxify
-    jaxify_types: Sequence[type] = (
-        jcore.Primitive,
-        # jstage.Wrapped, # Not runtime chakable
-        jaxpjit.JitWrapped,
-        jaxlib.xla_extension.PjitFunction,
+    return isinstance(
+        obj,
+        (
+            jcore.Primitive,
+            # jstage.Wrapped, # Not runtime chakable
+            jaxpjit.JitWrapped,
+            jaxlib.xla_extension.PjitFunction,
+        ),
     )
-    return isinstance(obj, jaxify_types)
 
 
 def translate_dtype(dtype: Any) -> dace.typeclass:
