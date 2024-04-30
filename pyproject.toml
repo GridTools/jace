@@ -112,6 +112,7 @@ extend-select = [
   "SIM",  # flake8-simplify # TODO: in evaluation
   "T10",  # flake8-debugger
   "T20",  # flake8-print    # TODO: in evaluation
+  "TCH",  # flake8-type-checking  # TODO: in evaluation
   "NPY"  # NumPy specific rules
 ]
 ignore = [
