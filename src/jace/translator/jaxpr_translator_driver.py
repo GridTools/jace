@@ -120,9 +120,8 @@ class JaxprTranslationDriver:
 
         # Maps a Jax variable to the name of its SDFG equivalent.
         #  As an extension it is also able to map JaCe Variables.
-        #  In case the key (Jax Variable) is a Literal, the mapped value is None.
         #  Only allocated during an ongoing translation.
-        self._jax_name_map: dict[jcore.Var | jutil.JaCeVar, str | None] = None  # type: ignore[assignment]
+        self._jax_name_map: dict[jcore.Var | jutil.JaCeVar, str] = None  # type: ignore[assignment]
 
         # These names can not be used for the automatic naming of Jax variables.
         #  They differ from the forbidden names, that they denote valid SDFG names.
@@ -376,29 +375,27 @@ class JaxprTranslationDriver:
         Args:
             jax_var:        The Jax variable to look up.
             allow_fail:     If mapping is not known return `None` instead of raise `KeyError`.
-
-        Notes:
-            Despite the fact that Jax literals can be added to the internal variable mapping 
-                it is an error to pass a Jax `Literal` object as `jax_var`.
         """
         assert self._jax_name_map is not None
         assert isinstance(jax_var, (jcore.Atom, str, jutil.JaCeVar))
 
-        if(isinstance(jax_var, str)):
+        if isinstance(jax_var, str):
             sdfg_name: str = jax_var
-        elif(isinstance(jax_var, jcore.Literal)):
+        elif isinstance(jax_var, jcore.Literal):
             raise RuntimeError("There is no SDFG variable for literal '{jax_var}'.")
-        elif(jax_var in self._jax_name_map):
-            sdfg_name: str = self._jax_name_map[jax_var]
+        elif jax_var in self._jax_name_map:
+            sdfg_name = self._jax_name_map[jax_var]
             assert isinstance(sdfg_name, str)
-        elif(allow_fail):
+        elif allow_fail:
             return None
         else:
             KeyError(f"The Jax variable '{jax_var}' was never registered.")
 
-        if(sdfg_name not in self._sdfg.arrays):
-            raise KeyError(f"Jax variable '{jax_var}' was supposed to map to '{sdfg_name}',"
-                            "but no such SDFG variable is known.")
+        if sdfg_name not in self._sdfg.arrays:
+            raise KeyError(
+                f"Jax variable '{jax_var}' was supposed to map to '{sdfg_name}',"
+                "but no such SDFG variable is known."
+            )
         return sdfg_name
 
     def get_sdfg(self) -> dace.SDFG:
@@ -477,26 +474,10 @@ class JaxprTranslationDriver:
         """
         return self._rev_idx
 
-    @overload
     def add_jax_name_mapping(
         self,
         jax_var: jcore.Var | jutil.JaCeVar,
         sdfg_name: str,
-    ) -> JaxprTranslationDriver:
-        ...
-
-    @overload
-    def add_jax_name_mapping(
-        self,
-        jax_var: jcore.Literal,
-        sdfg_name: None,
-    ) -> JaxprTranslationDriver:
-        ...
-
-    def add_jax_name_mapping(
-        self,
-        jax_var: jcore.Atom | jutil.JaCeVar,
-        sdfg_name: str | None,
     ) -> JaxprTranslationDriver:
         """Creates a mapping between `jax_var` to `sdfg_name`.
 
@@ -510,29 +491,20 @@ class JaxprTranslationDriver:
             sdfg_name:   The name of the corresponding SDFG variable.
         """
         assert self._jax_name_map is not None
-        assert isinstance(jax_var, (jcore.Atom, jutil.JaCeVar))
-
-        # Adding literals to the variable map.
-        #  The only reason why we allow to add literals to the map is because
-        #  we need them in the proposing of Jax names, see `_propose_jax_name()`.
-        if(isinstance(jax_var, jcore.Literal)):
-            assert sdfg_name is None
-            self._jax_name_map[jax_var] = None
-            return self
-
-        assert isinstance(sdfg_name, str) and (len(sdfg_name) > 0)
+        assert isinstance(jax_var, (jcore.Var, jutil.JaCeVar))
+        assert isinstance(sdfg_name, str) and (len(sdfg_name) > 0)  # noqa: PT018  # Should be one assertion.
 
         if jax_var in self._jax_name_map:
             if self._jax_name_map[jax_var] == sdfg_name:  # noops.
                 return self
             raise ValueError(
-                f"Tried to create the mapping '{jax_name} -> {sdfg_name}', but '{jax_name}'"
-                f" already points to '{self.map_jax_var_to_sdfg(jax_name)}'."
+                f"Tried to create the mapping '{jax_var} -> {sdfg_name}', but '{jax_var}'"
+                f" already points to '{self.map_jax_var_to_sdfg(jax_var)}'."
             )
         if sdfg_name not in self.get_arrays():
-            raise KeyError(f"Mapping '{jax_name} -> {sdfg_name}': SDFG target unknown.")
+            raise KeyError(f"Mapping '{jax_var} -> {sdfg_name}': SDFG target unknown.")
         if sdfg_name in self._forbidden_names:
-            raise NameError(f"Mapping '{jax_name} -> {sdfg_name}': Forbidden name.")
+            raise NameError(f"Mapping '{jax_var} -> {sdfg_name}': Forbidden name.")
 
         self._jax_name_map[jax_var] = sdfg_name
         return self
@@ -809,49 +781,57 @@ class JaxprTranslationDriver:
         jax_var_list: Sequence[jcore.Atom | jutil.JaCeVar],
         prevent_creation: bool = False,
         only_creation: bool = False,
+        handle_literals: bool = False,
         **kwargs: Any,
     ) -> list[None | str]:
         """Creates SDFG variables for the listed Jax variables and returns their SDFG names.
 
-        Before the function will create a variable, by using `add_array()` with `update_var_mapping=True`,
-        it will check if the variable is known and if so no new variable is created.
-        Instead the name of the previously created variable is added to the list.
-        In case the Jax Atom denotes a Jax Literal, no variable will be created, instead `None` will be added to the list.
+        If a Jax variable already has a SDFG equivalent then the function will use this variable.
+        If no SDFG variable is known the function will create one using `add_array()`, with `update_var_mapping` set to `True`.
+
+        By setting `prevent_creation` the function will not create any new SDFG variables.
+        This mode is used to indicate that all variables already have to exists already.
+        By setting `only_creation` the function will only create new SDFG variables.
+        If a Jax variable already has a known SDFG equivalent an error is generated.
+
+        By default literals cause an error.
+        However, by setting `handle_literals` to `True` literals will will be included in the output with the value `None`.
 
         Args:
             jax_var_list:       The list of Jax variables that should be transformed to SDFG names.
-            prevent_creation:   Never create a variable, indicates that all variables must exists.
-            only_creation:      Variables must be generated, generate an error instead of using it.
-            kwargs:             Will be forwarded to `self.add_array()` if a variable as to be created.
-
-        Notes:
-            If `only_creation` is set, then literals will cause an error.
-            It is an error to pass the `update_var_mapping` argument to this function.
+            prevent_creation:   Never create a variable, all must already be known.
+            only_creation:      Always create a variable, it is an error if one already exist.
+            handle_literals:    Allow the processing of literals.
+            kwargs:             Will be forwarded to `self.add_array()` if a variable as to be created,
         """
         assert self._jax_name_map is not None
-        assert "update_var_mapping" in kwargs
+        assert "update_var_mapping" not in kwargs
         if only_creation and prevent_creation:
             raise ValueError("Specified both 'only_creation' and 'prevent_creation'.")
 
         ret_list: list[None | str] = []
         for jax_var in jax_var_list:
             if isinstance(jax_var, jcore.Literal):
-                if only_creation:
-                    raise ValueError(f"Requested 'only_creation', but '{jax_var}' is a 'Literal'.")
-                # SOMEHOW TO UPDATE
-                ret_list.append(None)
+                if not handle_literals:
+                    raise ValueError("Encountered a literal but `handle_literals` was `False`.")
+                sdfg_name = None
             elif isinstance(jax_var, (jcore.Var, jutil.JaCeVar)):
                 mapped_sdfg_name: str | None = self.map_jax_var_to_sdfg(jax_var, allow_fail=True)
                 if (mapped_sdfg_name is None) and prevent_creation:
-                    raise ValueError(f"prevent_creation' given but have to create '{jax_var}'.")
+                    raise ValueError(f"'prevent_creation' given but have to create '{jax_var}'.")
                 if mapped_sdfg_name is None:
-                    ret_list.append(self.add_array(arg=jax_var, update_var_mapping=True, **kwargs))
+                    sdfg_name = self.add_array(arg=jax_var, update_var_mapping=True, **kwargs)
                 elif only_creation:
                     raise ValueError(f"'only_creation' given '{jax_var}' already exists.")
                 else:
-                    ret_list.append(mapped_sdfg_name)
+                    sdfg_name = mapped_sdfg_name
+                # `add_jax_name_mapping` is save, because if the mapping does already exists it is a no ops.
+                self.add_jax_name_mapping(jax_var, sdfg_name)
             else:
                 raise TypeError(f"Does not know how to handle '{type(jax_var).__name__}'")
+
+            ret_list.append(sdfg_name)
+
         return ret_list
 
     def _create_initial_input(
@@ -884,6 +864,7 @@ class JaxprTranslationDriver:
             jax_var_list=jaxpr.jaxpr.invars,
             only_creation=True,
             as_transient=True,  # Explicit transient; no error!
+            handle_literals=False,  # Initial arguments are never literals
             force_array=inp_scalar_as_array,
             force_jax_name=self.is_head_translator(),  # Ensure head get pure Jax names.
         )
@@ -1070,6 +1051,7 @@ class JaxprTranslationDriver:
             self.create_jax_var_list(
                 eqn.invars,
                 prevent_creation=True,  # Inputs must already exists.
+                handle_literals=True,  #  but they can be literals.
             )
         )
         out_var_names: Sequence[str] = self.create_jax_var_list(  # type: ignore[assignment]

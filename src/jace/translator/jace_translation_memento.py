@@ -12,6 +12,9 @@ from dataclasses import dataclass
 from typing import Any
 
 import dace
+from jax import core as jcore
+
+from jace import util as jutil
 
 
 @dataclass(init=True, repr=True, eq=False, frozen=True, kw_only=True, slots=True)
@@ -32,7 +35,7 @@ class JaCeTranslationMemento:
     sdfg: dace.SDFG
     start_state: dace.SDFGState
     terminal_state: dace.SDFGState
-    jax_name_map: Mapping[str, str]
+    jax_name_map: Mapping[jcore.Var | jutil.JaCeVar, str]
     inp_names: Sequence[str]
     out_names: Sequence[str]
 
