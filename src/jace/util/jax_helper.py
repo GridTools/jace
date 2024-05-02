@@ -68,23 +68,18 @@ def get_jax_var_name(jax_var: jcore.Atom | JaCeVar | str) -> str:
     match jax_var:
         case jcore.DropVar():
             return "_"
-
         case JaCeVar():
             jax_name = jax_var.name
-
         case jcore.Var():
             # This stopped working after version 0.20.4, because of some changes in Jax
             #  See `https://github.com/google/jax/pull/10573` for more information.
             #  The following implementation will generate stable names, however, they will be decoupled
             #  from output of the pretty printed Jaxpr
             jax_name = f"jax{jax_var.count}{jax_var.suffix}"
-
         case jcore.Literal():
             raise TypeError("Can not derive a name from a Jax Literal.")
-
         case str():
             jax_name = jax_var
-
         case _:
             raise TypeError(
                 f"Does not know how to transform '{jax_var}' (type: '{type(jax_var).__name__}') into a string."
@@ -105,10 +100,8 @@ def get_jax_var_shape(jax_var: jcore.Atom | JaCeVar) -> tuple[int, ...]:
     match jax_var:
         case jcore.Var() | jcore.Literal():
             return jax_var.aval.shape
-
         case JaCeVar():
             return jax_var.shape
-
         case _:
             raise TypeError(f"'get_jax_var_shape()` is not implemented for '{type(jax_var)}'.")
 
@@ -118,10 +111,8 @@ def get_jax_var_dtype(jax_var: jcore.Atom | JaCeVar) -> dace.typeclass:
     match jax_var:
         case jcore.Var() | jcore.Literal():
             return translate_dtype(jax_var.aval.dtype)
-
         case JaCeVar():
             return translate_dtype(jax_var.dtype)
-
         case _:
             raise TypeError(f"'get_jax_var_dtype()` is not implemented for '{type(jax_var)}'.")
 
@@ -157,15 +148,13 @@ def is_jaxified(obj: Any) -> bool:
     from jax._src import pjit as jaxpjit
 
     # These are all types we consider as jaxify
-    return isinstance(
-        obj,
-        (
-            jcore.Primitive,
-            # jstage.Wrapped, # Not runtime chakable
-            jaxpjit.JitWrapped,
-            jaxlib.xla_extension.PjitFunction,
-        ),
+    jaxifyed_types = (
+        jcore.Primitive,
+        # jstage.Wrapped is not runtime chakable
+        jaxpjit.JitWrapped,
+        jaxlib.xla_extension.PjitFunction,
     )
+    return isinstance(obj, jaxifyed_types)
 
 
 def translate_dtype(dtype: Any) -> dace.typeclass:
