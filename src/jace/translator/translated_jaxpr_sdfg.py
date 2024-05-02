@@ -29,7 +29,11 @@ class TranslatedJaxprSDFG:
     - `inp_names` a `list` of the SDFG variables that are used as input, in the same order as `Jaxpr.invars`.
     - `out_names` a `list` of the SDFG variables that are used as output, in the same order as `Jaxpr.outvars`.
 
-    Note that `inp_names` and `out_names` may not be disjunct.
+    The SDFG is in a so called canonical form, that is not directly usable, see `JaxprTranslationDriver` for more.
+
+    It might be that a name appears in both the `inp_names` and `out_names` list.
+    This happens if the corresponding variable is used as both input and output.
+    In Jax this is called argument donation.
     """
 
     sdfg: dace.SDFG
