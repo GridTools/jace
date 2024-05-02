@@ -21,15 +21,17 @@ from .jax_helper import (
     is_tracing_ongoing,
     translate_dtype,
 )
-from .util import ensure_iterability, is_jaceified
+from .traits import is_non_string_iterable
+from .util import as_sequence, is_jaceified
 
 
 __all__ = [
-    "ensure_iterability",
+    "as_sequence",
     "is_drop_var",
     "is_tracing_ongoing",
     "is_jaceified",
     "is_jaxified",
+    "is_non_string_iterable",
     "JaCeVar",
     "get_jax_var_name",
     "get_jax_var_shape",
