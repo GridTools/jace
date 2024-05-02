@@ -16,13 +16,11 @@ from .jax_helper import (
     get_jax_var_dtype,
     get_jax_var_name,
     get_jax_var_shape,
-    is_drop_var,
-    is_jaxified,
     is_tracing_ongoing,
     translate_dtype,
 )
-from .traits import is_non_string_iterable
-from .util import as_sequence, is_jaceified
+from .traits import is_drop_var, is_jaceified, is_jaxified, is_non_string_iterable
+from .util import as_sequence
 
 
 __all__ = [

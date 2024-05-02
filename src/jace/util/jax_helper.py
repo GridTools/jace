@@ -137,26 +137,6 @@ def is_tracing_ongoing(
     return any(isinstance(x, jcore.Tracer) for x in chain(args, kwargs.values()))
 
 
-def is_jaxified(obj: Any) -> bool:
-    """Tests if `obj` is a "jaxified" object.
-
-    A "jexified" object is an object that was processed by Jax.
-    While a return value of `True` guarantees a jaxified object,
-    `False` might not proof the contrary.
-    """
-    import jaxlib
-    from jax._src import pjit as jaxpjit
-
-    # These are all types we consider as jaxify
-    jaxifyed_types = (
-        jcore.Primitive,
-        # jstage.Wrapped is not runtime chakable
-        jaxpjit.JitWrapped,
-        jaxlib.xla_extension.PjitFunction,
-    )
-    return isinstance(obj, jaxifyed_types)
-
-
 def translate_dtype(dtype: Any) -> dace.typeclass:
     """Turns a Jax datatype into a DaCe datatype."""
     if isinstance(dtype, dace.typeclass):
@@ -181,16 +161,6 @@ def translate_dtype(dtype: Any) -> dace.typeclass:
             return dace.dtype_to_typeclass(dtype)
 
 
-def is_drop_var(jax_var: jcore.Atom | JaCeVar) -> bool:
-    """Tests if `jax_var` is a drop variable."""
-
-    if isinstance(jax_var, jcore.DropVar):
-        return True
-    if isinstance(jax_var, JaCeVar):
-        return jax_var.name == "_"
-    return False
-
-
 def _propose_jax_name(
     jax_var: jcore.Atom | JaCeVar,
     jax_name_map: Mapping[jcore.Var | JaCeVar, Any] | None = None,
@@ -211,6 +181,8 @@ def _propose_jax_name(
         The naming of variables are only consistent with the inner most Jaxpr a variable is defined in.
         Dropped variables will always be named `'_'`.
     """
+    from jace.util.traits import is_drop_var
+
     if is_drop_var(jax_var):
         return "_"
     if isinstance(jax_var, jcore.Literal):
