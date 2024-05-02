@@ -25,11 +25,11 @@ class JaCeTranslationMemento:
     - `sdfg` the SDFG object that was created.
     - `start_state` the first state in the SDFG state machine.
     - `terminal_state` the last state in the state machine.
-    - `jax_name_map` a `dict` that maps every Jax name to its corresponding SDFG variable name.
-    - `inp_names` a `list` of the SDFG variables that are used as input,
-            in the same order as `Jaxpr.invars`.
-    - `out_names` a `list` of the SDFG variables that are used as output,
-            in the same order as `Jaxpr.outvars`.
+    - `jax_name_map` a `dict` that maps every Jax variable to its corresponding SDFG variable _name_.
+    - `inp_names` a `list` of the SDFG variables that are used as input, in the same order as `Jaxpr.invars`.
+    - `out_names` a `list` of the SDFG variables that are used as output, in the same order as `Jaxpr.outvars`.
+
+    Note that `inp_names` and `out_names` may not be disjunct.
     """
 
     sdfg: dace.SDFG
