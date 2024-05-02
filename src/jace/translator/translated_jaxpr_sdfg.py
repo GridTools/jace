@@ -17,15 +17,15 @@ from jax import core as jcore
 from jace import util as jutil
 
 
-@dataclass(init=True, repr=True, eq=False, frozen=True, kw_only=True, slots=True)
+@dataclass(init=True, repr=True, eq=False, frozen=False, kw_only=True, slots=True)
 class TranslatedJaxprSDFG:
     """Encapsulates the result of a translation run of the `JaxprTranslationDriver` object.
 
     It defines the following members:
     - `sdfg` the SDFG object that was created.
+    - `jax_name_map` a `dict` that maps every Jax variable to its corresponding SDFG variable _name_.
     - `start_state` the first state in the SDFG state machine.
     - `terminal_state` the last state in the state machine.
-    - `jax_name_map` a `dict` that maps every Jax variable to its corresponding SDFG variable _name_.
     - `inp_names` a `list` of the SDFG variables that are used as input, in the same order as `Jaxpr.invars`.
     - `out_names` a `list` of the SDFG variables that are used as output, in the same order as `Jaxpr.outvars`.
 
@@ -37,11 +37,11 @@ class TranslatedJaxprSDFG:
     """
 
     sdfg: dace.SDFG
-    start_state: dace.SDFGState
-    terminal_state: dace.SDFGState
     jax_name_map: Mapping[jcore.Var | jutil.JaCeVar, str]
-    inp_names: Sequence[str]
-    out_names: Sequence[str]
+    start_state: dace.SDFGState | None = None
+    terminal_state: dace.SDFGState | None = None
+    inp_names: Sequence[str] | None = None
+    out_names: Sequence[str] | None = None
 
     def validate(self) -> bool:
         """Validate the underlying SDFG."""
