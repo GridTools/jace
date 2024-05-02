@@ -229,6 +229,7 @@ def _propose_jax_name(
     if jax_name_map is None:
         return get_jax_var_name(jax_var)
     if jax_var in jax_name_map:
+        # Should be turned into a lookup?
         raise RuntimeError(
             f"Can not propose a second name for '{jax_var}', it already known as '{jax_name_map[jax_var]}'."
         )
@@ -241,4 +242,4 @@ def _propose_jax_name(
     while len(jax_name) == 0 or c != 0:
         c, i = c // 26, c % 26
         jax_name = chr(97 + i % 26) + jax_name
-    return jax_name
+    return jax_name + jax_var.suffix
