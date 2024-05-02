@@ -18,7 +18,7 @@ from jace import util as jutil
 
 
 @dataclass(init=True, repr=True, eq=False, frozen=True, kw_only=True, slots=True)
-class JaCeTranslationMemento:
+class TranslatedJaxprSDFG:
     """Encapsulates the result of a translation run of the `JaxprTranslationDriver` object.
 
     It defines the following members:

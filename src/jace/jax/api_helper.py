@@ -79,16 +79,15 @@ class JitWrapped:
         Notes:
             Currently no caching of the compiled object is done.
         """
+        jsdfg: jtrans.TranslatedJaxprSDFG = self._get_translated_sdfg(*args, **kwargs)
+        return jutil.run_jax_sdfg(jsdfg, *args)
 
-        memento: jtrans.JaCeTranslationMemento = self._get_memento(*args, **kwargs)
-        return jutil.run_memento(memento, *args)
-
-    def _get_memento(
+    def _get_translated_sdfg(
         self,
         *args: Any,
         **kwargs: Any,
-    ) -> jtrans.JaCeTranslationMemento:
-        """This function returns the Memento.
+    ) -> jtrans.TranslatedJaxprSDFG:
+        """This function returns the `TranslatedJaxprSDFG` object.
 
         The function will transform its arguments into `_ArgInfo` versions.
         This is needed since Jax only cares about the information stored inside it.
@@ -96,28 +95,28 @@ class JitWrapped:
         and the kwonly arguments are used to influence the Jaxpr to SDFG translator.
 
         Notes:
-            It is forbidden to permanently modify the returned memento.
+            It is forbidden to permanently modify the returned translated SDFG.
                 Doing so results in undefined behaviour.
         """
-        return self._get_memento_cached(
+        return self._get_translated_sdfg_cached(
             *(_ArgInfo.from_value(v) for v in args),
             **kwargs,
         )
 
     @lru_cache
-    def _get_memento_cached(
+    def _get_translated_sdfg_cached(
         self,
         *args: _ArgInfo,
         **kwargs: Any,
-    ) -> jtrans.JaCeTranslationMemento:
+    ) -> jtrans.TranslatedJaxprSDFG:
         """Generates the SDFG from
 
         Todo:
-            Also make the SDFG compiled and permanent also in the memento
+            Also make the SDFG compiled and permanent also in the translated SDFG object; maybe.
             Implement a better cache that avoids using this strange way to pass values around.
 
         Notes:
-            It is forbidden to permanently modify the returned memento.
+            It is forbidden to permanently modify the returned translated SDFG.
                 Doing so results in undefined behaviour.
         """
         from jace.translator import JaxprTranslationDriver

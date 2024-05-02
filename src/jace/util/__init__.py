@@ -9,17 +9,17 @@
 
 from __future__ import annotations
 
-from .debug import _jace_run, run_memento
+from .debug import _jace_run, run_jax_sdfg
 from .jax_helper import (
     JaCeVar,
+    _propose_jax_name,
     get_jax_var_dtype,
     get_jax_var_name,
     get_jax_var_shape,
+    is_drop_var,
     is_jaxified,
     is_tracing_ongoing,
     translate_dtype,
-    is_drop_var,
-    _propose_jax_name,
 )
 from .util import ensure_iterability, is_jaceified
 
@@ -35,7 +35,7 @@ __all__ = [
     "get_jax_var_shape",
     "get_jax_var_dtype",
     "translate_dtype",
-    "run_memento",
+    "run_jax_sdfg",
     "_jace_run",
     "_propose_jax_name",
 ]

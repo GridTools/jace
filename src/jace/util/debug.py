@@ -5,7 +5,10 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""This module contains functions for debugging the translator."""
+"""This module contains functions for debugging the translator.
+
+Everything in this module is experimental and might vanish anytime.
+"""
 
 from __future__ import annotations
 
@@ -20,34 +23,35 @@ if TYPE_CHECKING:
     from jace import translator as jtrans
 
 
-def run_memento(
-    memento: jtrans.JaCeTranslationMemento,
+def run_jax_sdfg(
+    jsdfg: jtrans.TranslatedJaxprSDFG,
     *args: Any,
 ) -> tuple[Any, ...] | Any:
-    """Calls the SDFG with the supplied arguments.
+    """Calls the SDFG that is encapsulated with the supplied arguments.
 
     Notes:
         Currently the SDFG must not have any undefined symbols, i.e. no undefined sizes.
+        Currently denoted arguments are not fully respected.
         The function either returns a value or a tuple of values, i.e. no tree.
     """
     from dace.data import Array, Data, Scalar, make_array_from_descriptor
 
     # This is a simplification that makes our life simply
-    if len(memento.sdfg.free_symbols) != 0:
+    if len(jsdfg.sdfg.free_symbols) != 0:
         raise ValueError(
-            f"No externally defined symbols are allowed, found: {memento.sdfg.free_symbols}"
+            f"No externally defined symbols are allowed, found: {jsdfg.sdfg.free_symbols}"
         )
-    if len(memento.inp_names) != len(args):
+    if len(jsdfg.inp_names) != len(args):
         raise ValueError(
-            f"Wrong numbers of arguments expected {len(memento.inp_names)} got {len(args)}."
+            f"Wrong numbers of arguments expected {len(jsdfg.inp_names)} got {len(args)}."
         )
 
     # We use a return by reference approach, for calling the SDFG
     call_args: dict[str, Any] = {}
-    for in_name, in_val in zip(memento.inp_names, args):
+    for in_name, in_val in zip(jsdfg.inp_names, args):
         call_args[in_name] = in_val
-    for out_name in memento.out_names:
-        sarray: Data = memento.sdfg.arrays[out_name]
+    for out_name in jsdfg.out_names:
+        sarray: Data = jsdfg.sdfg.arrays[out_name]
         assert out_name not in call_args
 
         if (out_name == "__return") or (out_name.startswith("__return_")):
@@ -61,25 +65,25 @@ def run_memento(
 
     # Canonical SDFGs do not have global memory, so we must transform it.
     #  We will afterwards undo it.
-    for glob_name in memento.inp_names + memento.out_names:  # type: ignore[operator]  # concatenation
-        memento.sdfg.arrays[glob_name].transient = False
+    for glob_name in jsdfg.inp_names + jsdfg.out_names:  # type: ignore[operator]  # concatenation
+        jsdfg.sdfg.arrays[glob_name].transient = False
 
     try:
-        csdfg: dace.CompiledSDFG = memento.sdfg.compile()
+        csdfg: dace.CompiledSDFG = jsdfg.sdfg.compile()
         with dace.config.temporary_config():
             dace.Config.set("compiler", "allow_view_arguments", value=True)
             csdfg(**call_args)
 
-        if len(memento.out_names) == 0:
+        if len(jsdfg.out_names) == 0:
             return None
-        ret_val: tuple[Any] = tuple(call_args[out_name] for out_name in memento.out_names)
-        if len(memento.out_names) == 1:
+        ret_val: tuple[Any] = tuple(call_args[out_name] for out_name in jsdfg.out_names)
+        if len(jsdfg.out_names) == 1:
             return ret_val[0]
         return ret_val
 
     finally:
-        for name in memento.inp_names + memento.out_names:  # type: ignore[operator]  # concatenation
-            memento.sdfg.arrays[name].transient = True
+        for name in jsdfg.inp_names + jsdfg.out_names:  # type: ignore[operator]  # concatenation
+            jsdfg.sdfg.arrays[name].transient = True
 
 
 def _jace_run(
@@ -97,5 +101,5 @@ def _jace_run(
 
     jaxpr = jax.make_jaxpr(fun)(*args)
     driver = JaxprTranslationDriver(**kwargs)
-    memento = driver.translate_jaxpr(jaxpr)
-    return run_memento(memento, *args)
+    jsdfg = driver.translate_jaxpr(jaxpr)
+    return run_jax_sdfg(jsdfg, *args)

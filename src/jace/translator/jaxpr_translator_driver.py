@@ -163,14 +163,13 @@ class JaxprTranslationDriver:
         reserved_names: str | Collection[str] | None = None,
         allow_empty_jaxpr: bool = False,
         **kwargs: Any,
-    ) -> jtrans.JaCeTranslationMemento:
+    ) -> jtrans.TranslatedJaxprSDFG:
         """Perform the translation of a Jaxpr description into a SDFG.
 
         Returns:
             The function will translate the passed Jaxpr object into an SDFG.
-            However, the SDFG will be in canonical form and needs further
-            processing. The SDFG is encapsulated inside a `JaCeTranslationMemento`,
-            that contains additional metadata for further manipulation.
+            However, the SDFG will be in canonical form and needs further processing.
+            The SDFG is encapsulated inside a `TranslatedJaxprSDFG`, that contains additional metadata.
 
         Args:
             inp_scalar_as_array:    Translate scalar _input_ arguments to arrays of length 1.
@@ -181,7 +180,7 @@ class JaxprTranslationDriver:
 
         Returns:
             The function will not return the SDFG directly.
-            Instead it will be wrapped inside a `JaCeTranslationMemento` instance.
+            Instead it will be wrapped inside a `TranslatedJaxprSDFG` instance.
             That contains the SDFG and some meta data needed for further processing.
         """
         if self.is_allocated():
@@ -213,14 +212,14 @@ class JaxprTranslationDriver:
             jaxpr=jaxpr,
             inp_scalar_as_array=inp_scalar_as_array,
         )
-        memento: jtrans.JaCeTranslationMemento = self._translate_jaxpr_internal(jaxpr)
+        jsdfg: jtrans.TranslatedJaxprSDFG = self._translate_jaxpr_internal(jaxpr)
 
-        # If the translation context is not cleared `self` and `memento` will share the same data.
+        # If the translation context is not cleared `self` and `jsdfg` will share the same data.
         #  There is some legitimate use for that.
         if _clear_translation_ctx:
             self._clear_translation_ctx()
 
-        return memento
+        return jsdfg
 
     def fork(self) -> JaxprTranslationDriver:
         """Return a child of `self` ready for transformation.
@@ -1133,14 +1132,12 @@ class JaxprTranslationDriver:
     def _translate_jaxpr_internal(
         self,
         jaxpr: jcore.ClosedJaxpr,
-    ) -> jtrans.JaCeTranslationMemento:
+    ) -> jtrans.TranslatedJaxprSDFG:
         """Performs the actual translation of the Jaxpr into an SDFG.
 
-        The function assumes that the context is already allocated and the initial
-        input variables were already created. The function will store the internal
-        state of `self` into a memento and return it.
-        However, it will not deallocate the translation context, thus `self`
-        and the memento share the same context in memory.
+        The function assumes that the context is allocated as well as initial variables.
+        The function will return the internal state of `self` as a `TranslatedJaxprSDFG` object.
+        However, it will not deallocate the translation context, thus `self` and the return value share the same memory.
 
         Args:
             jaxpr:      The Jaxpr to translate.
@@ -1173,19 +1170,20 @@ class JaxprTranslationDriver:
             out_var_names = self._handle_null_jaxpr(jaxpr)
         self._sdfg_out_names = tuple(out_var_names)
 
-        return self._export_memento()
+        return self._export_context()
 
-    def _export_memento(self) -> jtrans.JaCeTranslationMemento:
-        """Encapsulate the translation context of `self` into a memento.
+    def _export_context(self) -> jtrans.TranslatedJaxprSDFG:
+        """Encapsulate the translation context of `self` into a `TranslatedJaxprSDFG` object..
 
         This function will not deallocate the internal context of `self`.
-        Thus the memento and `self` share the same context in memory.
+        Thus `self` and the return value will share the same context in memory.
+        To free the context of `self` use `self._clear_translation_ctx()`.
         """
         assert self.is_allocated()
         assert all((isinstance(x, str) and (len(x) > 0)) for x in self._sdfg_in_names)
         assert all((isinstance(x, str) and (len(x) > 0)) for x in self._sdfg_out_names)
 
-        return jtrans.JaCeTranslationMemento(
+        return jtrans.TranslatedJaxprSDFG(
             sdfg=self._sdfg,
             start_state=self._init_sdfg_state,
             terminal_state=self._term_sdfg_state,
