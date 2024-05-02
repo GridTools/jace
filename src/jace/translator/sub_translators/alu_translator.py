@@ -20,9 +20,6 @@ from typing_extensions import override
 from jace import translator as jtranslator
 
 
-# from ..primitive_translator import PrimitiveTranslator
-
-
 class ALUTranslator(jtranslator.PrimitiveTranslator):
     # class ALUTranslator(PrimitiveTranslator):
     """This translator handles all arithmetic and logical operations."""
@@ -72,6 +69,15 @@ class ALUTranslator(jtranslator.PrimitiveTranslator):
         "le": "__out0 = __in0 <= __in1",
         "lt": "__out0 = __in0 < __in1",
     }
+
+    @classmethod
+    def CREATE(
+        cls,
+        *args: Any,
+        **kwargs: Any,
+    ) -> ALUTranslator:
+        """Creates an `ALUTranslator` instance."""
+        return cls(*args, **kwargs)
 
     def __init__(self, **kwargs: Any) -> None:
         """Initialize the `ALUTranslator`."""

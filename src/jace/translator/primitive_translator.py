@@ -24,11 +24,8 @@ class PrimitiveTranslator(Protocol):
 
     A translator for a primitive translates a single equation of a Jaxpr into its SDFG equivalent.
     A type that implements this interface must fulfil the following properties:
-    - It must be stateless.
-        It is still possible and explicitly allowed to have an
-        immutable configuration state.
-    - All subclasses has to accept `**kwargs` arguments and must
-        forward all unconsumed arguments to the base.
+    - It must be immutable after construction.
+    - All subclass must implement the class method `CREATE()` to construct an instance.
 
     Subtranslators are simple, but highly specialized objects that are only able to perform the translation of a single primitive.
     The overall translation process itself is managed by a driver object, which also owns and manage the subtranslators.
@@ -43,15 +40,14 @@ class PrimitiveTranslator(Protocol):
 
     __slots__ = ()
 
-    def __init__(
-        self,
+    @classmethod
+    def CREATE(
+        cls,
         *args: Any,
         **kwargs: Any,
-    ) -> None:
-        """Initialize the interface.
-
-        It is required that subclasses calls this method during initialization.
-        """
+    ) -> PrimitiveTranslator:
+        """Creates an instance of a subtranslator."""
+        raise NotImplementedError("Class '{type(self).__name__}' does not implement 'CREATE()'.")
 
     def get_handled_primitive(self) -> str | Sequence[str]:
         """Returns the names of the Jax primitive that `self` is able to handle.

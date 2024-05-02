@@ -958,7 +958,7 @@ class JaxprTranslationDriver:
         subtrans_args = {k: v for k, v in subtrans_args.items() if not k.startswith("_")}  # type: ignore[unreachable]
         sub_translators: dict[str, jtrans.PrimitiveTranslator] = {}
         for sub_translator_cls in _get_subtranslators_cls():
-            sub_translator: jtrans.PrimitiveTranslator = sub_translator_cls(**subtrans_args)
+            sub_translator: jtrans.PrimitiveTranslator = sub_translator_cls.CREATE(**subtrans_args)
             handled_primitives: Iterable[str] = jutil.ensure_iterability(
                 sub_translator.get_handled_primitive()
             )
