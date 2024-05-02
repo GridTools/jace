@@ -1018,9 +1018,9 @@ class JaxprTranslationDriver:
             assert len(eqn.effects) == 0
             if len(eqn.outvars) == 0:  # Do we need this special case.
                 continue  #  Looks more like internal Jax error.
-            if any(jutil.get_jax_var_name(outVar) == "_" for outVar in eqn.outvars):
+            if any(jutil.is_drop_var(outVar) for outVar in eqn.outvars):
                 assert (len(eqn.outvars) == 1) or all(
-                    jutil.get_jax_var_name(outVar) == "_" for outVar in eqn.outvars
+                    jutil.is_drop_var(outVar) for outVar in eqn.outvars
                 )
                 continue
             _, out_var_names = self._translate_single_eqn(jaxpr=jaxpr, eqn=eqn)
