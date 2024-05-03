@@ -9,11 +9,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Collection
-from typing import Any
-
-import pytest
-
 from jace import translator as jtrans
 
 
@@ -22,112 +17,50 @@ def test_subtranslatior_managing():
     from jace.translator.sub_translators import (
         _get_subtranslators_cls,
         add_subtranslator,
-        rm_subtranslator,
     )
 
-    class ValidSubTrans(jtrans.PrimitiveTranslator):
-        def __init__(self, *args, **kwargs):
-            super().__init__(*args, **kwargs)
+    # These are all initial subtranslators
+    builtin_subtrans_cls = _get_subtranslators_cls()
 
-    class ValidSubTrans2(jtrans.PrimitiveTranslator):
-        def __init__(self, *args, **kwargs):
-            super().__init__(*args, **kwargs)
+    # Definitions of some classes to help.
+    class SubTrans1(jtrans.PrimitiveTranslator):
+        @classmethod
+        def CREATE(cls) -> SubTrans1:
+            return SubTrans1()
 
-    class InvalidSubTrans:
-        def __init__(self): ...
-        def get_handled_primitives(self) -> Collection[str] | str:
-            return "add"
+        @property
+        def primitive(self):
+            return "non_existing_primitive1"
 
-        def can_translate_jaxeqn(self, *args: Any, **kwargs: Any):  # noqa: ARG002  # Unused arguments
-            return False
+        def translate_jaxeqn(self) -> None:  # type: ignore[override]  # Arguments
+            return None
 
-        def translate_jaxeqn(self, *args: Any, **kwargs: Any):
-            raise NotImplementedError()
+    class SubTrans2(jtrans.PrimitiveTranslator):
+        @classmethod
+        def CREATE(cls) -> SubTrans2:
+            return SubTrans2()
 
-        def get_priority(self) -> int:
-            return 0
+        @property
+        def primitive(self):
+            return "non_existing_primitive2"
 
-        def has_default_priority(self) -> bool:
-            return False
+        def translate_jaxeqn(self) -> None:  # type: ignore[override]  # Arguments
+            return None
 
-        def __lt__(self, other: Any) -> bool:
-            return NotImplemented
+    # Adding the first subtranslator to the list.
+    assert add_subtranslator(SubTrans1)
 
-        def __eq__(self, other: Any) -> bool:
-            return id(self) == id(other)
+    curr_subtrans_cls = _get_subtranslators_cls()
+    assert len(curr_subtrans_cls) == len(builtin_subtrans_cls) + 1
+    assert [SubTrans1, *builtin_subtrans_cls] == curr_subtrans_cls
 
-        def __hash__(self) -> int:
-            return id(self)
+    # Now adding the second subtranslator
+    assert add_subtranslator(SubTrans2)
 
-        def __ne__(self, other: Any) -> bool:
-            return NotImplemented
-
-        def __le__(self, other: Any) -> bool:
-            return NotImplemented
-
-        def __ge__(self, other: Any) -> bool:
-            return NotImplemented
-
-        def __gt__(self, other: Any) -> bool:
-            return NotImplemented
-
-    #
-
-    # Test the initial conditions
-    builtin_subtrans = _get_subtranslators_cls(with_external=False)
-    curr_external_subtrans = _get_subtranslators_cls(builtins=False)
-    exp_curr_external_subtrans = []
-    assert (
-        curr_external_subtrans == exp_curr_external_subtrans
-    ), f"Expected no external subtranslators but found: {builtin_subtrans}"
-    assert (
-        len(builtin_subtrans) != 0
-    ), "Expected to have some builtin subtranslator, but there were none."
-    assert builtin_subtrans is not _get_subtranslators_cls()  # Ensures no sharing
-
-    # Add a subtranslator to the internal list
-    assert add_subtranslator(ValidSubTrans), "Failed to add 'ValidSubTrans'"
-    exp_curr_external_subtrans = [ValidSubTrans]
-    curr_external_subtrans = _get_subtranslators_cls(builtins=False)
-    assert (
-        curr_external_subtrans == exp_curr_external_subtrans
-    ), f"Wrong subtranslator order, expected '{exp_curr_external_subtrans}' got '{curr_external_subtrans}'."
-    assert builtin_subtrans == _get_subtranslators_cls(with_external=False)
-    assert _get_subtranslators_cls() == exp_curr_external_subtrans + builtin_subtrans
-
-    # Add a second translator
-    assert add_subtranslator(ValidSubTrans2), "Failed to add 'ValidSubTrans2'"
-    exp_curr_external_subtrans = [ValidSubTrans2, ValidSubTrans]  # FILO order
-    curr_external_subtrans = _get_subtranslators_cls(builtins=False)
-    assert (
-        exp_curr_external_subtrans == curr_external_subtrans
-    ), f"Wrong subtranslator order, expected '{exp_curr_external_subtrans}' got '{curr_external_subtrans}'."
-    assert exp_curr_external_subtrans + builtin_subtrans == _get_subtranslators_cls()
-
-    # Now we try to add some translators that will be rejected.
-    assert not add_subtranslator(ValidSubTrans)  # Already known
-    assert not add_subtranslator(ValidSubTrans2)  # Already known
-    assert not add_subtranslator(ValidSubTrans())  # Is an instance
-    assert not add_subtranslator(InvalidSubTrans)  # Not implementing interface
-    assert exp_curr_external_subtrans + builtin_subtrans == _get_subtranslators_cls()
-
-    # Now we remove a translator from the list.
-    assert rm_subtranslator(ValidSubTrans), "Failed to remove 'ValidSubTrans'"
-    exp_curr_external_subtrans = [ValidSubTrans2]
-    curr_external_subtrans = _get_subtranslators_cls(builtins=False)
-    assert (
-        curr_external_subtrans == exp_curr_external_subtrans
-    ), f"Wrong subtranslator order, expected '{exp_curr_external_subtrans}' got '{curr_external_subtrans}'."
-    assert builtin_subtrans == _get_subtranslators_cls(with_external=False)
-    assert _get_subtranslators_cls() == exp_curr_external_subtrans + builtin_subtrans
-
-    # Now try to remove it again.
-    assert not rm_subtranslator(ValidSubTrans), "Was allowed to remove 'ValidSubTrans' again!"
-    with pytest.raises(
-        expected_exception=KeyError, match=f"Subtranslator '{type(ValidSubTrans)}' is not known."
-    ):
-        rm_subtranslator(ValidSubTrans, strict=True)
-    #
+    curr_subtrans_cls2 = _get_subtranslators_cls()
+    assert len(curr_subtrans_cls2) == len(builtin_subtrans_cls) + 2
+    assert [SubTrans2, SubTrans1, *builtin_subtrans_cls] == curr_subtrans_cls2
+    assert curr_subtrans_cls2 is not curr_subtrans_cls
 
 
 if __name__ == "__main__":
