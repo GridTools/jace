@@ -98,10 +98,18 @@ class JitWrapped:
             It is forbidden to permanently modify the returned translated SDFG.
                 Doing so results in undefined behaviour.
         """
-        return self._get_translated_sdfg_cached(
-            *(_ArgInfo.from_value(v) for v in args),
-            **kwargs,
-        )
+        from jace.translator import JaxprTranslationDriver
+
+        # TODO(phimuell): This is only to make the API tests pass with the half implemented cache.
+        try:
+            return self._get_translated_sdfg_cached(
+                *(_ArgInfo.from_value(v) for v in args),
+                **kwargs,
+            )
+        except NotImplementedError:
+            jaxpr = jax.make_jaxpr(self.__wrapped__)(*args)
+            driver = JaxprTranslationDriver(**kwargs)
+            return driver.translate_jaxpr(jaxpr)
 
     @lru_cache
     def _get_translated_sdfg_cached(
