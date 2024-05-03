@@ -75,6 +75,8 @@ class _TranslationContext:
             rev_idx:    The revision index of the context.
             name:       Name of the SDFG object.
         """
+        if isinstance(name, str) and not jutil._VALID_SDFG_OBJ_NAME.fullmatch(name):
+            raise ValueError(f"'{name}' is not a valid SDFG name.")
 
         self._sdfg: dace.SDFG = dace.SDFG(name=(name or f"unnamed_SDFG_{id(self)}"))
         self._start_state: dace.SDFGState = self._sdfg.add_state(

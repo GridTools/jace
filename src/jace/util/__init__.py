@@ -19,6 +19,7 @@ from .jax_helper import (
     is_tracing_ongoing,
     translate_dtype,
 )
+from .re_pattern import _VALID_JAX_VAR_NAME, _VALID_SDFG_OBJ_NAME, _VALID_SDFG_VAR_NAME
 from .traits import is_drop_var, is_jaceified, is_jaxified, is_non_string_iterable
 from .util import as_sequence
 
@@ -38,4 +39,7 @@ __all__ = [
     "run_jax_sdfg",
     "_jace_run",
     "_propose_jax_name",
+    "_VALID_JAX_VAR_NAME",
+    "_VALID_SDFG_OBJ_NAME",
+    "_VALID_SDFG_VAR_NAME",
 ]

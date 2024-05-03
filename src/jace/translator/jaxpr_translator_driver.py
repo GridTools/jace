@@ -8,7 +8,6 @@
 from __future__ import annotations
 
 import itertools
-import re
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from typing import Any, Final, cast, overload
 
@@ -196,6 +195,9 @@ class JaxprTranslationDriver:
             prev_state:     Alternative `SDFGState` at which we should append the new state.
 
         """
+        if isinstance(label, str) and (not jutil._VALID_SDFG_OBJ_NAME.fullmatch(label)):
+            raise ValueError(f"Can not create state with label '{label}' since it is invalid.")
+
         # Decide if appending to that state will modify the terminal state.
         modify_term_state: bool = False
         if (prev_state is self._ctx.terminal_state) or (prev_state is None):
@@ -380,8 +382,12 @@ class JaxprTranslationDriver:
             pass
         else:
             raise TypeError(f"Does not know how to handle the type '{type(reserved_names)}'.")
-        if not all(isinstance(x, str) and (len(x) != 0) for x in reserved_names):
-            raise TypeError("Reserved names must all be non empty strings.")
+        for rev_name in reserved_names:
+            assert isinstance(rev_name, str)
+            if not jutil._VALID_SDFG_VAR_NAME.fullmatch(rev_name):
+                raise ValueError(
+                    f"Can not use '{rev_name}' as reserved name as it is not a valid SDFG name."
+                )
         self._reserved_names.update(reserved_names)
         return self
 
@@ -497,7 +503,7 @@ class JaxprTranslationDriver:
                 raise ValueError("Passed an empty 'alt_name'.")
             if alt_name in self._forbidden_names:
                 raise ValueError("'alt_name' is a forbidden name.")
-            if not re.fullmatch("[a-zA-Z_][a-zA-Z0-9_]*", alt_name):
+            if not jutil._VALID_SDFG_VAR_NAME.fullmatch(alt_name):
                 raise ValueError(f"The passed name 'alt_name' '{alt_name}' is invalid.")
             if name_prefix is not None:
                 raise ValueError(
@@ -584,7 +590,7 @@ class JaxprTranslationDriver:
             raise ValueError(f"Can't create variable '{arg_name}', name is forbidden.")
         if arg_name in self._ctx.sdfg.arrays:
             raise ValueError(f"Can't create variable '{arg_name}', variable is already created.")
-        if not re.fullmatch("[a-zA-Z_][a-zA-Z0-9_]*", arg_name):
+        if not jutil._VALID_SDFG_VAR_NAME.fullmatch(arg_name):
             raise ValueError(f"The requested variable name '{arg_name}' is invalid.")
 
         # Promotion of scalar to array.
@@ -785,9 +791,6 @@ class JaxprTranslationDriver:
             reserved_names:     Add these name to the set of resered names of `self`.
         """
         from ._translation_context import _TranslationContext
-
-        if name and (not re.fullmatch("[a-zA-Z_][a-zA-Z0-9_]*", name)):
-            raise ValueError(f"The provided name '{name}' for the SDFG is invalid.")
 
         # Create a new translation context and put it on the stack.
         self._ctx = _TranslationContext(

@@ -15,7 +15,6 @@ mimics the full `jax` package itself.
 
 from __future__ import annotations
 
-import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
@@ -24,9 +23,7 @@ import dace
 import jax.core as jcore
 import numpy as np
 
-
-# Used by `get_jax_var_name()` to test if a name for a jax variable is valid.
-_VALID_JAX_NAME_PATTERN: re.Pattern = re.compile("[a-zA-Z_][a-zA-Z0-9_]*")
+from jace import util
 
 
 @dataclass(init=True, repr=True, frozen=True, slots=True)
@@ -86,7 +83,7 @@ def get_jax_var_name(jax_var: jcore.Atom | JaCeVar | str) -> str:
             )
     assert isinstance(jax_name, str)
 
-    if not _VALID_JAX_NAME_PATTERN.fullmatch(jax_name):
+    if not util._VALID_JAX_VAR_NAME.fullmatch(jax_name):
         raise ValueError(f"Deduced Jax name '{jax_name}' is invalid.")
     return jax_name
 
