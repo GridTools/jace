@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+from abc import abstractmethod
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
@@ -24,11 +25,8 @@ class PrimitiveTranslator(Protocol):
 
     A translator for a primitive translates a single equation of a Jaxpr into its SDFG equivalent.
     A type that implements this interface must fulfil the following properties:
-    - It must be stateless.
-        It is still possible and explicitly allowed to have an
-        immutable configuration state.
-    - All subclasses has to accept `**kwargs` arguments and must
-        forward all unconsumed arguments to the base.
+    - It must be immutable after construction.
+    - All subclass must implement the class method `CREATE()` to construct an instance.
 
     Subtranslators are simple, but highly specialized objects that are only able to perform the translation of a single primitive.
     The overall translation process itself is managed by a driver object, which also owns and manage the subtranslators.
@@ -43,25 +41,26 @@ class PrimitiveTranslator(Protocol):
 
     __slots__ = ()
 
-    def __init__(
-        self,
+    @classmethod
+    @abstractmethod
+    def CREATE(
+        cls,
         *args: Any,
         **kwargs: Any,
-    ) -> None:
-        """Initialize the interface.
+    ) -> PrimitiveTranslator:
+        """Creates an instance of a subtranslator."""
+        ...
 
-        It is required that subclasses calls this method during initialization.
-        """
-
-    def get_handled_primitive(self) -> str | Sequence[str]:
+    @property
+    @abstractmethod
+    def primitive(self) -> str | Sequence[str]:
         """Returns the names of the Jax primitive that `self` is able to handle.
 
         In case `self` can handle multiple primitives, it should return a list with these names.
         """
-        raise NotImplementedError(
-            "Class '{type(self).__name__}' does not implement 'get_handled_primitive()'."
-        )
+        ...
 
+    @abstractmethod
     def translate_jaxeqn(
         self,
         driver: JaxprTranslationDriver,
@@ -117,6 +116,4 @@ class PrimitiveTranslator(Protocol):
             eqn_state:      State into which the primitive`s SDFG representation
                                 should be constructed.
         """
-        raise NotImplementedError(
-            "Class '{type(self).__name__}' does not implement 'translate_jaxeqn()'."
-        )
+        ...

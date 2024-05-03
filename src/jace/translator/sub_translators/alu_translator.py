@@ -21,6 +21,7 @@ from jace import translator as jtranslator
 
 
 class ALUTranslator(jtranslator.PrimitiveTranslator):
+    # class ALUTranslator(PrimitiveTranslator):
     """This translator handles all arithmetic and logical operations."""
 
     __slots__ = ()
@@ -69,12 +70,22 @@ class ALUTranslator(jtranslator.PrimitiveTranslator):
         "lt": "__out0 = __in0 < __in1",
     }
 
+    @classmethod
+    def CREATE(
+        cls,
+        *args: Any,
+        **kwargs: Any,
+    ) -> ALUTranslator:
+        """Creates an `ALUTranslator` instance."""
+        return cls(*args, **kwargs)
+
     def __init__(self, **kwargs: Any) -> None:
         """Initialize the `ALUTranslator`."""
         super().__init__(**kwargs)
 
+    @property
     @override
-    def get_handled_primitive(self) -> Sequence[str]:
+    def primitive(self) -> Sequence[str]:
         """Returns the list of all known primitives."""
         return list(self._unary_ops.keys()) + list(self._binary_ops.keys())
 
@@ -167,7 +178,7 @@ class ALUTranslator(jtranslator.PrimitiveTranslator):
         tskl_inputs: list[tuple[str, dace.Memlet] | tuple[None, None]] = []
 
         # Generate the Memlets for the input.
-        for i, dims_to_bcast in enumerate([dims_to_bcastl, dims_to_bcastr]):
+        for i, dims_to_bcast in zip(range(len(in_var_names)), [dims_to_bcastl, dims_to_bcastr]):
             if in_var_names[i] is None:  # Literal: No input needed.
                 tskl_inputs.append((None, None))
                 continue

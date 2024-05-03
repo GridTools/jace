@@ -9,18 +9,33 @@
 
 from __future__ import annotations
 
-from .debug import _jace_run, run_memento
-from .jax import JaCeVar, get_jax_var_dtype, get_jax_var_name, get_jax_var_shape, translate_dtype
-from .util import ensure_iterability
+from .debug import _jace_run, run_jax_sdfg
+from .jax_helper import (
+    JaCeVar,
+    _propose_jax_name,
+    get_jax_var_dtype,
+    get_jax_var_name,
+    get_jax_var_shape,
+    translate_dtype,
+)
+from .re_pattern import _VALID_JAX_VAR_NAME, _VALID_SDFG_OBJ_NAME, _VALID_SDFG_VAR_NAME
+from .traits import is_drop_var, is_non_string_iterable
+from .util import as_sequence
 
 
 __all__ = [
+    "as_sequence",
+    "is_drop_var",
+    "is_non_string_iterable",
     "JaCeVar",
     "get_jax_var_name",
     "get_jax_var_shape",
     "get_jax_var_dtype",
-    "ensure_iterability",
     "translate_dtype",
-    "run_memento",
+    "run_jax_sdfg",
     "_jace_run",
+    "_propose_jax_name",
+    "_VALID_JAX_VAR_NAME",
+    "_VALID_SDFG_OBJ_NAME",
+    "_VALID_SDFG_VAR_NAME",
 ]

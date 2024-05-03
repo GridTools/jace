@@ -8,23 +8,27 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import Any
+from typing import TypeVar, cast, overload
 
 
-def ensure_iterability(
-    x: Any,
-    ign_str: bool = True,
-) -> Iterable[Any]:
-    """Ensures that `x` is iterable.
+_T = TypeVar("_T")
 
-    By default strings are _not_ considered iterable.
 
-    Args:
-        x:          To test.
-        ign_str:    Ignore that a string is iterabile.
-    """
-    if ign_str and isinstance(x, str):
-        x = [x]
-    elif isinstance(x, Iterable):
-        pass
-    return x
+@overload
+def as_sequence(value: str) -> Iterable[str]: ...
+
+
+@overload
+def as_sequence(value: Iterable[_T]) -> Iterable[_T]: ...
+
+
+@overload
+def as_sequence(value: _T) -> Iterable[_T]: ...
+
+
+def as_sequence(value: _T | Iterable[_T]) -> Iterable[_T]:
+    from jace.util.traits import is_non_string_iterable
+
+    if is_non_string_iterable(value):
+        return value
+    return cast(Iterable[_T], [value])
