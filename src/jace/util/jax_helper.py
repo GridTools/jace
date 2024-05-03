@@ -37,6 +37,9 @@ class JaCeVar:
     Notes:
         Main intention is to test functionality.
         While for a Jax `Var` object the name is rather irrelevant, `JaCeVar` use their name.
+        If the name of a `JaCeVar` is '_' it is considered a drop variable.
+        If the name of a `JaCeVar` is empty, the automatic naming will consider it as a Jax variable.
+        The definition of `__hash__` and `__eq__` is in accordance how Jax variable works.
     """
 
     name: str
@@ -44,12 +47,16 @@ class JaCeVar:
     dtype: dace.typeclass
 
     def __hash__(self) -> int:
-        return hash(self.name)
+        return id(self)
 
     def __eq__(self, other: Any) -> bool:
         if not isinstance(other, JaCeVar):
             return NotImplemented
-        return self.name == other.name
+        return id(self) == id(other)
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.shape, tuple):
+            raise ValueError("The 'shape' member of a 'JaCeVar' must be a tuple.")
 
 
 def get_jax_var_name(jax_var: jcore.Atom | JaCeVar | str) -> str:
@@ -66,7 +73,9 @@ def get_jax_var_name(jax_var: jcore.Atom | JaCeVar | str) -> str:
         case jcore.DropVar():
             return "_"
         case JaCeVar():
-            jax_name = jax_var.name
+            # In case of an empty name consider the jace variable as a Jax variable.
+            #  This is mostly for testing.
+            jax_name = f"jax{id(jax_var)}" if jax_var.name == "" else jax_var.name
         case jcore.Var():
             # This stopped working after version 0.20.4, because of some changes in Jax
             #  See `https://github.com/google/jax/pull/10573` for more information.
@@ -191,13 +200,19 @@ def _propose_jax_name(
         raise RuntimeError(
             f"Can not propose a second name for '{jax_var}', it already known as '{jax_name_map[jax_var]}'."
         )
-    if isinstance(jax_var, JaCeVar):
-        return jax_var.name
-    assert isinstance(jax_var, jcore.Atom)
+    if isinstance(jax_var, jcore.Var):
+        pass
+    elif isinstance(jax_var, JaCeVar):
+        # If the name of the JaCe variable is empty, then use the name proposing
+        #  technique used for Jax variables; Mostly used for debugging.
+        if jax_var.name != "":
+            return jax_var.name
+    else:
+        raise TypeError(f"Can not propose a name for '{jax_var}'")
 
     c = len(jax_name_map)
     jax_name = ""
     while len(jax_name) == 0 or c != 0:
         c, i = c // 26, c % 26
         jax_name = chr(97 + i % 26) + jax_name
-    return jax_name + jax_var.suffix
+    return jax_name + getattr(jax_var, "suffix", "")
