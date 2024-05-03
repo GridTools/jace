@@ -9,15 +9,15 @@
 
 from __future__ import annotations
 
-import dace
-import pytest
-
 import re
 
+import dace
+import pytest
 from dace.data import Array, Data, Scalar
 
 from jace import translator as jtrans
 from jace.util import JaCeVar
+
 
 @pytest.fixture(scope="module")
 def alloc_driver():
@@ -33,7 +33,7 @@ def test_driver_alloc() -> None:
     driver = jtrans.JaxprTranslationDriver()
     assert not driver.is_allocated(), "Driver was created allocated."
     assert driver._ctx is None
-    assert len(driver._ctx_stack) == 0
+    assert len(driver._ctx_stack) == 0  # type: ignore[unreachable]
 
     # The reserved names will be tested in `test_driver_fork()`.
     sdfg_name = "qwertzuiopasdfghjkl"
@@ -86,6 +86,18 @@ def test_driver_nested() -> None:
         assert org is not nest, f"Detected sharing for '{member_name}'"
 
     assert org_ctx.rev_idx < driver._ctx.rev_idx
+
+    # Now we go back one state, i.e. pretend that we are done with translating the nested jaxpr.
+    driver._clear_translation_ctx()
+    assert driver._ctx is org_ctx
+    assert len(driver._ctx_stack) == 1
+    assert driver._reserved_names == org_res_names
+
+    # Now if we fully deallocate then we expect that it is fully deallocated.
+    driver._clear_translation_ctx()
+    assert driver._ctx is None
+    assert len(driver._ctx_stack) == 0  # type: ignore[unreachable]
+    assert driver._reserved_names is None
 
 
 def test_driver_append_state(alloc_driver: jtrans.JaxprTranslationDriver) -> None:
@@ -263,6 +275,69 @@ def test_driver_array(alloc_driver: jtrans.JaxprTranslationDriver) -> None:
             assert stri == 0, f"Expected a stride of 0, but got '{stri}'."
         else:
             assert isinstance(stri, (str, dace.symbol))
+
+
+def test_driver_array2() -> None:
+    """This function tests the array creation routine with respect to the automatic naming.
+
+    Todo:
+        - Literals.
+    """
+    # This is the parent driver.
+    driver = jtrans.JaxprTranslationDriver()
+    assert not driver.is_allocated(), "Driver should not be allocated."
+
+    # Creating JaCe Variables with empty names, forces the driver to use the
+    #  Jax naming algorithm.
+    var_a = JaCeVar("", (10, 19), dace.int64)
+    var_b = JaCeVar("", (10, 909), dace.float16)
+
+    # These are the reserved names, so `a` should be named as is, but `b` should have another name.
+    org_res_names = {"b"}
+    driver._allocate_translation_ctx("driver", reserved_names=org_res_names)
+
+    # These are the expected names
+    exp_names = [
+        "a",
+        "_jax_variable__b__0",
+    ]
+    res_names = driver.create_jax_var_list(
+        [var_a, var_b],
+        only_creation=True,
+    )
+    assert res_names == exp_names, f"Expected names '{exp_names}' but got '{res_names}'."
+    assert len(driver._ctx.jax_name_map) == 2
+
+    # Try to create variable `c` and `a`, however, since variable `a` already exists it will fail.
+    #  However, currently the variable `c` will be created, this might change in the future.
+    var_c = JaCeVar("", (10, 19), dace.int64)
+    with pytest.raises(
+        expected_exception=ValueError,
+        match=re.escape(f"'only_creation' given '{var_a}' already exists."),
+    ):
+        res_names = driver.create_jax_var_list(
+            [var_c, var_a],
+            only_creation=True,
+        )
+    assert len(driver._ctx.jax_name_map) == 3, f"{driver._ctx.jax_name_map}"
+    assert driver._ctx.jax_name_map[var_c] == "c"
+
+    # Now we test the only collection mode
+    res_names = driver.create_jax_var_list(
+        [var_c, var_a],
+        prevent_creation=True,
+    )
+    assert len(driver._ctx.jax_name_map) == 3, f"{driver._ctx.jax_name_map}"
+    assert res_names == ["c", "a"]
+
+    # Now also the mixed mode, i.e. between collecting and creating.
+    var_d = JaCeVar("", (10, 19), dace.int64)
+    exp_names = ["c", "d", "a"]
+    res_names = driver.create_jax_var_list(
+        [var_c, var_d, var_a],
+    )
+    assert len(driver._ctx.jax_name_map) == 4
+    assert exp_names == res_names
 
 
 if __name__ == "__main__":
