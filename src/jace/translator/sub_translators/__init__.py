@@ -12,8 +12,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from jace import translator as jtrans
-
-from .alu_translator import ALUTranslator
+from jace.translator.sub_translators.alu_translator import ALUTranslator
 
 
 # List of all subtranslators that ships with JaCe.

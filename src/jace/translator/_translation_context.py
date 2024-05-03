@@ -10,16 +10,11 @@
 from __future__ import annotations
 
 from collections.abc import MutableMapping, Sequence
-from typing import TYPE_CHECKING
 
 import dace
 from jax import core as jcore
 
-from jace import util as jutil
-
-
-if TYPE_CHECKING:
-    from jace import translator as jtrans
+from jace import translator as jtrans, util as jutil
 
 
 class _TranslationContext:
