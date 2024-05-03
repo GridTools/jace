@@ -667,6 +667,9 @@ class JaxprTranslationDriver:
             only_creation:      Always create a variable, it is an error if one already exist.
             handle_literals:    Allow the processing of literals.
             kwargs:             Will be forwarded to `self.add_array()` if a variable as to be created,
+
+        Todo:
+            Rollback if the creation fails.
         """
         if only_creation and prevent_creation:
             raise ValueError("Specified both 'only_creation' and 'prevent_creation'.")
