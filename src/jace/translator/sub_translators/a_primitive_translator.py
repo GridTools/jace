@@ -4,6 +4,14 @@
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
+"""Contains the interface for all primitive subtranslators.
+
+Note the name of this file is because it has to be the first that is imported in the `__init__.py` file.
+If not, we would get a cyclic import error.
+However, all attempts to prevent ruff from mindlessly (rule abiding) destroying this orders failed.
+Thus the name was changed to enforce this.
+If you have the solution, feel free to implement it.
+"""
 
 from __future__ import annotations
 
@@ -12,7 +20,7 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 import dace
-from jax import core as jcore
+from jax import core as jax_core
 
 
 if TYPE_CHECKING:
@@ -21,7 +29,7 @@ if TYPE_CHECKING:
 
 @runtime_checkable
 class PrimitiveTranslator(Protocol):
-    """Interface for all Jax primitive subtranslators.
+    """Interface for all Jax primitive translators, also known as subtranslator.
 
     A translator for a primitive translates a single equation of a Jaxpr into its SDFG equivalent.
     A type that implements this interface must fulfil the following properties:
@@ -66,7 +74,7 @@ class PrimitiveTranslator(Protocol):
         driver: JaxprTranslationDriver,
         in_var_names: Sequence[str | None],
         out_var_names: Sequence[str],
-        eqn: jcore.JaxprEqn,
+        eqn: jax_core.JaxprEqn,
         eqn_state: dace.SDFGState,
     ) -> dace.SDFGState | None:
         """Translates the Jax primitive into its SDFG equivalent.

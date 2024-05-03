@@ -10,12 +10,16 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import dace
 import jax
 
-from jace import translator as jtrans, util as jutil
+from jace import util
+
+
+if TYPE_CHECKING:
+    from jace import translator
 
 
 class JitWrapped:
@@ -52,7 +56,7 @@ class JitWrapped:
         This guarantees that `self` itself is traceable.
         """
 
-        if jutil.is_tracing_ongoing(*args, **kwargs):
+        if util.is_tracing_ongoing(*args, **kwargs):
             return self._forward_trace(*args, **kwargs)
         return self._call_sdfg(*args, **kwargs)
 
@@ -79,14 +83,14 @@ class JitWrapped:
         Notes:
             Currently no caching of the compiled object is done.
         """
-        jsdfg: jtrans.TranslatedJaxprSDFG = self._get_translated_sdfg(*args, **kwargs)
-        return jutil.run_jax_sdfg(jsdfg, *args)
+        jsdfg: translator.TranslatedJaxprSDFG = self._get_translated_sdfg(*args, **kwargs)
+        return util.run_jax_sdfg(jsdfg, *args)
 
     def _get_translated_sdfg(
         self,
         *args: Any,
         **kwargs: Any,
-    ) -> jtrans.TranslatedJaxprSDFG:
+    ) -> translator.TranslatedJaxprSDFG:
         """This function returns the `TranslatedJaxprSDFG` object.
 
         The function will transform its arguments into `_ArgInfo` versions.
@@ -116,7 +120,7 @@ class JitWrapped:
         self,
         *args: _ArgInfo,
         **kwargs: Any,
-    ) -> jtrans.TranslatedJaxprSDFG:
+    ) -> translator.TranslatedJaxprSDFG:
         """Generates the SDFG from
 
         Todo:

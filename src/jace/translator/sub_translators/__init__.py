@@ -4,25 +4,24 @@
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
-
 """Module collecting all built-in subtranslators."""
 
 from __future__ import annotations
 
 from collections.abc import Sequence
 
-from jace import translator as jtrans
-from jace.translator.sub_translators.alu_translator import ALUTranslator
+from .a_primitive_translator import PrimitiveTranslator  # has to be the first import.
+from .alu_translator import ALUTranslator
 
 
 # List of all subtranslators that ships with JaCe.
-_KNOWN_SUBTRANSLATORS: list[type[jtrans.PrimitiveTranslator]] = [
+_KNOWN_SUBTRANSLATORS: list[type[PrimitiveTranslator]] = [
     ALUTranslator,
 ]
 
 
 def add_subtranslator(
-    subtrans: type[jtrans.PrimitiveTranslator],
+    subtrans: type[PrimitiveTranslator],
 ) -> bool:
     """Add `subtrans` to the externally defined subtranslators.
 
@@ -37,7 +36,7 @@ def add_subtranslator(
     return True
 
 
-def _get_subtranslators_cls() -> Sequence[type[jtrans.PrimitiveTranslator]]:
+def _get_subtranslators_cls() -> Sequence[type[PrimitiveTranslator]]:
     """Returns the list of all subtranslator known to JaCe.
 
     The translators are returned in FIFO order.
@@ -48,4 +47,5 @@ def _get_subtranslators_cls() -> Sequence[type[jtrans.PrimitiveTranslator]]:
 __all__ = [
     "ALUTranslator",
     "add_subtranslator",
+    "PrimitiveTranslator",
 ]

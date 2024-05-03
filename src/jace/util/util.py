@@ -10,6 +10,8 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import TypeVar, cast, overload
 
+from jace.util import traits
+
 
 _T = TypeVar("_T")
 
@@ -27,8 +29,6 @@ def as_sequence(value: _T) -> Iterable[_T]: ...
 
 
 def as_sequence(value: _T | Iterable[_T]) -> Iterable[_T]:
-    from jace.util.traits import is_non_string_iterable
-
-    if is_non_string_iterable(value):
+    if traits.is_non_string_iterable(value):
         return value
     return cast(Iterable[_T], [value])

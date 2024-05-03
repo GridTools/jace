@@ -12,9 +12,9 @@ from dataclasses import dataclass
 from typing import Any
 
 import dace
-from jax import core as jcore
+from jax import core as jax_core
 
-from jace import util as jutil
+from jace import util
 
 
 @dataclass(init=True, repr=True, eq=False, frozen=False, kw_only=True, slots=True)
@@ -37,7 +37,7 @@ class TranslatedJaxprSDFG:
     """
 
     sdfg: dace.SDFG
-    jax_name_map: Mapping[jcore.Var | jutil.JaCeVar, str]
+    jax_name_map: Mapping[jax_core.Var | util.JaCeVar, str]
     start_state: dace.SDFGState | None = None
     terminal_state: dace.SDFGState | None = None
     inp_names: Sequence[str] | None = None

@@ -14,14 +14,13 @@ from typing import Any, Final, cast
 
 import dace
 import numpy as np
-from jax import core as jcore
+from jax import core as jax_core
 from typing_extensions import override
 
-from jace import translator as jtranslator
+from jace.translator import sub_translators
 
 
-class ALUTranslator(jtranslator.PrimitiveTranslator):
-    # class ALUTranslator(PrimitiveTranslator):
+class ALUTranslator(sub_translators.PrimitiveTranslator):
     """This translator handles all arithmetic and logical operations."""
 
     __slots__ = ()
@@ -92,10 +91,10 @@ class ALUTranslator(jtranslator.PrimitiveTranslator):
     @override
     def translate_jaxeqn(
         self,
-        driver: jtranslator.JaxprTranslationDriver,
+        driver: sub_translators.JaxprTranslationDriver,
         in_var_names: Sequence[str | None],
         out_var_names: Sequence[str],
-        eqn: jcore.JaxprEqn,
+        eqn: jax_core.JaxprEqn,
         eqn_state: dace.SDFGState,
     ) -> None:
         """Perform the translation.
@@ -244,7 +243,7 @@ class ALUTranslator(jtranslator.PrimitiveTranslator):
     def _writeTaskletCode(
         self,
         in_var_names: Sequence[str | None],
-        eqn: jcore.JaxprEqn,
+        eqn: jax_core.JaxprEqn,
     ) -> str:
         """This function generates the Tasklet code based on a primitive.
 
@@ -284,7 +283,7 @@ class ALUTranslator(jtranslator.PrimitiveTranslator):
             if in_var_name is not None:
                 continue
 
-            jax_in_var: jcore.Literal = cast(jcore.Literal, eqn.invars[i])
+            jax_in_var: jax_core.Literal = cast(jax_core.Literal, eqn.invars[i])
             if jax_in_var.aval.shape == ():
                 t_val = jax_in_var.val
                 if isinstance(t_val, np.ndarray):

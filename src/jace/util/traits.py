@@ -12,9 +12,9 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any, TypeGuard
 
-from jax import core as jcore
+from jax import core as jax_core
 
-from jace import util as jutil
+from jace import util
 
 
 class NonStringIterable(Iterable): ...
@@ -29,21 +29,21 @@ def is_jaceified(obj: Any) -> bool:
 
     Similar to `jace.util.is_jaxified`, but for JaCe object.
     """
-    from jace import jax as jjax, util as jutil
+    from jace import jax as jjax
 
-    if jutil.is_jaxified(obj):
+    if util.is_jaxified(obj):
         return False
     # Currently it is quite simple because we can just check if `obj`
     #  is derived from `jace.jax.JitWrapped`, might become harder in the future.
     return isinstance(obj, jjax.JitWrapped)
 
 
-def is_drop_var(jax_var: jcore.Atom | jutil.JaCeVar) -> bool:
+def is_drop_var(jax_var: jax_core.Atom | util.JaCeVar) -> bool:
     """Tests if `jax_var` is a drop variable."""
 
-    if isinstance(jax_var, jcore.DropVar):
+    if isinstance(jax_var, jax_core.DropVar):
         return True
-    if isinstance(jax_var, jutil.JaCeVar):
+    if isinstance(jax_var, util.JaCeVar):
         return jax_var.name == "_"
     return False
 
@@ -56,13 +56,13 @@ def is_jaxified(obj: Any) -> bool:
     `False` might not proof the contrary.
     """
     import jaxlib
-    from jax._src import pjit as jaxpjit
+    from jax import _src as jax_src
 
     # These are all types we consider as jaxify
     jaxifyed_types = (
-        jcore.Primitive,
+        jax_core.Primitive,
         # jstage.Wrapped is not runtime chakable
-        jaxpjit.JitWrapped,
+        jax_src.pjit.JitWrapped,
         jaxlib.xla_extension.PjitFunction,
     )
     return isinstance(obj, jaxifyed_types)

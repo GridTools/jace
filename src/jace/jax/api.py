@@ -12,7 +12,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any, cast
 
-from jace import jax as jjax, util as jutil
+from jace import jax as jjax, util
 
 
 def jit(
@@ -33,7 +33,7 @@ def jit(
 
     # in case we are dealing with a JaCe object, we first unwrap it.
     #  Recursion to handle arbitrary deep nestings.
-    if jutil.is_jaceified(fun):
+    if util.is_jaceified(fun):
         fun = cast(jjax.JitWrapped, fun)
         return jit(fun.__wrapped__)
 
