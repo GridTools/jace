@@ -83,8 +83,9 @@ class ALUTranslator(jtranslator.PrimitiveTranslator):
         """Initialize the `ALUTranslator`."""
         super().__init__(**kwargs)
 
+    @property
     @override
-    def get_handled_primitive(self) -> Sequence[str]:
+    def primitive(self) -> Sequence[str]:
         """Returns the list of all known primitives."""
         return list(self._unary_ops.keys()) + list(self._binary_ops.keys())
 

@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+from abc import abstractmethod
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
@@ -41,23 +42,25 @@ class PrimitiveTranslator(Protocol):
     __slots__ = ()
 
     @classmethod
+    @abstractmethod
     def CREATE(
         cls,
         *args: Any,
         **kwargs: Any,
     ) -> PrimitiveTranslator:
         """Creates an instance of a subtranslator."""
-        raise NotImplementedError("Class '{type(self).__name__}' does not implement 'CREATE()'.")
+        ...
 
-    def get_handled_primitive(self) -> str | Sequence[str]:
+    @property
+    @abstractmethod
+    def primitive(self) -> str | Sequence[str]:
         """Returns the names of the Jax primitive that `self` is able to handle.
 
         In case `self` can handle multiple primitives, it should return a list with these names.
         """
-        raise NotImplementedError(
-            "Class '{type(self).__name__}' does not implement 'get_handled_primitive()'."
-        )
+        ...
 
+    @abstractmethod
     def translate_jaxeqn(
         self,
         driver: JaxprTranslationDriver,
@@ -113,6 +116,4 @@ class PrimitiveTranslator(Protocol):
             eqn_state:      State into which the primitive`s SDFG representation
                                 should be constructed.
         """
-        raise NotImplementedError(
-            "Class '{type(self).__name__}' does not implement 'translate_jaxeqn()'."
-        )
+        ...
