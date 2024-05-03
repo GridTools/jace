@@ -12,9 +12,9 @@ from __future__ import annotations
 from collections.abc import MutableMapping, Sequence
 
 import dace
-from jax import core as jcore
+from jax import core as jax_core
 
-from jace import translator as jtrans, util as jutil
+from jace import translator, util
 
 
 class _TranslationContext:
@@ -70,7 +70,7 @@ class _TranslationContext:
             rev_idx:    The revision index of the context.
             name:       Name of the SDFG object.
         """
-        if isinstance(name, str) and not jutil._VALID_SDFG_OBJ_NAME.fullmatch(name):
+        if isinstance(name, str) and not util._VALID_SDFG_OBJ_NAME.fullmatch(name):
             raise ValueError(f"'{name}' is not a valid SDFG name.")
 
         self._sdfg: dace.SDFG = dace.SDFG(name=(name or f"unnamed_SDFG_{id(self)}"))
@@ -78,14 +78,14 @@ class _TranslationContext:
             label="initial_state", is_start_block=True
         )
         self._terminal_state: dace.SDFGState = self._start_state
-        self._jax_name_map: MutableMapping[jcore.Var | jutil.JaCeVar, str] = {}
+        self._jax_name_map: MutableMapping[jax_core.Var | util.JaCeVar, str] = {}
         self._inp_names: tuple[str, ...] = ()
         self._out_names: tuple[str, ...] = ()
         self._rev_idx: int = rev_idx
 
-    def to_translated_jaxpr_sdfg(self) -> jtrans.TranslatedJaxprSDFG:
+    def to_translated_jaxpr_sdfg(self) -> translator.TranslatedJaxprSDFG:
         """Transforms `self` into a `TranslatedJaxprSDFG`."""
-        return jtrans.TranslatedJaxprSDFG(
+        return translator.TranslatedJaxprSDFG(
             sdfg=self._sdfg,
             start_state=self._start_state,
             terminal_state=self._terminal_state,
@@ -114,7 +114,7 @@ class _TranslationContext:
         self._terminal_state = new_term_state
 
     @property
-    def jax_name_map(self) -> MutableMapping[jcore.Var | jutil.JaCeVar, str]:
+    def jax_name_map(self) -> MutableMapping[jax_core.Var | util.JaCeVar, str]:
         return self._jax_name_map
 
     @property

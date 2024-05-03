@@ -13,18 +13,16 @@ Everything in this module is experimental and might vanish anytime.
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import dace
 import jax
 
-
-if TYPE_CHECKING:
-    from jace import translator as jtrans
+from jace import translator
 
 
 def run_jax_sdfg(
-    jsdfg: jtrans.TranslatedJaxprSDFG,
+    jsdfg: translator.TranslatedJaxprSDFG,
     *args: Any,
 ) -> tuple[Any, ...] | Any:
     """Calls the SDFG that is encapsulated with the supplied arguments.
@@ -97,9 +95,7 @@ def _jace_run(
         *args:      Forwarded to the tracing and final execution of the SDFG.
         **kwargs:   Used to construct the driver.
     """
-    from jace.translator import JaxprTranslationDriver
-
     jaxpr = jax.make_jaxpr(fun)(*args)
-    driver = JaxprTranslationDriver(**kwargs)
+    driver = translator.JaxprTranslationDriver(**kwargs)
     jsdfg = driver.translate_jaxpr(jaxpr)
     return run_jax_sdfg(jsdfg, *args)
