@@ -12,8 +12,12 @@ from __future__ import annotations
 import dace
 import pytest
 
-from jace import translator as jtrans
+import re
 
+from dace.data import Array, Data, Scalar
+
+from jace import translator as jtrans
+from jace.util import JaCeVar
 
 @pytest.fixture(scope="module")
 def alloc_driver():
@@ -28,6 +32,8 @@ def test_driver_alloc() -> None:
     """Tests the state right after allocation."""
     driver = jtrans.JaxprTranslationDriver()
     assert not driver.is_allocated(), "Driver was created allocated."
+    assert driver._ctx is None
+    assert len(driver._ctx_stack) == 0
 
     # The reserved names will be tested in `test_driver_fork()`.
     sdfg_name = "qwertzuiopasdfghjkl"
@@ -35,79 +41,51 @@ def test_driver_alloc() -> None:
 
     sdfg: dace.SDFG = driver.get_sdfg()
 
+    assert driver._ctx.sdfg is sdfg
     assert driver.get_sdfg().name == sdfg_name
     assert sdfg.number_of_nodes() == 1
     assert sdfg.number_of_edges() == 0
-    assert sdfg.start_block is driver._init_sdfg_state
-    assert driver.get_terminal_sdfg_state() is driver._init_sdfg_state
+    assert sdfg.start_block is driver._ctx.start_state
+    assert driver.get_terminal_sdfg_state() is driver._ctx.start_state
 
 
-def test_driver_fork() -> None:
-    """Tests the fork ability of the driver."""
+def test_driver_nested() -> None:
+    """Tests the ability of the nesting of the driver.
+
+    Note this test does the creation of subcontext manually, which is not recommended.
+    """
 
     # This is the parent driver.
     driver = jtrans.JaxprTranslationDriver()
     assert not driver.is_allocated(), "Driver should not be allocated."
 
-    with pytest.raises(expected_exception=RuntimeError, match="Only allocated driver can fork."):
-        _ = driver.fork()
-    #
-
     # We allocate the driver directly, because we need to set some internals.
     #  This is also the reason why we do not use the fixture.
     org_res_names = {"a", "b"}
     driver._allocate_translation_ctx("driver", reserved_names=org_res_names)
+    driver._ctx.inp_names = ("a", "b")
+    driver._ctx.out_names = ("c", "d")
     assert driver.is_allocated()
+    assert len(driver._ctx_stack) == 1
     assert driver._reserved_names == org_res_names
 
-    # Now we allocate a child
-    dolly = driver.fork()
-    dolly_rev = dolly.get_rev_idx()
-    assert not dolly.is_allocated()
-    assert not dolly.is_head_translator()
-    assert driver.is_head_translator()
-    assert dolly.same_family(driver)
-    assert driver.same_family(dolly)
-    assert driver._sub_translators is dolly._sub_translators
-    assert driver._rev_manager is dolly._rev_manager
-    assert dolly._reserved_names == driver._reserved_names
-    assert dolly._reserved_names is not driver._reserved_names
+    # Now we increase the stack by one.
+    org_ctx = driver._ctx
+    driver._allocate_translation_ctx("driver2")
+    driver._ctx.inp_names = ("e", "f")
+    driver._ctx.out_names = ("g", "h")
+    assert driver.is_allocated()
+    assert len(driver._ctx_stack) == 2
+    assert driver._ctx is driver._ctx_stack[-1]
+    assert driver._ctx is not driver._ctx_stack[0]
+    assert org_ctx is driver._ctx_stack[0]
 
-    # Test if allocation of fork works properly
-    dolly_only_res_names = ["c"]  # reserved names that are only known to dolly; Added latter
-    dolly_full_res_names = org_res_names.union(dolly_only_res_names)
-    dolly._allocate_translation_ctx(
-        "dolly",
-    )
+    for member_name in driver._ctx.__slots__:
+        org = getattr(org_ctx, member_name)
+        nest = getattr(driver._ctx, member_name)
+        assert org is not nest, f"Detected sharing for '{member_name}'"
 
-    assert dolly.is_allocated()
-    assert dolly._reserved_names == org_res_names
-    assert driver._reserved_names == org_res_names
-
-    # Now adding reserved names to dolly after construction.
-    dolly.add_reserved_names(None)
-    assert dolly._reserved_names == org_res_names
-    dolly.add_reserved_names(dolly_only_res_names)
-    assert dolly._reserved_names == dolly_full_res_names
-    assert driver._reserved_names == org_res_names
-
-    # Now we deallocate dolly
-    dolly._clear_translation_ctx()
-    assert not dolly.is_allocated()
-    assert dolly._reserved_names is not None
-    assert dolly._reserved_names == dolly_full_res_names
-
-    # Now we test if the revision index is again increased properly.
-    dolly2 = driver.fork()
-    assert dolly_rev < dolly2.get_rev_idx()
-    assert dolly2.same_family(dolly)
-    assert dolly2.same_family(driver)
-
-    # Deallocate the driver
-    driver._clear_translation_ctx()
-    assert not driver.is_allocated()
-    assert driver.is_head_translator()
-    assert driver._reserved_names is None
+    assert org_ctx.rev_idx < driver._ctx.rev_idx
 
 
 def test_driver_append_state(alloc_driver: jtrans.JaxprTranslationDriver) -> None:
@@ -118,9 +96,9 @@ def test_driver_append_state(alloc_driver: jtrans.JaxprTranslationDriver) -> Non
     assert sdfg.number_of_nodes() == 2
     assert sdfg.number_of_edges() == 1
     assert terminal_state_1 is alloc_driver.get_terminal_sdfg_state()
-    assert alloc_driver.get_terminal_sdfg_state() is alloc_driver._term_sdfg_state
-    assert alloc_driver._init_sdfg_state is sdfg.start_block
-    assert alloc_driver._init_sdfg_state is not terminal_state_1
+    assert alloc_driver.get_terminal_sdfg_state() is alloc_driver._ctx.terminal_state
+    assert alloc_driver._ctx.start_state is sdfg.start_block
+    assert alloc_driver._ctx.start_state is not terminal_state_1
     assert next(iter(sdfg.edges())).src is sdfg.start_block
     assert next(iter(sdfg.edges())).dst is terminal_state_1
 
@@ -151,10 +129,6 @@ def test_driver_array(alloc_driver: jtrans.JaxprTranslationDriver) -> None:
 
     However, it does so without using Jax variables.
     """
-    from dace.data import Array, Data, Scalar
-
-    from jace.util import JaCeVar
-
     # Since we do not have Jax variables, we are using JaCe substitute for it.
 
     # Creating a scalar.
@@ -293,4 +267,3 @@ def test_driver_array(alloc_driver: jtrans.JaxprTranslationDriver) -> None:
 
 if __name__ == "__main__":
     test_driver_alloc()
-    test_driver_fork()
