@@ -46,12 +46,18 @@ class TranslatedJaxprSDFG:
     def validate(self) -> bool:
         """Validate the underlying SDFG."""
 
-        # To prevent the 'non initialized' data warnings we have to temporary promote the
-        #  input arguments as global.
+        # To prevent the 'non initialized' data warnings we have to temporary
+        #  promote input and output arguments to globals
+        promote_to_glob: set[str] = set()
         org_trans_state: dict[str, bool] = {}
-        for var in self.inp_names:
+        if self.inp_names:
+            promote_to_glob.update(self.inp_names)
+        if self.out_names:
+            promote_to_glob.update(self.out_names)
+        for var in promote_to_glob:
             org_trans_state[var] = self.sdfg.arrays[var].transient
             self.sdfg.arrays[var].transient = False
+
         try:
             self.sdfg.validate()
         finally:
