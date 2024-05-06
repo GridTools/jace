@@ -9,7 +9,7 @@
 
 from __future__ import annotations
 
-from .debug import _jace_run, run_jax_sdfg
+from .debug import _jace_run, compile_jax_sdfg, run_jax_sdfg
 from .jax_helper import (
     JaCeVar,
     _propose_jax_name,
@@ -26,6 +26,7 @@ from .util import as_sequence
 
 __all__ = [
     "as_sequence",
+    "compile_jax_sdfg",
     "is_drop_var",
     "is_tracing_ongoing",
     "is_jaceified",
