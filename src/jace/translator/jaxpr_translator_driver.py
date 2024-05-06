@@ -735,7 +735,8 @@ class JaxprTranslationDriver:
             force_array=inp_scalar_as_array,
             force_jax_name=self.is_root_translator(),  # Ensure root get pure Jax names.
         )
-        sdfg.arg_names.extend(init_in_var_names)
+        # This forces the code to only accept kwargs
+        sdfg.arg_names = []
 
         # Store the list of inputs in self; this is done to simplify exporting.
         #  The output list is populated by `self._translate_jaxpr_internal()`
