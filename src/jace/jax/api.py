@@ -23,6 +23,11 @@ def jit(
     """Creates a jit wrapper instance."""
     import jax
 
+    if any(
+        kwargs.get(static, None) is not None for static in ["static_argnums", "static_argnames"]
+    ):
+        raise NotImplementedError("Static arguments are not yet supported.")
+
     if fun is None:
         assert len(kwargs) > 0
 
