@@ -36,7 +36,7 @@ from jace import translator, util
 
 
 class Stage(jax_stages.Stage):
-    """A distinct step in the compilation chain, see module description.
+    """A distinct step in the compilation chain, see module description for more.
 
     This class inherent from its Jax counterpart.
     """
@@ -45,7 +45,7 @@ class Stage(jax_stages.Stage):
 class Wrapped(Protocol):
     """A function ready to be specialized, lowered, and compiled.
 
-    This protocol reflects the output of functions such as `jax.jit`.
+    This protocol reflects the output of functions such as `jace.jit`.
     Calling it results in jit (just-in-time) lowering, compilation, and execution.
     It can also be explicitly lowered prior to compilation, and the result compiled prior to execution.
 
@@ -79,6 +79,10 @@ class Wrapped(Protocol):
         Performs the first two steps of the AOT steps described above,
         i.e. stage the computation out to Jaxpr and then translate it to SDFG.
         The result is encapsulated into a `Lowered` object.
+
+        Note:
+            As a Jace extension this this function might be change such that it just performs
+                the staging out of the Jaxpr, i.e. lowering to SDFG might become a separate step.
         """
         ...
 
