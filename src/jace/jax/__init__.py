@@ -10,11 +10,25 @@
 from __future__ import annotations
 
 from .api import grad, jacfwd, jacrev, jit
-from .api_helper import JitWrapped
+from .jace_compiled import JaceCompiled
+from .jace_jitted import JaceWrapped
+from .jace_lowered import JaceLowered
+from .stages import (  # type: ignore[attr-defined] # not explicit exported
+    Compiled,
+    CompilerOptions,
+    Lowered,
+    Wrapped,
+)
 
 
 __all__ = [
-    "JitWrapped",
+    "Compiled",
+    "CompilerOptions",
+    "JaceWrapped",
+    "JaceLowered",
+    "JaceCompiled",
+    "Lowered",
+    "Wrapped",
     "jit",
     "jacfwd",
     "jacrev",

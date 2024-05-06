@@ -20,11 +20,12 @@ import dace
 import jax
 
 from jace import translator
+from jace.util import dace_helper as jdace
 
 
 def compile_jax_sdfg(
     jsdfg: translator.TranslatedJaxprSDFG, force: bool = False, save: bool = True
-) -> dace.CompiledSDFG:
+) -> jdace.CompiledSDFG:
     """This function compiles the embedded SDFG and return it.
 
     The SDFG is compiled in a very special way, i.e. all arguments and return values have to be passed as arguments.
@@ -51,7 +52,7 @@ def compile_jax_sdfg(
         raise NotImplementedError("No return statement is supported yet.")
 
     if (not force) and (jsdfg.csdfg is not None):
-        assert isinstance(jsdfg.csdfg, dace.CompiledSDFG)
+        assert isinstance(jsdfg.csdfg, jdace.CompiledSDFG)
         return jsdfg.csdfg
 
     # This is a simplification that makes our life simply.
@@ -63,14 +64,21 @@ def compile_jax_sdfg(
 
     # Canonical SDFGs do not have global memory, so we must transform it; undo afterwards
     prev_trans_state: dict[str, bool] = {}
-    for glob_name in jsdfg.inp_names + jsdfg.out_names:  # type: ignore[operator]  # concatenation
-        if glob_name in prev_trans_state:  # Donated arguments
-            continue
-        prev_trans_state[glob_name] = jsdfg.sdfg.arrays[glob_name].transient
-        jsdfg.sdfg.arrays[glob_name].transient = False
-
+    org_arg_names: Any = jsdfg.sdfg.arg_names
+    sdfg_arg_names: list[str] = []
     try:
-        csdfg: dace.CompiledSDFG = jsdfg.sdfg.compile()
+        for glob_name in jsdfg.inp_names + jsdfg.out_names:  # type: ignore[operator]  # concatenation
+            if glob_name in prev_trans_state:  # Donated arguments
+                continue
+            prev_trans_state[glob_name] = jsdfg.sdfg.arrays[glob_name].transient
+            jsdfg.sdfg.arrays[glob_name].transient = False
+            sdfg_arg_names.append(glob_name)
+
+        # This forces the signature of the SDFG to include all arguments in order they appear.
+        jsdfg.sdfg.arg_names = sdfg_arg_names
+
+        # Actual compiling the stuff
+        csdfg: jdace.CompiledSDFG = jsdfg.sdfg.compile()
         if save:
             jsdfg.csdfg = csdfg
         return csdfg
@@ -79,6 +87,7 @@ def compile_jax_sdfg(
         # Restore the initial transient state
         for var_name, trans_state in prev_trans_state.items():
             jsdfg.sdfg.arrays[var_name].transient = trans_state
+        jsdfg.sdfg.arg_names = org_arg_names
 
 
 @singledispatch
@@ -99,7 +108,7 @@ def run_jax_sdfg(
         raise ValueError("Output names are not specified.")
 
     if jsdfg.csdfg is not None:
-        csdfg: dace.CompiledSDFG = jsdfg.csdfg
+        csdfg: jdace.CompiledSDFG = jsdfg.csdfg
     else:
         csdfg = compile_jax_sdfg(jsdfg, save=False)
     return run_jax_sdfg(
@@ -111,9 +120,9 @@ def run_jax_sdfg(
     )
 
 
-@run_jax_sdfg.register(dace.CompiledSDFG)
+@run_jax_sdfg.register(jdace.CompiledSDFG)
 def _(
-    csdfg: dace.CompiledSDFG,
+    csdfg: jdace.CompiledSDFG,
     inp_names: Sequence[str],
     out_names: Sequence[str],
     /,
@@ -156,6 +165,7 @@ def _(
         raise ValueError(
             "Failed to construct the call arguments,"
             f" expected {len(csdfg.argnames)} but got {len(call_args)}."
+            f"\nExpected: {csdfg.argnames}\nGot: {list(call_args.keys())}"
         )
 
     # Calling the SDFG

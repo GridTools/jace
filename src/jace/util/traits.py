@@ -34,8 +34,8 @@ def is_jaceified(obj: Any) -> bool:
     if util.is_jaxified(obj):
         return False
     # Currently it is quite simple because we can just check if `obj`
-    #  is derived from `jace.jax.JitWrapped`, might become harder in the future.
-    return isinstance(obj, jjax.JitWrapped)
+    #  is derived from `jace.jax.JaceWrapped`, might become harder in the future.
+    return isinstance(obj, jjax.JaceWrapped)
 
 
 def is_drop_var(jax_var: jax_core.Atom | util.JaCeVar) -> bool:

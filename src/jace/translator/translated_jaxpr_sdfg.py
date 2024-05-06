@@ -15,6 +15,7 @@ import dace
 from jax import core as jax_core
 
 from jace import util
+from jace.util import dace_helper as jdace
 
 
 @dataclass(init=True, repr=True, eq=False, frozen=False, kw_only=True, slots=True)
@@ -43,7 +44,7 @@ class TranslatedJaxprSDFG:
     terminal_state: dace.SDFGState | None = None
     inp_names: Sequence[str] | None = None
     out_names: Sequence[str] | None = None
-    csdfg: dace.CompiledSDFG | None = None
+    csdfg: jdace.CompiledSDFG | None = None
 
     def validate(self) -> bool:
         """Validate the underlying SDFG."""

@@ -19,7 +19,7 @@ def jit(
     fun: Callable | None = None,
     /,
     **kwargs: Any,
-) -> jjax.JitWrapped:
+) -> jjax.JaceWrapped:
     """Creates a jit wrapper instance."""
     import jax
 
@@ -31,7 +31,7 @@ def jit(
     if fun is None:
         assert len(kwargs) > 0
 
-        def wrapper(f: Callable) -> jjax.JitWrapped:
+        def wrapper(f: Callable) -> jjax.JaceWrapped:
             return jit(f, **kwargs)
 
         return wrapper  # type: ignore[return-value]
@@ -39,65 +39,65 @@ def jit(
     # in case we are dealing with a JaCe object, we first unwrap it.
     #  Recursion to handle arbitrary deep nestings.
     if util.is_jaceified(fun):
-        fun = cast(jjax.JitWrapped, fun)
+        fun = cast(jjax.JaceWrapped, fun)
         return jit(fun.__wrapped__)
 
     # Prevents the creation of a level of unnecessary jit.
     #  Probably better solution by using the `disable_jit()`?
     if len(kwargs) == 0:
-        return jjax.JitWrapped(fun)
-    return jjax.JitWrapped(jax.jit(fun, **kwargs))
+        return jjax.JaceWrapped(fun)
+    return jjax.JaceWrapped(jax.jit(fun, **kwargs))
 
 
 def grad(
     fun: Callable | None = None,
     /,
     **kwargs: Any,
-) -> jjax.JitWrapped:
+) -> jjax.JaceWrapped:
     """The gradient transformation."""
     import jax
 
     if fun is None:
 
-        def wrapper(f: Callable) -> jjax.JitWrapped:
+        def wrapper(f: Callable) -> jjax.JaceWrapped:
             return grad(f, **kwargs)
 
         return wrapper  # type: ignore[return-value]
 
-    return jjax.JitWrapped(jax.grad(fun, **kwargs))
+    return jjax.JaceWrapped(jax.grad(fun, **kwargs))
 
 
 def jacfwd(
     fun: Callable | None = None,
     /,
     **kwargs: Any,
-) -> jjax.JitWrapped:
+) -> jjax.JaceWrapped:
     """Returns the Jacobian of `fun` in forward differentiation mode."""
     import jax
 
     if fun is None:
 
-        def wrapper(f: Callable) -> jjax.JitWrapped:
+        def wrapper(f: Callable) -> jjax.JaceWrapped:
             return jacfwd(f, **kwargs)
 
         return wrapper  # type: ignore[return-value]
 
-    return jjax.JitWrapped(jax.jacfwd(fun, **kwargs))
+    return jjax.JaceWrapped(jax.jacfwd(fun, **kwargs))
 
 
 def jacrev(
     fun: Callable | None = None,
     /,
     **kwargs: Any,
-) -> jjax.JitWrapped:
+) -> jjax.JaceWrapped:
     """Returns the Jacobian of `fun` in reverse differentiation mode."""
     import jax
 
     if fun is None:
 
-        def wrapper(f: Callable) -> jjax.JitWrapped:
+        def wrapper(f: Callable) -> jjax.JaceWrapped:
             return jacrev(f, **kwargs)
 
         return wrapper  # type: ignore[return-value]
 
-    return jjax.JitWrapped(jax.jacrev(fun, **kwargs))
+    return jjax.JaceWrapped(jax.jacrev(fun, **kwargs))
