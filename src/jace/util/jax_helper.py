@@ -22,6 +22,7 @@ from typing import Any, overload
 
 import dace
 import jax.core as jax_core
+import jax.dtypes as jax_dtypes
 import numpy as np
 
 from jace import util
@@ -167,12 +168,21 @@ def translate_dtype(dtype: Any) -> dace.typeclass:
     try:
         return dace.dtype_to_typeclass(dtype)
     except KeyError:
-        dtype_name = str(dtype)
-        if hasattr(dace.dtypes, dtype_name):
-            return getattr(dace.dtypes, dtype_name)
-        if hasattr(np, dtype_name):
-            dtype = getattr(np, dtype)
-            return dace.dtype_to_typeclass(dtype)
+        pass
+
+    try:
+        dtype_ = jax_dtypes.canonicalize_dtype(dtype)
+        return dace.dtype_to_typeclass(dtype_)
+    except Exception:
+        pass
+
+    dtype_name = str(dtype)
+    if hasattr(dace.dtypes, dtype_name):
+        return getattr(dace.dtypes, dtype_name)
+    if hasattr(np, dtype_name):
+        dtype = getattr(np, dtype)
+        return dace.dtype_to_typeclass(dtype)
+    raise ValueError(f"Unable to translate '{dtype}' ino a DaCe dtype.")
 
 
 def _propose_jax_name(
