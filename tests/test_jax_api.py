@@ -5,7 +5,7 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Tests the compability of the JaCe api to Jax."""
+"""Tests the compatibility of the JaCe api to Jax."""
 
 from __future__ import annotations
 
@@ -117,7 +117,25 @@ def test_composition2():
     assert np.allclose(ref, res_jace), "JaCe Failed."
 
 
-if __name__ == "__main__":
-    test_jit()
-    # test_composition1()
-    test_composition2()
+@pytest.mark.skip(reason="Scalar return values are not handled.")
+def test_grad_control_flow():
+    """Tests if `grad` and controlflow works.
+
+    This requirement is mentioned in `https://jax.readthedocs.io/en/latest/notebooks/Common_Gotchas_in_JAX.html#python-control-flow-autodiff`.
+    """
+    jax.config.update("jax_enable_x64", True)
+
+    def f(x):
+        if x < 3:
+            return 3.0 * x**2
+        return -4 * x
+
+    df = jace.grad(f)
+
+    x1 = 2.0
+    df_x1 = 6 * x1
+    x2 = 4.0
+    df_x2 = -4.0
+
+    assert (res := df(x1)) == df_x1, f"Failed lower branch, expected '{df_x1}', got '{res}'."
+    assert (res := df(x2)) == df_x2, f"Failed upper branch, expected '{df_x2}', got '{res}'."
