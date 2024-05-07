@@ -129,6 +129,7 @@ known-third-party = [
   'cupy',
   'dace',
   'jax',
+  'jaxlib',
   'numpy',
   'pytest',
   'typing_extensions'
