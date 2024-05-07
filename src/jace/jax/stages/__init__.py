@@ -26,10 +26,10 @@ from __future__ import annotations
 
 from jax.stages import CompilerOptions
 
+from .a_stage import Stage
 from .jace_compiled import JaceCompiled
 from .jace_lowered import JaceLowered
 from .jace_wrapped import JaceWrapped
-from .stage import Stage
 
 
 __all__ = [
