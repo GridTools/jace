@@ -12,15 +12,26 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+import jax as _jax_jax
+
 from jace import jax as jjax, util
+from jace.jax import api_helper
 
 
+@api_helper.jax_wrapper(_jax_jax.jit)
 def jit(
     fun: Callable | None = None,
     /,
     **kwargs: Any,
 ) -> jjax.JaceWrapped:
-    """Creates a jit wrapper instance."""
+    """Jace wrapper for `jax.jit`.
+
+    Wraps the computation `fun` into a wrapped instance, that can either be traced or compiled.
+    For more information see `jace.jax.stages`.
+
+    Notes:
+        The function can either be used as decorator or as a command.
+    """
     import jax
     from jax._src import sharding_impls
 
@@ -58,59 +69,76 @@ def jit(
     return jjax.JaceWrapped(jax.jit(fun, **kwargs))
 
 
+@api_helper.jax_wrapper(_jax_jax.pmap)
+def pmap(
+    fun: Callable | None = None,  # noqa: ARG001  # Unused argument
+    /,
+    **kwargs: Any,  # noqa: ARG001 # Unused argument.
+) -> jjax.JaceWrapped:
+    """Jace wrapper around `jax.pmap`.
+
+    Notes:
+        Will be supported in a very late state.
+    """
+    raise NotImplementedError("Currently Jace is not able to run in multi resource mode.")
+
+
+@api_helper.jax_wrapper(_jax_jax.vmap)
+def vmap(
+    fun: Callable,
+    /,
+    **kwargs: Any,
+) -> jjax.JaceWrapped:
+    """Jace wrapper around `jax.vmap`.
+
+    Notes:
+        Currently that is an untested extension.
+    """
+    import warnings
+
+    warnings.warn(
+        "You are using the highly untested 'vamp' interface.",
+        stacklevel=2,
+    )
+    return jit(
+        _jax_jax.vmap(
+            fun,
+            **kwargs,
+        ),
+    )
+
+
+@api_helper.jax_wrapper(_jax_jax.grad)
 def grad(
     fun: Callable | None = None,
     /,
     **kwargs: Any,
-) -> jjax.JaceWrapped:
-    """The gradient transformation.
+) -> Callable:
+    """Jace wrapper for `jax.grad`.
 
-    Todo:
-        Handle controlflow properly (https://jax.readthedocs.io/en/latest/notebooks/Common_Gotchas_in_JAX.html#python-control-flow-autodiff)
+    Notes:
+        Note we can not put it into a `JaceWrapped` object because in autodiff mode
+            control primitives, such as `if` are allowed, but not in `jit`.
+            Thus there need to be this extra layer.
     """
-    import jax
-
-    # fmt: off
-    if fun is None:
-        def wrapper(f: Callable) -> jjax.JaceWrapped:
-            return grad(f, **kwargs)
-        return wrapper  # type: ignore[return-value]
-    # fmt: on
-
-    return jjax.JaceWrapped(jax.grad(fun, **kwargs))
+    return _jax_jax.grad(fun, **kwargs)
 
 
+@api_helper.jax_wrapper(_jax_jax.jacfwd)
 def jacfwd(
     fun: Callable | None = None,
     /,
     **kwargs: Any,
-) -> jjax.JaceWrapped:
-    """Returns the Jacobian of `fun` in forward differentiation mode."""
-    import jax
-
-    # fmt: off
-    if fun is None:
-        def wrapper(f: Callable) -> jjax.JaceWrapped:
-            return jacfwd(f, **kwargs)
-        return wrapper  # type: ignore[return-value]
-    # fmt: on
-
-    return jjax.JaceWrapped(jax.jacfwd(fun, **kwargs))
+) -> Callable:
+    """Jace wrapper around `jax.jacfwd`."""
+    return _jax_jax.jacfwd(fun, **kwargs)
 
 
+@api_helper.jax_wrapper(_jax_jax.jacrev)
 def jacrev(
     fun: Callable | None = None,
     /,
     **kwargs: Any,
-) -> jjax.JaceWrapped:
-    """Returns the Jacobian of `fun` in reverse differentiation mode."""
-    import jax
-
-    # fmt: off
-    if fun is None:
-        def wrapper(f: Callable) -> jjax.JaceWrapped:
-            return jacrev(f, **kwargs)
-        return wrapper  # type: ignore[return-value]
-    # fmt: on
-
-    return jjax.JaceWrapped(jax.jacrev(fun, **kwargs))
+) -> Callable:
+    """Jace wrapper around `jax.jacrev`."""
+    return _jax_jax.jacrev(fun, **kwargs)
