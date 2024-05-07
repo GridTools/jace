@@ -1,0 +1,101 @@
+# JaCe - JAX Just-In-Time compilation using DaCe (Data Centric Parallel Programming)
+#
+# Copyright (c) 2024, ETH Zurich
+# All rights reserved.
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
+"""Implementation of the `jace.jax.stages.Lowered` stage for Jace."""
+
+from __future__ import annotations
+
+import json
+from typing import Any
+
+from jace import translator, util
+from jace.jax import stages
+from jace.util import dace_helper as jdace
+
+
+class JaceLowered(stages.Stage):
+    """Represents the original computation that was lowered to SDFG."""
+
+    __slots__ = ("_translated_sdfg",)
+
+    _translated_sdfg: translator.TranslatedJaxprSDFG
+
+    def __init__(
+        self,
+        translated_sdfg: translator.TranslatedJaxprSDFG,
+    ) -> None:
+        """Constructs the wrapper."""
+        if translated_sdfg.inp_names is None:
+            raise ValueError("Input names must be defined.")
+        if translated_sdfg.out_names is None:
+            raise ValueError("Output names must be defined.")
+        self._translated_sdfg = translated_sdfg
+
+    def optimize(
+        self,
+        **kwargs: Any,  # noqa: ARG002  # Unused agument
+    ) -> JaceLowered:
+        """Perform optimization _inplace_ and return `self`.
+
+        Notes:
+            Currently no optimization is performed.
+        """
+        return self
+
+    def compile(
+        self,
+        compiler_options: stages.CompilerOptions | None = None,  # noqa: ARG002  # Unused arguments
+    ) -> stages.JaceCompiled:
+        """Compile the SDFG.
+
+        Returns an Object that encapsulates a
+        """
+        csdfg: jdace.CompiledSDFG = util.compile_jax_sdfg(
+            self._translated_sdfg,
+            force=True,
+            save=False,
+        )
+        return stages.JaceCompiled(
+            csdfg=csdfg,
+            inp_names=self._translated_sdfg.inp_names,  # type: ignore[arg-type]  # init guarantees this
+            out_names=self._translated_sdfg.out_names,  # type: ignore[arg-type]
+        )
+
+    def compiler_ir(self, dialect: str | None = None) -> translator.TranslatedJaxprSDFG:
+        if (dialect is None) or (dialect.upper() == "SDFG"):
+            return self._translated_sdfg
+        raise ValueError(f"Unknown dialect '{dialect}'.")
+
+    def as_html(self, filename: str | None = None) -> None:
+        """Runs the `view()` method of the underlying SDFG.
+
+        This is a Jace extension.
+        """
+        self.compiler_ir().sdfg.view(filename=filename, verbose=False)
+
+    def as_text(self, dialect: str | None = None) -> str:
+        """Textual representation of the SDFG.
+
+        By default, the function will return the Json representation of the SDFG.
+        However, by specifying `'html'` as `dialect` the function will call `view()` on the underlying SDFG.
+
+        Notes:
+            You should prefer `self.as_html()` instead of this function.
+        """
+        if (dialect is None) or (dialect.upper() == "JSON"):
+            return json.dumps(self.compiler_ir().sdfg.to_json())
+        if dialect.upper() == "HTML":
+            self.as_html()
+            return ""  # For the interface
+        raise ValueError(f"Unknown dialect '{dialect}'.")
+
+    def cost_analysis(self) -> Any | None:
+        """A summary of execution cost estimates.
+
+        Not implemented use the DaCe [instrumentation API](https://spcldace.readthedocs.io/en/latest/optimization/profiling.html) directly.
+        """
+        raise NotImplementedError()

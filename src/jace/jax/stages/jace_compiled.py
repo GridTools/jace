@@ -17,8 +17,10 @@ from jace.jax import stages
 from jace.util import dace_helper as jdace
 
 
-class JaceCompiled(stages.Compiled):
+class JaceCompiled(stages.Stage):
     """Compiled version of the SDFG.
+
+    Contains all the information to run the associated computation.
 
     Todo:
         Handle pytrees.
@@ -40,7 +42,7 @@ class JaceCompiled(stages.Compiled):
         inp_names: Sequence[str],
         out_names: Sequence[str],
     ) -> None:
-        if (len(inp_names) == 0) or (len(out_names) == 0):
+        if (not inp_names) or (not out_names):
             raise ValueError("Input and output can not be empty.")
         self._csdfg = csdfg
         self._inp_names = tuple(inp_names)
