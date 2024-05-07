@@ -12,9 +12,10 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any, TypeGuard
 
-from jax import core as jax_core
+from jax import _src as jax_src, core as jax_core
+from jaxlib import xla_extension as jax_xe
 
-from jace import util
+from jace import jax as jjax, util
 
 
 class NonStringIterable(Iterable): ...
@@ -24,13 +25,11 @@ def is_non_string_iterable(val: Any) -> TypeGuard[NonStringIterable]:
     return isinstance(val, Iterable) and not isinstance(val, str)
 
 
-def is_jaceified(obj: Any) -> bool:
+def is_jaceified(obj: Any) -> TypeGuard[jjax.JaceWrapped]:
     """Tests if `obj` is decorated by JaCe.
 
     Similar to `jace.util.is_jaxified`, but for JaCe object.
     """
-    from jace import jax as jjax
-
     if util.is_jaxified(obj):
         return False
     # Currently it is quite simple because we can just check if `obj`
@@ -38,31 +37,33 @@ def is_jaceified(obj: Any) -> bool:
     return isinstance(obj, jjax.JaceWrapped)
 
 
-def is_drop_var(jax_var: jax_core.Atom | util.JaCeVar) -> bool:
-    """Tests if `jax_var` is a drop variable."""
+def is_drop_var(jax_var: jax_core.Atom | util.JaCeVar) -> TypeGuard[jax_core.Dorp]:
+    """Tests if `jax_var` is a drop variable, i.e. a variable that is not read from in a Jaxpr."""
 
     if isinstance(jax_var, jax_core.DropVar):
         return True
     if isinstance(jax_var, util.JaCeVar):
+        # We type narrow it to a pure jax DropVar, because essentially
+        #  you can not do anything with it.
         return jax_var.name == "_"
     return False
 
 
-def is_jaxified(obj: Any) -> bool:
+def is_jaxified(
+    obj: Any,
+) -> TypeGuard[jax_core.Primitive | jax_src.pjit.JitWrapped | jax_xe.PjitFunction]:
     """Tests if `obj` is a "jaxified" object.
 
-    A "jexified" object is an object that was processed by Jax.
-    While a return value of `True` guarantees a jaxified object,
-    `False` might not proof the contrary.
+    A "jaxified" object is an object that was processed by Jax.
+    While a return value of `True` guarantees a jaxified object, `False` might not proof the contrary.
+    See also `jace.util.is_jaceified()` to tests if something is a Jace object.
     """
-    import jaxlib
-    from jax import _src as jax_src
 
     # These are all types we consider as jaxify
     jaxifyed_types = (
         jax_core.Primitive,
         # jstage.Wrapped is not runtime chakable
         jax_src.pjit.JitWrapped,
-        jaxlib.xla_extension.PjitFunction,
+        jax_xe.PjitFunction,
     )
     return isinstance(obj, jaxifyed_types)
