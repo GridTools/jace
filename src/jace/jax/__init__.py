@@ -9,7 +9,7 @@
 
 from __future__ import annotations
 
-from . import api_helper
+from . import api_helper, stages
 from .api import grad, jacfwd, jacrev, jit
 from .stages import (
     CompilerOptions,
@@ -20,6 +20,7 @@ from .stages import (
 
 
 __all__ = [
+    "stages",
     "Compiled",
     "CompilerOptions",
     "JaceWrapped",
