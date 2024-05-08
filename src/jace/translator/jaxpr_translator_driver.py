@@ -478,6 +478,11 @@ class JaxprTranslationDriver:
         storage: dace.StorageType = dace.StorageType.Default  # Set at later stages (optimization)
         is_scalar: bool = shape == ()
 
+        # Use the storage if passed in the variable.
+        #  Note that this is a bad idea, since one should always specialize later.
+        if isinstance(arg, util.JaCeVar):
+            storage = arg.storage
+
         if (alt_name is None) and (self.map_jax_var_to_sdfg(arg, allow_fail=True) is not None):
             # Maybe the test could be more robust, but it will check if we try to create
             #  a variable for a second time. It is, however, okay to use one as template,

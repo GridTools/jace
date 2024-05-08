@@ -12,6 +12,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any, TypeGuard
 
+import dace
 from jax import _src as jax_src, core as jax_core
 from jaxlib import xla_extension as jax_xe
 
@@ -84,7 +85,13 @@ def is_jax_array(
 def is_on_device(
     obj: Any,
 ) -> bool:
-    """Tests if `obj` is on a device."""
+    """Tests if `obj` is on a device.
+
+    The function will recognize and correctly handle `JaCeVar` objects.
+    """
+    if isinstance(obj, util.JaCeVar):
+        return obj.storage in [dace.StorageType.GPU_Global, dace.StorageType.GPU_Shared]
+
     # The problem is, that we can not test if `__cuda_array_interface__` exists.
     #  because Jax array have that even on CPU, thus it is a bit mnore complex.
     # TODO(phimuell): Hip
