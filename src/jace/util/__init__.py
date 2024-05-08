@@ -21,12 +21,13 @@ from .jax_helper import (
 )
 from .re_pattern import _VALID_JAX_VAR_NAME, _VALID_SDFG_OBJ_NAME, _VALID_SDFG_VAR_NAME
 from .traits import is_drop_var, is_jaceified, is_jaxified, is_non_string_iterable
-from .util import as_sequence
+from .util import as_sequence, dataclass_with_default_init
 
 
 __all__ = [
     "as_sequence",
     "compile_jax_sdfg",
+    "dataclass_with_default_init",
     "is_drop_var",
     "is_tracing_ongoing",
     "is_jaceified",
