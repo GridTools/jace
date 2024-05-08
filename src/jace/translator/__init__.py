@@ -10,10 +10,12 @@
 from __future__ import annotations
 
 from .jaxpr_translator_driver import JaxprTranslationDriver
+from .sub_translators import PrimitiveTranslator
 from .translated_jaxpr_sdfg import TranslatedJaxprSDFG
 
 
 __all__ = [
     "JaxprTranslationDriver",
+    "PrimitiveTranslator",
     "TranslatedJaxprSDFG",
 ]
