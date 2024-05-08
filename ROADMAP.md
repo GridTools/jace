@@ -51,6 +51,8 @@ These are more general topics that should be addressed at one point.
       For example in an addition the shape of the two inputs and the outputs are the same.
       That is knowledge that is inherent to the primitives itself.
       However, the compiled object must know how to extract the sizes itself.
+- [ ] Defining a Logo:
+      It should be green with a nice curly font.
 
 # Optimization & Transformations
 
