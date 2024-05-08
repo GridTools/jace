@@ -33,6 +33,7 @@ from .util import as_sequence, dataclass_with_default_init
 
 
 __all__ = [
+    "JaCeVar",
     "as_sequence",
     "compile_jax_sdfg",
     "dataclass_with_default_init",
@@ -44,7 +45,6 @@ __all__ = [
     "is_fully_addressable",
     "is_non_string_iterable",
     "is_on_device",
-    "JaCeVar",
     "get_jax_var_name",
     "get_jax_var_shape",
     "get_jax_var_dtype",
