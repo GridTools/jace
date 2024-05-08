@@ -37,7 +37,7 @@ def is_jaceified(obj: Any) -> TypeGuard[jjax.JaceWrapped]:
     return isinstance(obj, jjax.JaceWrapped)
 
 
-def is_drop_var(jax_var: jax_core.Atom | util.JaCeVar) -> TypeGuard[jax_core.Dorp]:
+def is_drop_var(jax_var: jax_core.Atom | util.JaCeVar) -> TypeGuard[jax_core.DropVarp]:
     """Tests if `jax_var` is a drop variable, i.e. a variable that is not read from in a Jaxpr."""
 
     if isinstance(jax_var, jax_core.DropVar):
@@ -67,3 +67,41 @@ def is_jaxified(
         jax_xe.PjitFunction,
     )
     return isinstance(obj, jaxifyed_types)
+
+
+def is_jax_array(
+    obj: Any,
+) -> bool:
+    """Tests if `obj` is a jax array.
+
+    Todo:
+        Find the Jax type for `TypeGuard`.
+    """
+    # Currently this seams to be the besst way to identify Jax arrays.
+    return all(hasattr(obj, x) for x in ["sharding", "is_fully_addressable"])
+
+
+def is_on_device(
+    obj: Any,
+) -> bool:
+    """Tests if `obj` is on a device."""
+    # The problem is, that we can not test if `__cuda_array_interface__` exists.
+    #  because Jax array have that even on CPU, thus it is a bit mnore complex.
+    # TODO(phimuell): Hip
+    if is_jax_array(obj):
+        obj = obj.__array__()
+    return hasattr(obj, "__cuda_array_interface__")
+
+
+def is_fully_addressable(
+    obj: Any,
+) -> bool:
+    """Tests if `obj` is fully addreassable, i.e. is only on this host.
+
+    Notes:
+        The function (currently) assumes that everything that is not a distributed
+            Jax array is on this host.
+    """
+    if is_jax_array(obj):
+        return obj.is_fully_addressable()
+    return True

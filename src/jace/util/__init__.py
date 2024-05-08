@@ -20,7 +20,15 @@ from .jax_helper import (
     translate_dtype,
 )
 from .re_pattern import _VALID_JAX_VAR_NAME, _VALID_SDFG_OBJ_NAME, _VALID_SDFG_VAR_NAME
-from .traits import is_drop_var, is_jaceified, is_jaxified, is_non_string_iterable
+from .traits import (
+    is_drop_var,
+    is_fully_addressable,
+    is_jaceified,
+    is_jax_array,
+    is_jaxified,
+    is_non_string_iterable,
+    is_on_device,
+)
 from .util import as_sequence, dataclass_with_default_init
 
 
@@ -32,7 +40,10 @@ __all__ = [
     "is_tracing_ongoing",
     "is_jaceified",
     "is_jaxified",
+    "is_jax_array",
+    "is_fully_addressable",
     "is_non_string_iterable",
+    "is_on_device",
     "JaCeVar",
     "get_jax_var_name",
     "get_jax_var_shape",
