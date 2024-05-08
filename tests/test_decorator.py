@@ -30,10 +30,13 @@ def test_decorator_individually():
     def testee_(A: np.ndarray, B: np.ndarray) -> np.ndarray:
         return A + B
 
+    @jace.jit
+    def testee(A: np.ndarray, B: np.ndarray) -> np.ndarray:
+        return testee_(A, B)
+
     A = np.arange(12, dtype=np.float64).reshape((4, 3))
     B = np.full((4, 3), 10, dtype=np.float64)
 
-    testee = jace.jit(testee_)
     lowered = testee.lower(A, B)
     optimized = lowered.optimize()
     compiled = optimized.compile()
