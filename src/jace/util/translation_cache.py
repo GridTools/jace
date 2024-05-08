@@ -16,6 +16,7 @@ Both are implemented as a singleton.
 
 from __future__ import annotations
 
+import functools as ft
 from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -48,6 +49,30 @@ def get_cache(
     if name not in _caches:
         raise ValueError(f"The cache '{name}' is unknown.")
     return _caches[name]
+
+
+def cached_translation(
+    action: Callable,
+) -> Callable:
+    """Decorator for making the function cacheable."""
+
+    @ft.wraps(action)
+    def _action_wrapper(
+        self: stages.Stage,
+        *args: Any,
+        **kwargs: Any,
+    ) -> stages.Stage:
+        assert hasattr(self, "_cache")
+        cache: TranslationCache = self._cache
+        key: _CacheKey = self.make_key(self, *args, **kwargs)
+        if cache.has(key):
+            return cache.get(key)
+
+        next_stage: stages.Stage = action(*args, **kwargs)
+        cache.add(key, next_stage)
+        return next_stage
+
+    return _action_wrapper
 
 
 @util.dataclass_with_default_init(init=True, repr=True, frozen=True, slots=True)
