@@ -8,7 +8,7 @@
 from __future__ import annotations
 
 import itertools
-from collections.abc import Collection, Iterable, Mapping, Sequence
+from collections.abc import Collection, Iterable, Mapping, MutableSequence, Sequence
 from typing import Any, Final, cast, overload
 
 import dace
@@ -54,7 +54,6 @@ class JaxprTranslationDriver:
 
     __slots__ = (
         "_ctx_stack",  # Stack of all contexts
-        "_ctx",  # Current top of the context stack.
         "_reserved_names",  # Part of the context, but is copied.
         "_sub_translators",
         "_rev_manager",
@@ -98,7 +97,6 @@ class JaxprTranslationDriver:
         # Context stack and current context.
         #  Only allocated during an ongoing translation
         self._ctx_stack: list[_TranslationContext] = []
-        self._ctx: _TranslationContext = None  # type: ignore[assignment]
 
         # Creating of the subtranslators.
         self._init_sub_translators(kwargs)
@@ -261,22 +259,18 @@ class JaxprTranslationDriver:
 
     def map_jax_var_to_sdfg(
         self,
-        jax_var: str | jax_core.Atom | util.JaCeVar,
+        jax_var: jax_core.Atom | util.JaCeVar,
         allow_fail: bool = False,
     ) -> str | None:
         """Get the _name_ of the SDFG variable to which `jax_var` is referring to.
-
-        For convenient this function will consider a string as input to be already an SDFG variable name.
 
         Args:
             jax_var:        The Jax variable to look up.
             allow_fail:     If mapping is not known return `None` instead of raise `KeyError`.
         """
-        if isinstance(jax_var, str):
-            sdfg_name: str = jax_var
-        elif isinstance(jax_var, jax_core.Literal):
+        if isinstance(jax_var, jax_core.Literal):
             raise RuntimeError("There is no SDFG variable for literal '{jax_var}'.")
-        elif jax_var in self._ctx.jax_name_map:
+        if jax_var in self._ctx.jax_name_map:
             sdfg_name = self._ctx.jax_name_map[jax_var]
         elif allow_fail:
             return None
@@ -310,11 +304,8 @@ class JaxprTranslationDriver:
 
         If `self` is allocated then there is also an ongoing translation process.
         """
-        assert isinstance(self._sub_translators, dict)
-        if self._ctx is not None:
-            assert self._ctx_stack[-1] is self._ctx
+        if len(self._ctx_stack) != 0:
             return True
-        assert len(self._ctx_stack) == 0  # type: ignore[unreachable]
         return False
 
     def is_root_translator(self) -> bool:
@@ -383,12 +374,6 @@ class JaxprTranslationDriver:
             pass
         else:
             raise TypeError(f"Does not know how to handle the type '{type(reserved_names)}'.")
-        for rev_name in reserved_names:
-            assert isinstance(rev_name, str)
-            if not util.VALID_SDFG_VAR_NAME.fullmatch(rev_name):
-                raise ValueError(
-                    f"Can not use '{rev_name}' as reserved name as it is not a valid SDFG name."
-                )
         self._reserved_names.update(reserved_names)
         return self
 
@@ -399,42 +384,31 @@ class JaxprTranslationDriver:
         as_transient: bool = True,
         alt_name: str | None = None,
         name_prefix: str | None = None,
-        force_array: bool = False,
-        as_view: bool = False,
-        strides: Sequence[int | dace.symbol | str] | None = None,
-        symb_strides: bool | None = None,
         find_new_name: bool | None = None,
+        force_array: bool = False,
+        strides: Sequence[int | dace.symbol | str] | None = None,
         allow_literals: bool = False,
         force_jax_name: bool = False,
         update_var_mapping: bool = False,
     ) -> str:
         """Creates an SDFG variable for the Jax variable `arg` and returns its SDFG name.
 
-        By default the function will create a transient, use `as_transient` to
-        change that. By default the function will honor if the Jax variable is
-        a scalar or an array. However, by setting `force_array` the function
-        will always generate an array.
+        By default the function will create a transient, use `as_transient=True` to change that.
+        By default the function will honor if the Jax variable is a scalar or an array.
+        However, by setting `force_array` the function will always generate an array.
 
         By default the name for the SDFG variable is derived from the Jax variable.
-        It is guaranteed that this name is unique in the SDFG, even in the presence
-        of nested SDFGs. By specifying `alt_name` it is possible to force a certain
-        name on a variable. It is important that if `alt_name` is specified the function
-        will either generate the variable or fail.
+        It is guaranteed that this name is unique in the SDFG, even in the presence of nested SDFGs.
+        By specifying `alt_name` it is possible to force a certain name on a variable.
+        It is important that if `alt_name` is specified the function will either generate the variable or fail.
 
         The  driver distinguishes between two kinds of "bad (SDFG) variable names".
         The first category are the forbidden names, which the function refuses to generate.
-        The second type are the so called reserved names, which were set at the beginning.
-        These names can be used if they are specified through `alt_name` but are not used
-        in automatic naming.
+        The second type are the so called reserved names, which were set at the beginning, or by `self.add_reserved_names()`.
+        These names can be used if the name is specified through `alt_name` but are not used in automatic naming.
 
-        If nothing is specified, the strides of the data are determined by DaCe, which is
-        continuous C order. There are two ways to change that.
-        The first way is to specify the `strides` argument, which are then forwarded
-        to the underlying DaCe function. The second way is to set `symb_strides`
-        to `True` in which case the function will generate symbols and use them.
-        However, even if symbolic strides are activated, arrays with just one
-        dimensions have always a non symbolic stride of 1. Furthermore, dimensions
-        with shape 1 will always have stride 0.
+        If nothing is specified, the strides of the data are determined by DaCe, which is continuous C order.
+        It is possible to set a certain values by setting `strides` appropriate.
 
         By default this function does not update the internal variable map.
         However, by setting `update_var_mapping` to `True` the function will
@@ -445,14 +419,9 @@ class JaxprTranslationDriver:
             as_transient:       If set, the SDFG variable is a transient, `True` by default.
             alt_name:           Try to create the variable with this name; either succeed or fail.
             name_prefix:        If given and in automatic naming mode, add this prefix to the name.
+            find_new_name:      The translator will try to find a new name if the designated is already occupied.
             force_array:        Instead of a `dace.Scalar` create a `dace.Array` with one element.
-            as_view:            Creates a view instead of an array, if it is a scalar
-                                    it is silently ignored.
             strides:            Instead of the default strides use these values.
-            symb_strides:       Create symbols and use them for fully symbolic strides.
-            find_new_name:      The translator will try to find a new name if the designated
-                                    is already occupied. This does not work if the name
-                                    was supplied by `alt_name`.
             allow_literals:     If `True` then also allows JaxLiterals as `arg`.
             force_jax_name:     If `True` then, the verbatim Jax name will be used.
             update_var_mapping: Update the internal variable mapping; by default `False`.
@@ -460,13 +429,6 @@ class JaxprTranslationDriver:
         Notes:
             If this function is used directly a user is advised to always set
                 `update_var_mapping` to `True`.
-            If `find_new_name` is `None` the default, the function will only
-                look for a new name if there is a need for it. If it is `True`
-                the function will always look for a new name, even if the initial
-                name was fine. If it is `False` the function will never look for
-                a new new, thus if the name is unavailable an error is generated.
-                However, this excluds variable names that are known.
-            Specifying `alt_name` implies `find_new_name=False`.
             If you need to create a special array, you can use `jace.util.JaCeVar`
                 to create a pseudo Jax variable.
         """
@@ -483,7 +445,7 @@ class JaxprTranslationDriver:
             #  a variable for a second time. It is, however, okay to use one as template,
             #  if another name is specified from the beginning.
             raise ValueError(
-                f"Tried to create variable '{arg}' again, without specifying an alternative name.."
+                f"Tried to create variable '{arg}' again, without specifying an alternative name."
             )
         if force_jax_name:
             if alt_name is not None:
@@ -494,11 +456,12 @@ class JaxprTranslationDriver:
                 raise ValueError(
                     f"Specified 'force_jax_name', but passed '{name_prefix}' as 'name_prefix'."
                 )
+            if find_new_name:
+                raise ValueError("Specified `force_jax_name` but also wanted a new name.")
+            find_new_name = False
             alt_name = util._propose_jax_name(arg, self._ctx.jax_name_map)
         if alt_name is not None:
-            assert isinstance(
-                alt_name, str
-            ), f"Got '{type(alt_name)}' instead of 'str' for 'alt_name'."
+            assert isinstance(alt_name, str)
             find_new_name = False  # If a name was given, then use it no matter what.
             if len(alt_name) == 0:
                 raise ValueError("Passed an empty 'alt_name'.")
@@ -506,32 +469,30 @@ class JaxprTranslationDriver:
                 raise ValueError("'alt_name' is a forbidden name.")
             if not util.VALID_SDFG_VAR_NAME.fullmatch(alt_name):
                 raise ValueError(f"The passed name 'alt_name' '{alt_name}' is invalid.")
+            if update_var_mapping and arg in self._ctx.jax_name_map:
+                raise ValueError(f"Variable '{alt_name}' already registered.")
+            if alt_name in self._ctx.sdfg.arrays:
+                raise ValueError(f"Variable '{alt_name}' already exists.")
             if name_prefix is not None:
                 raise ValueError(
                     f"Specified 'name_prefix' ('{name_prefix}') but passed '{alt_name}' as 'alt_name'."
                 )
-            if alt_name in self._ctx.sdfg.arrays:
-                raise ValueError(f"Variable '{alt_name}' already exists.")
         if name_prefix is not None:
             assert isinstance(name_prefix, str)
             if len(name_prefix) == 0:
                 raise ValueError("Specified an empty 'name_prefix'.")
-        if as_view and (not as_transient):
-            raise ValueError("You tried to create a global view, which is not allowed.")
 
         # Checking the strides.
-        if (symb_strides is None) and (strides is None):
-            def_symb_stride = False  # default value for symbolic strides
-            symb_strides = False if (len(shape) <= 1) else def_symb_stride  # Keep for the future
-        elif (symb_strides is not None) and (strides is not None):
-            raise ValueError("Specified 'symb_strides' and 'stride at the same time.")
-        elif strides is not None:
+        if strides is not None:
+            if is_scalar:
+                raise ValueError("Specified a stride for a scalar.")
+            if isinstance(strides, (str, dace.symbol, int)):
+                strides = (strides,)
+            assert isinstance(strides, tuple)
             if len(strides) != len(shape):
                 raise ValueError(
                     f"'strides' has length {len(strides)}, but array rank is {len(shape)}."
                 )
-        else:
-            assert isinstance(symb_strides, bool)
 
         # Now we determine the proposed name of the variable.
         #  Depending on the situation, we will further manipulate it.
@@ -539,20 +500,17 @@ class JaxprTranslationDriver:
             prop_name = alt_name  # Just for completion: will be ignored later
         elif isinstance(arg, (jax_core.Var, util.JaCeVar)):
             prop_name = util._propose_jax_name(arg, self._ctx.jax_name_map)
-            if prop_name.startswith("__"):
-                raise ValueError(
-                    f"You tried to create the variable '{prop_name}' which"
-                    "starts with two underscores, use 'alt_name' for that."
-                )
+            assert not prop_name.startswith("__")
             if name_prefix is not None:
                 prop_name = name_prefix + prop_name
         elif isinstance(arg, jax_core.Literal):  # type: ignore[unreachable]
-            if not allow_literals:
+            if not allow_literals:  # Allows to use a literal as template.
                 raise NotImplementedError("Jax Literals are not supported.")
             if alt_name is None:
                 raise ValueError(f"Passed literal '{arg}', but not specified a name to use.")
         else:
             raise TypeError(f"Does not know how to handle '{type(arg).__name__}'.")
+
         if alt_name is None:
             # If we are the root translator, then we will use `prop_name` directly;
             #  otherwise we will append the revision of `self` to the name.
@@ -560,6 +518,7 @@ class JaxprTranslationDriver:
                 "" if self.is_root_translator() else f"_rev_idx{self._ctx.rev_idx}"
             )
         else:
+            # Use the supplied name directly.
             arg_name = str(alt_name)
 
         # Determine if we should look for a new name or not, if nothing was specified
@@ -567,10 +526,10 @@ class JaxprTranslationDriver:
             if arg_name in self._reserved_names:
                 find_new_name = True
             if arg_name in self._forbidden_names:
+                # This is not an error, but happens if we handle Jax variable `if`.
                 find_new_name = True
 
         if find_new_name:
-            # We have to find a new name.
             name_tmpl = "_jax_variable__" + arg_name + "__{}"
             for iCounter in range(1000):
                 _arg_name = name_tmpl.format(iCounter)
@@ -597,33 +556,12 @@ class JaxprTranslationDriver:
         # Promotion of scalar to array.
         if is_scalar and force_array:
             shape = (1,)
-            symb_strides = False
             strides = None
             is_scalar = False
-
-        # Set the stride if we have to change.
-        if strides is not None:
-            strides = tuple(strides)
-            assert len(strides) == len(shape)
-
-        elif (symb_strides is True) and (not is_scalar):
-            strides = [
-                dace.symbol(f"{arg_name}_stride{dim}", dace.int64) if size >= 2 else 0
-                for dim, size in enumerate(shape)
-            ]
 
         if is_scalar:
             self._ctx.sdfg.add_scalar(
                 name=arg_name, storage=storage, dtype=dtype, transient=as_transient
-            )
-        elif as_view:
-            self._ctx.sdfg.add_view(
-                name=arg_name,
-                shape=shape,
-                strides=strides,
-                offset=offset,
-                storage=storage,
-                dtype=dtype,
             )
         else:
             self._ctx.sdfg.add_array(
@@ -641,7 +579,27 @@ class JaxprTranslationDriver:
 
         return arg_name
 
+    @overload
     def create_jax_var_list(
+        self,
+        jax_var_list: Sequence[jax_core.Atom | util.JaCeVar],
+        prevent_creation: bool = False,
+        only_creation: bool = True,
+        handle_literals: bool = False,
+        **kwargs: Any,
+    ) -> list[str]: ...
+
+    @overload
+    def create_jax_var_list(  # type: ignore[misc]
+        self,
+        jax_var_list: Sequence[jax_core.Atom | util.JaCeVar],
+        prevent_creation: bool = False,
+        only_creation: bool = False,
+        handle_literals: bool = False,
+        **kwargs: Any,
+    ) -> list[None | str]: ...
+
+    def create_jax_var_list(  # type: ignore[misc]
         self,
         jax_var_list: Sequence[jax_core.Atom | util.JaCeVar],
         prevent_creation: bool = False,
@@ -655,7 +613,7 @@ class JaxprTranslationDriver:
         If no SDFG variable is known the function will create one using `add_array()`, with `update_var_mapping` set to `True`.
 
         By setting `prevent_creation` the function will not create any new SDFG variables.
-        This mode is used to indicate that all variables already have to exists already.
+        This mode is used to indicate that all variables have to exists already.
         By setting `only_creation` the function will only create new SDFG variables.
         If a Jax variable already has a known SDFG equivalent an error is generated.
 
@@ -692,7 +650,7 @@ class JaxprTranslationDriver:
                     raise ValueError(f"'only_creation' given '{jax_var}' already exists.")
                 else:
                     sdfg_name = mapped_sdfg_name
-                # `add_jax_name_mapping` is save, because if the mapping does already exists it is a no ops.
+                # Calling `add_jax_name_mapping` is save, because if the mapping does already exists it is a no ops.
                 self.add_jax_name_mapping(jax_var, sdfg_name)
             else:
                 raise TypeError(f"Does not know how to handle '{type(jax_var).__name__}'")
@@ -727,7 +685,7 @@ class JaxprTranslationDriver:
 
         # Handle the initial input arguments
         sdfg: dace.SDFG = self._ctx.sdfg
-        init_in_var_names: Sequence[str] = self.create_jax_var_list(  # type: ignore[assignment]
+        init_in_var_names: Sequence[str] = self.create_jax_var_list(
             jax_var_list=jaxpr.jaxpr.invars,
             only_creation=True,
             as_transient=True,  # Explicit transient; no error!
@@ -736,10 +694,10 @@ class JaxprTranslationDriver:
             force_jax_name=self.is_root_translator(),  # Ensure root get pure Jax names.
         )
         # This forces the code to only accept kwargs
+        #  Is also part of "what a canonical sdfg" is.
         sdfg.arg_names = []
 
-        # Store the list of inputs in self; this is done to simplify exporting.
-        #  The output list is populated by `self._translate_jaxpr_internal()`
+        # The output list is populated by `self._translate_jaxpr_internal()`
         self._ctx.inp_names = tuple(init_in_var_names)
 
         return init_in_var_names
@@ -760,25 +718,22 @@ class JaxprTranslationDriver:
 
         if not self.is_allocated():
             raise RuntimeError("Driver is not allocated, can not create constants.")
-        if not len(jaxpr.consts):
+        if len(jaxpr.consts) == 0:
             return []
 
-        const_names: list[str] = []
-        for cJaxVar, cValue in zip(jaxpr.jaxpr.constvars, jaxpr.consts, strict=False):
-            c_sdfg_name = self.add_array(
-                arg=cJaxVar,
-                name_prefix="__const_",
-                as_transient=True,
-                symb_strides=False,
-                strides=None,
-                update_var_mapping=True,
-            )
+        sdfg_const_names: Sequence[str] = self.create_jax_var_list(
+            jax_var_list=jaxpr.jaxpr.constvars,
+            only_creation=True,
+            strides=None,
+            name_prefix="__const_",
+        )
+
+        for sdfg_name, const_value in zip(sdfg_const_names, jaxpr.consts, strict=True):
             # We have to pass the data descriptor to `add_constant()`, otherwise a new one would be created.
             self._ctx.sdfg.add_constant(
-                c_sdfg_name, deepcopy(cValue), self._ctx.sdfg.arrays[c_sdfg_name]
+                sdfg_name, deepcopy(const_value), self._ctx.sdfg.arrays[sdfg_name]
             )
-            const_names.append(c_sdfg_name)
-        return const_names
+        return sdfg_const_names
 
     def _allocate_translation_ctx(
         self,
@@ -798,11 +753,12 @@ class JaxprTranslationDriver:
         from ._translation_context import _TranslationContext
 
         # Create a new translation context and put it on the stack.
-        self._ctx = _TranslationContext(
-            rev_idx=next(self._rev_manager),
-            name=name,
+        self._ctx_stack.append(
+            _TranslationContext(
+                rev_idx=next(self._rev_manager),
+                name=name,
+            )
         )
-        self._ctx_stack.append(self._ctx)
 
         if self.is_root_translator():
             # The root translation, i.e. the very first context allocation
@@ -817,6 +773,12 @@ class JaxprTranslationDriver:
             self.add_reserved_names(reserved_names)
 
         return self
+
+    @property
+    def _ctx(self) -> _TranslationContext:
+        """Returns the currently active translation context."""
+        assert len(self._ctx_stack) != 0, "No context is active."
+        return self._ctx_stack[-1]
 
     def _init_sub_translators(
         self,
@@ -839,7 +801,7 @@ class JaxprTranslationDriver:
 
             for handled_primitive in handled_primitives:
                 if handled_primitive in prim_translators:
-                    raise RuntimeError(f"Multiple sub translators for '{handled_primitive}' found.")
+                    raise RuntimeError(f"Multiple translators for '{handled_primitive}' found.")
                 prim_translators[handled_primitive] = prim_translator
         self._sub_translators = prim_translators
 
@@ -849,7 +811,7 @@ class JaxprTranslationDriver:
         """This function deallocate the translation context of `self`.
 
         Notes:
-            While it is allowed for outside code to call this explicitly function,
+            While it is allowed for outside code to call this function explicit
                 it is is most likely an error.
             If `self` is not allocated this function acts as a noops.
             The reserved names are only deallocated if `self` is a root translator.
@@ -857,19 +819,14 @@ class JaxprTranslationDriver:
         if not self.is_allocated():
             return self
 
-        assert self._ctx is self._ctx_stack[-1], "Inconsistent stack detected."
         if self.is_root_translator():
             self._rev_manager = itertools.count(0, 1)
             self._reserved_names = None  # type: ignore[assignment]
-
-            self._ctx = None  # type: ignore[assignment]
             self._ctx_stack.pop()
 
         else:
             # Restore the previous state
-            assert len(self._ctx_stack) > 1
             self._ctx_stack.pop()
-            self._ctx = self._ctx_stack[-1]
         return self
 
     def _find_sub_translator_for(
@@ -877,8 +834,6 @@ class JaxprTranslationDriver:
         eqn: jax_core.JaxprEqn,
     ) -> translator.PrimitiveTranslator:
         """Returns the appropriate subtranslator for equation `eqn`."""
-        assert self._sub_translators is not None
-
         prim_name: str = eqn.primitive.name
         if prim_name not in self._sub_translators:
             raise NotImplementedError(f"No subtranslators known to handle '{prim_name}'.")
@@ -887,7 +842,6 @@ class JaxprTranslationDriver:
 
     def _translate_single_eqn(
         self,
-        jaxpr: jax_core.ClosedJaxpr,
         eqn: jax_core.JaxprEqn,
     ) -> tuple[Sequence[str | None], Sequence[str]]:
         """Translate `eqn` into its SDFG equivalent.
@@ -903,17 +857,14 @@ class JaxprTranslationDriver:
             The inputs might contain `None` which indicates that that input was a Jax Literal.
 
         Notes:
-            While `jaxpr` must be a `ClosedJaxpr`, `eqn` must come from the unclosed instance.
+            The equation, `eqn` must come from the unclosed jaxpr instance.
             The function will perform some consistency checking after the subtranslator was called.
         """
-        assert isinstance(eqn, jax_core.JaxprEqn)
-        assert isinstance(jaxpr, jax_core.ClosedJaxpr)
-
         if len(eqn.effects) != 0:
             raise NotImplementedError(f"Equation '{eqn}' has side effects.")
 
         # Input/Output variables
-        #  Using a tuple for the input ensures that it is not modified.
+        #  Using a tuple for the input ensures that it cannot be modified.
         in_var_names: Sequence[str | None] = tuple(
             self.create_jax_var_list(
                 eqn.invars,
@@ -921,7 +872,7 @@ class JaxprTranslationDriver:
                 handle_literals=True,  #  but they can be literals.
             )
         )
-        out_var_names: Sequence[str] = self.create_jax_var_list(  # type: ignore[assignment]
+        out_var_names: MutableSequence[str] = self.create_jax_var_list(
             eqn.outvars,
             only_creation=True,  # Output must not exist yet.
         )
@@ -933,7 +884,7 @@ class JaxprTranslationDriver:
         last_term_state: dace.SDFGState = self.get_terminal_sdfg_state()  # noqa: F841 # Will be used later
         eqn_state = self.append_new_state(
             label=f"{eqn.primitive.name}_{out_var_names[0]}",
-            prev_state=None,  # forces terminal state
+            prev_state=None,  # forces terminal state to use
         )
 
         # Now perform the actual translation of the equation.
@@ -958,38 +909,13 @@ class JaxprTranslationDriver:
 
         # In case a subtranslator decided to not use the variables we created for it, which is allowed
         #  but he must update the `out_var_names` list correctly, we will now verify this.
-        if len(out_var_names) != len(eqn.outvars):
-            raise RuntimeError(
-                f"Modified 'out_var_names'! Expected {len(eqn.outvars)} variables."
-                f" but found {len(out_var_names)}"
-            )
         for expectedSDFGName, jax_var in zip(out_var_names, eqn.outvars, strict=True):
             mapped_sdfg_name = self.map_jax_var_to_sdfg(jax_var)
-            jax_name = util.get_jax_var_name(jax_var)
             if mapped_sdfg_name != expectedSDFGName:
                 raise ValueError(
                     f"Mapping inconsistency detected, expected that Jax variable"
-                    f" '{jax_name}' maps to '{expectedSDFGName}' but it actually"
+                    f" '{jax_var}' maps to '{expectedSDFGName}' but it actually"
                     f" maps to '{mapped_sdfg_name}'."
-                )
-
-        # Views can only be used if there is a direct connection, between source,
-        #  view and destination (place of usage). Because of the way how Jax works,
-        #  it is impossible that an output variable is a View.
-        for outVarName, jax_var in zip(out_var_names, eqn.outvars, strict=True):
-            sdfg_var = self.get_array(outVarName)
-            if isinstance(sdfg_var, (dace.data.Array, dace.data.Scalar)):
-                pass
-            elif isinstance(sdfg_var, dace.data.View):
-                raise TypeError(
-                    f"For Jax variable '{util.get_jax_var_name(jax_var)}' (SDFG: '{outVarName}'),"
-                    f" which is an output, you used a View, which is not possible."
-                    " It must either be an array or a scalar."
-                )
-            else:
-                raise NotImplementedError(
-                    f"Output variable '{util.get_jax_var_name(jax_var)}' (SDFG: '{outVarName}')"
-                    f" is of type '{type(sdfg_var).__name__}' which I does not know how to handle."
                 )
 
         # Modify terminal root state of 'self'
@@ -1021,21 +947,21 @@ class JaxprTranslationDriver:
 
         nb_translated_eqn: int = 0
         out_var_names: Sequence[str] = []
-        for eqn in jaxpr.jaxpr.eqns:  # Translate the equations one by one.
+
+        # Translate the equations one by one.
+        for eqn in jaxpr.jaxpr.eqns:
             assert len(eqn.effects) == 0
-            if len(eqn.outvars) == 0:  # Do we need this special case.
-                continue  #  Looks more like internal Jax error.
             if any(util.is_drop_var(outVar) for outVar in eqn.outvars):
-                assert (len(eqn.outvars) == 1) or all(
-                    util.is_drop_var(outVar) for outVar in eqn.outvars
-                )
+                assert all(util.is_drop_var(outVar) for outVar in eqn.outvars)
                 continue
-            _, out_var_names = self._translate_single_eqn(jaxpr=jaxpr, eqn=eqn)
+            _, out_var_names = self._translate_single_eqn(eqn=eqn)
             nb_translated_eqn += 1
 
+        # There were no equation, so handle the copying of input to output.
         if nb_translated_eqn == 0:
-            # There were no equation, so handle the copying of input to output.
             out_var_names = self._handle_null_jaxpr(jaxpr)
+
+        # Set the output names inside the context.
         self._ctx.out_names = tuple(out_var_names)
 
         return self._export_context()
@@ -1066,9 +992,9 @@ class JaxprTranslationDriver:
     ) -> Sequence[str]:
         """This function is called in case a `Jaxpr` with zero equations is encountered.
 
-        A function with zero equation might still have output, in which case an
-        input is copied to an output. This function will handle the copying from
-        the input into the corresponding output variable.
+        A function with zero equation might still have output, in which case an input is copied to an output.
+        This function will handle the copying from the input into the corresponding output variable.
+        It is important that the function will remove the input and output variables from the internal mapping.
 
         Returns:
             The function returns a list denoting the SDFG variables that refers to the output.
@@ -1083,47 +1009,46 @@ class JaxprTranslationDriver:
         assert len(self._ctx.inp_names) > 0
         assert len(self._ctx.out_names) == 0
 
-        # We will use this list to build the list of output names.
-        #  This is important for the exporter.
+        # List of the output variables.
         out_var_names: list[str] = []
 
         # If we are here then we are dealing with a nested SDFG/Jaxpr.
-        #  Because an input also serves as output, the nested SDFG will have connector pairs
-        #  with the same name, one serving as input the other as output, with the same name.
+        #  Because an input also serves as output, the nested SDFG will have a connector for the
+        #  input and one for the output, but both with the same name.
         #  This will make node validation fail.
-        #  Thus we have to introduce a some fake output name and explicitly copy the data around.
-        #  Once DaCe will inline the nested SDFG it will remove this intermediate copy.
+        #  We have to work around by introducing some fake copies, which will be removed by DaCe later.
         for jax_out_var in jaxpr.jaxpr.outvars:
-            jax_inp_name = util.get_jax_var_name(
-                jax_out_var
-            )  # Since output == input their names must be the same.
-            assert self.map_jax_var_to_sdfg(jax_inp_name, allow_fail=True)
+            # Since the output is also used as an input the variable mapping must be known.
+            sdfg_in_name: str = self.map_jax_var_to_sdfg(jax_out_var)
 
-            # This is the name we give to fictive Jax variable serving as output.
-            jax_out_name = f"_zero_equation_output_{self.map_jax_var_to_sdfg(jax_out_var)}"
-
-            # Now create the SDFG variable for it, give it a unique name.
+            # Now we create a variable that serves as true output, however, since the Jax variable
+            #  is already known we can not update the variable mapping.
             sdfg_out_name = self.add_array(
                 jax_out_var,
                 as_transient=True,
                 name_prefix="_zero_equation_output_for_",
                 update_var_mapping=False,
             )
+            out_var_names.append(sdfg_out_name)
 
-            # We now create a new mapping, we do this that we will later find the variable again.
-            self.add_jax_name_mapping(jax_var=jax_out_name, sdfg_name=sdfg_out_name)
-            out_var_names.append(jax_out_name)
-
-            # Now copy the input into the fake output variable.
-            inp_acc = self._ctx.start_state.add_read(self.map_jax_var_to_sdfg(jax_inp_name))
-            out_acc = self._ctx.start_state.add_write(self.map_jax_var_to_sdfg(jax_out_var))
+            # Now we perform the copy from the input variable in the newly created output variable.
+            inp_acc = self._ctx.start_state.add_read(sdfg_in_name)
+            out_acc = self._ctx.start_state.add_write(sdfg_out_name)
             self._ctx.start_state.add_nedge(
                 src=inp_acc,
                 dst=out_acc,
                 data=dace.Memlet.from_array(
-                    jax_inp_name, self.get_array(self.map_jax_var_to_sdfg(jax_inp_name))
+                    sdfg_in_name, self.get_array(self.map_jax_var_to_sdfg(sdfg_in_name))
                 ),
             )
+
+            # A Jax variable now has two SDFG equivalent, the input, that was previously created by
+            #  `self._create_initial_input()` and the `sdfg_out_name` we just created.
+            #  But we can not add this to the mapping, because of this situation we will now remove
+            #  the variable from the mapping. I am open for different approaches.
+            #  Note that input variables that are not used, will remain in the mapping.
+            self._ctx.jax_name_map.pop(jax_out_var)
+
         return tuple(out_var_names)
 
     # fmt: off
