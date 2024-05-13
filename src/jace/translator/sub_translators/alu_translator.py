@@ -9,7 +9,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import MutableSequence, Sequence
 from typing import Any, Final, cast
 
 import dace
@@ -17,6 +17,7 @@ import numpy as np
 from jax import core as jax_core
 from typing_extensions import override
 
+from jace import translator
 from jace.translator import sub_translators
 
 
@@ -91,9 +92,9 @@ class ALUTranslator(sub_translators.PrimitiveTranslator):
     @override
     def translate_jaxeqn(
         self,
-        driver: sub_translators.JaxprTranslationDriver,
+        driver: translator.JaxprTranslationDriver,
         in_var_names: Sequence[str | None],
-        out_var_names: Sequence[str],
+        out_var_names: MutableSequence[str],
         eqn: jax_core.JaxprEqn,
         eqn_state: dace.SDFGState,
     ) -> None:
