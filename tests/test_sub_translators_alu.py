@@ -12,7 +12,7 @@ from __future__ import annotations
 import jax
 import numpy as np
 
-from jace import util as jutil
+import jace
 
 
 def test_add():
@@ -26,7 +26,7 @@ def test_add():
     B = np.full((4, 3), 10, dtype=np.float64)
 
     ref = testee(A, B)
-    res = jutil._jace_run(testee, A, B)
+    res = jace.jit(testee)(A, B)
 
     assert np.allclose(ref, res), f"Expected '{ref}' got '{res}'."
 
@@ -46,7 +46,7 @@ def test_add2():
     B = np.full((4, 3), 10, dtype=np.float64)
 
     ref = testee(A, B)
-    res = jutil._jace_run(testee, A, B)
+    res = jace.jit(testee)(A, B)
 
     assert np.allclose(ref, res), f"Expected '{ref}' got '{res}'."
 
@@ -61,6 +61,6 @@ def test_add3():
     A = np.ones((3, 3), dtype=np.float64)
 
     ref = testee(A)
-    res = jutil._jace_run(testee, A)
+    res = jace.jit(testee)(A)
 
     assert np.allclose(ref, res), f"Expected '{ref}' got '{res}'."

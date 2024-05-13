@@ -9,7 +9,10 @@
 
 from __future__ import annotations
 
-from .debug import _jace_run, compile_jax_sdfg, run_jax_sdfg
+from .compiling import (
+    compile_jax_sdfg,
+    run_jax_sdfg,
+)
 from .jax_helper import (
     JaCeVar,
     _propose_jax_name,
@@ -56,7 +59,6 @@ __all__ = [
     "get_jax_var_dtype",
     "translate_dtype",
     "run_jax_sdfg",
-    "_jace_run",
     "_propose_jax_name",
     "VALID_JAX_VAR_NAME",
     "VALID_SDFG_OBJ_NAME",

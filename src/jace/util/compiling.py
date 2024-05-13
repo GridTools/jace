@@ -12,12 +12,11 @@ Everything in this module is experimental and might vanish anytime.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from functools import singledispatch
 from typing import Any
 
 import dace
-import jax
 
 from jace import translator
 from jace.util import dace_helper as jdace
@@ -78,10 +77,11 @@ def run_jax_sdfg(
     *args: Any,
     **kwargs: Any,
 ) -> tuple[Any, ...] | Any:
-    """Run the `TranslatedJaxprSDFG` object.
+    """Execute a `TranslatedJaxprSDFG` object directly.
 
     Notes:
-        The function either returns a value or a tuple of values, i.e. no tree.
+        This function is used for debugging purposes and you should use the `jace.jit` annotation instead.
+        The function either returns a value or a tuple of values, i.e. no pytree.
         There is an overload of this function that accepts an already compiled SDFG and runs it.
     """
     if jsdfg.inp_names is None:
@@ -110,7 +110,9 @@ def _(
 ) -> tuple[Any, ...] | Any:
     """Call the compiled SDFG.
 
-    The function assumes that the SDFG was compiled in accordance with `compile_jax_sdfg()`
+    Notes:
+        This function is used for debugging purposes and you should use the `jace.jit` annotation instead.
+        The function assumes that the SDFG was compiled in accordance with `compile_jax_sdfg()`
     """
     from dace.data import Array, Data, Scalar, make_array_from_descriptor
 
@@ -162,23 +164,3 @@ def _(
     if len(out_names) == 1:
         return ret_val[0]
     return ret_val
-
-
-def _jace_run(
-    fun: Callable,
-    *args: Any,
-    **kwargs: Any,
-) -> Any:
-    """Traces and run function `fun` using `Jax | DaCe`.
-
-    Args:
-        *args:      Forwarded to the tracing and final execution of the SDFG.
-        **kwargs:   Used to construct the driver.
-
-    Notes:
-        This function will be removed soon.
-    """
-    jaxpr = jax.make_jaxpr(fun)(*args)
-    driver = translator.JaxprTranslationDriver(**kwargs)
-    jsdfg = driver.translate_jaxpr(jaxpr)
-    return run_jax_sdfg(jsdfg, *args)
