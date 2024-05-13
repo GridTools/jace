@@ -20,6 +20,7 @@ from .jax_helper import (
     translate_dtype,
 )
 from .traits import (
+    is_array,
     is_drop_var,
     is_fully_addressable,
     is_jaceified,
@@ -41,6 +42,7 @@ __all__ = [
     "as_sequence",
     "compile_jax_sdfg",
     "dataclass_with_default_init",
+    "is_array",
     "is_drop_var",
     "is_tracing_ongoing",
     "is_jaceified",
