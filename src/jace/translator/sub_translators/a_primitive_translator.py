@@ -16,15 +16,13 @@ If you have the solution, feel free to implement it.
 from __future__ import annotations
 
 from abc import abstractmethod
-from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+from collections.abc import MutableSequence, Sequence
+from typing import Any, Protocol, runtime_checkable
 
 import dace
 from jax import core as jax_core
 
-
-if TYPE_CHECKING:
-    from .jaxpr_translator_driver import JaxprTranslationDriver
+from jace import translator
 
 
 @runtime_checkable
@@ -71,9 +69,9 @@ class PrimitiveTranslator(Protocol):
     @abstractmethod
     def translate_jaxeqn(
         self,
-        driver: JaxprTranslationDriver,
+        driver: translator.JaxprTranslationDriver,
         in_var_names: Sequence[str | None],
-        out_var_names: Sequence[str],
+        out_var_names: MutableSequence[str],
         eqn: jax_core.JaxprEqn,
         eqn_state: dace.SDFGState,
     ) -> dace.SDFGState | None:
@@ -94,25 +92,20 @@ class PrimitiveTranslator(Protocol):
             `eqn_state` argument. This state is guaranteed to be empty and
             `translator.get_terminal_sdfg_state() is eqn_state` holds.
 
-        Then the subtranslator is called. Usually a subtranslator should
-        construct the dataflow graph inside `eqn_state`. It is allowed that the
-        subtranslators creates more states if needed, but this state machine
-        has to have a single terminal state, which must be returned
-        and reachable from `eqn_state`.
-        If the function returns `None` the driver will assume that
-        subtranslator was able to fully construct the dataflow graph
-        within `eqn_state`.
+        Then the subtranslator is called.
+        Usually a subtranslator should construct the dataflow graph inside `eqn_state`.
+        It is allowed that the subtranslators creates more states if needed, but this state machinery
+        has to have a single terminal state, which must be returned and reachable from `eqn_state`.
+        If the function returns `None` the driver will assume that subtranslator was able to
+        fully construct the dataflow graph within `eqn_state`.
 
-        While a subtranslator is forbidden from meddling with the input
-        variables mentioned in `in_var_names` in any way, it is allowed to
-        modify the output variables. For example he could create a new
-        SDFG variable, with different strides. But in that case the
-        subtranslator must update the internal mapping of the driver TBA HOW,
-        and modify the mapping in `out_var_names`.
-        However, the subtranslator is allowed to create internal temporary
-        variables. It just have to ensure that no name collision will occur,
-        a way to do this is to use a passed variable name as prefix.
-
+        While a subtranslator is forbidden from meddling with the input variables mentioned in
+        `in_var_names` in any way, it is allowed to modify the output variables.
+        For example it could create a new SDFG variable, with different strides.
+        But in that case the subtranslator must update the internal mapping of the driver TBA HOW,
+        and modify the mapping specified by `out_var_names`.
+        However, the subtranslator is allowed to create internal temporary variables.
+        It just have to ensure that no name collision will occur, a way to do this is to use a passed variable name as prefix.
 
         Args:
             driver:         The driver object of the translation.
