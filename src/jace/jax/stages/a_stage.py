@@ -7,7 +7,7 @@
 """Interface of the Stages.
 
 In `jace.jax.stages.__init__.py` this file must be imported first.
-However, isort/ruff fail to do that and can not be convinced otherwise. 
+However, isort/ruff fail to do that and can not be convinced otherwise.
 For that reason this file was renamed to ensure that it comes at first.
 """
 

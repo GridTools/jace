@@ -18,7 +18,7 @@ import jace
 from jace import util as jutil
 
 
-np.random.seed(42)
+np.random.seed(42)  # noqa: NPY002  # random generator
 
 
 def test_jit():
@@ -103,7 +103,7 @@ def test_composition2():
     f3_jax = jax.jit(f3_)
     f3_jace = jace.jit(f3_)
 
-    A, B, C, D = (np.random.random((10, 3, 50)) for _ in range(4))
+    A, B, C, D = (np.random.random((10, 3, 50)) for _ in range(4))  # noqa: NPY002  # random generator
 
     ref = ((A + B) - C) * D
 
@@ -137,5 +137,8 @@ def test_grad_control_flow():
     x2 = 4.0
     df_x2 = -4.0
 
-    assert (res := df(x1)) == df_x1, f"Failed lower branch, expected '{df_x1}', got '{res}'."
-    assert (res := df(x2)) == df_x2, f"Failed upper branch, expected '{df_x2}', got '{res}'."
+    res_1 = df(x1)
+    res_2 = df(x2)
+
+    assert df(x1) == df_x1, f"Failed lower branch, expected '{df_x1}', got '{res_1}'."
+    assert df(x2) == df_x2, f"Failed upper branch, expected '{df_x2}', got '{res_2}'."

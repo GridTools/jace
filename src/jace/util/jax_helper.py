@@ -62,7 +62,7 @@ class JaCeVar:
         name: str,
         shape: Sequence[int | dace.symbol | str] | int | dace.symbol | str,
         dtype: Any,
-    ) -> None:
+    ) -> JaCeVar:
         """Creates a `JaCeVar` object.
 
         Performs some sanity checks on the input.

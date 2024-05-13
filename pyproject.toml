@@ -151,5 +151,5 @@ section-order = [
 "tests/**" = [
   "T10",
   "T20",  # Ignore `flake8-debugger` and `flake8-print`
-  "F841",  # Ignore assigned but not used; inside `with` to test if throw.
+  "F841"  # Ignore assigned but not used; inside `with` to test if throw.
 ]
