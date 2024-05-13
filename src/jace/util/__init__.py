@@ -19,7 +19,6 @@ from .jax_helper import (
     is_tracing_ongoing,
     translate_dtype,
 )
-from .re_pattern import _VALID_JAX_VAR_NAME, _VALID_SDFG_OBJ_NAME, _VALID_SDFG_VAR_NAME
 from .traits import (
     is_drop_var,
     is_fully_addressable,
@@ -29,7 +28,13 @@ from .traits import (
     is_non_string_iterable,
     is_on_device,
 )
-from .util import as_sequence, dataclass_with_default_init
+from .util import (
+    VALID_JAX_VAR_NAME,
+    VALID_SDFG_OBJ_NAME,
+    VALID_SDFG_VAR_NAME,
+    as_sequence,
+    dataclass_with_default_init,
+)
 
 
 __all__ = [
@@ -52,7 +57,7 @@ __all__ = [
     "run_jax_sdfg",
     "_jace_run",
     "_propose_jax_name",
-    "_VALID_JAX_VAR_NAME",
-    "_VALID_SDFG_OBJ_NAME",
-    "_VALID_SDFG_VAR_NAME",
+    "VALID_JAX_VAR_NAME",
+    "VALID_SDFG_OBJ_NAME",
+    "VALID_SDFG_VAR_NAME",
 ]

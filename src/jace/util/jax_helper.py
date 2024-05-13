@@ -61,7 +61,7 @@ class JaCeVar:
     ) -> None:
         if name == "":
             pass  # Explicit allowed in the interface, but a bit strange.
-        elif (name != "_") and (not util._VALID_SDFG_VAR_NAME.fullmatch(name)):
+        elif (name != "_") and (not util.VALID_SDFG_VAR_NAME.fullmatch(name)):
             raise ValueError(f"Passed an invalid name '{name}'.")
         if isinstance(shape, (int, dace.symbol, str)):
             shape = (shape,)
@@ -115,7 +115,7 @@ def get_jax_var_name(jax_var: jax_core.Atom | JaCeVar | str) -> str:
             )
     assert isinstance(jax_name, str)
 
-    if not util._VALID_JAX_VAR_NAME.fullmatch(jax_name):
+    if not util.VALID_JAX_VAR_NAME.fullmatch(jax_name):
         raise ValueError(f"Deduced Jax name '{jax_name}' is invalid.")
     return jax_name
 

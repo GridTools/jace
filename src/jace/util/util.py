@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Iterable
 from typing import Any, TypeVar, cast, overload
 
@@ -75,3 +76,13 @@ def dataclass_with_default_init(
     if _cls is None:
         return wrap
     return wrap(_cls)
+
+
+# Valid name for a jax variable.
+VALID_JAX_VAR_NAME: re.Pattern = re.compile("(jax[0-9]+_?)|([a-z]+_?)")
+
+# Valid name for an SDFG variable.
+VALID_SDFG_VAR_NAME: re.Pattern = re.compile("[a-zA-Z_][a-zA-Z0-9_]*")
+
+# Valid name for an SDFG itself, includes `SDFGState` objects.
+VALID_SDFG_OBJ_NAME: re.Pattern = re.compile("[a-zA-Z_][a-zA-Z0-9_]*")
