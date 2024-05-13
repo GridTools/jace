@@ -51,5 +51,16 @@ def test_add2():
     assert np.allclose(ref, res), f"Expected '{ref}' got '{res}'."
 
 
-if __name__ == "__main__":
-    test_add()
+def test_add3():
+    """Simple add function, with constant."""
+    jax.config.update("jax_enable_x64", True)
+
+    def testee(A: np.ndarray) -> np.ndarray:
+        return A + jax.numpy.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]])
+
+    A = np.ones((3, 3), dtype=np.float64)
+
+    ref = testee(A)
+    res = jutil._jace_run(testee, A)
+
+    assert np.allclose(ref, res), f"Expected '{ref}' got '{res}'."

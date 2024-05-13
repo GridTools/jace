@@ -148,4 +148,8 @@ section-order = [
 [tool.ruff.lint.per-file-ignores]
 "!tests/**.py" = ["PT"]  # Ignore `flake8-pytest-style` everywhere except in `tests/`
 "noxfile.py" = ["T20"]  # Ignore `flake8-print`
-"tests/**" = ["T10", "T20"]  # Ignore `flake8-debugger` and `flake8-print`
+"tests/**" = [
+  "T10",
+  "T20",  # Ignore `flake8-debugger` and `flake8-print`
+  "F841",  # Ignore assigned but not used; inside `with` to test if throw.
+]

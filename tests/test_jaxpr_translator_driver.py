@@ -32,8 +32,7 @@ def test_driver_alloc() -> None:
     """Tests the state right after allocation."""
     driver = jtrans.JaxprTranslationDriver()
     assert not driver.is_allocated(), "Driver was created allocated."
-    assert driver._ctx is None
-    assert len(driver._ctx_stack) == 0  # type: ignore[unreachable]
+    assert len(driver._ctx_stack) == 0
 
     # The reserved names will be tested in `test_driver_fork()`.
     sdfg_name = "qwertzuiopasdfghjkl"
@@ -78,7 +77,6 @@ def test_driver_nested() -> None:
     assert len(driver._ctx_stack) == 2
     assert driver._ctx is driver._ctx_stack[-1]
     assert driver._ctx is not driver._ctx_stack[0]
-    assert org_ctx is driver._ctx_stack[0]
 
     for member_name in driver._ctx.__slots__:
         org = getattr(org_ctx, member_name)
@@ -95,8 +93,7 @@ def test_driver_nested() -> None:
 
     # Now if we fully deallocate then we expect that it is fully deallocated.
     driver._clear_translation_ctx()
-    assert driver._ctx is None
-    assert len(driver._ctx_stack) == 0  # type: ignore[unreachable]
+    assert len(driver._ctx_stack) == 0
     assert driver._reserved_names is None
 
 
@@ -136,8 +133,8 @@ def test_driver_append_state(alloc_driver: jtrans.JaxprTranslationDriver) -> Non
     assert next(iter(sdfg.in_edges(non_terminal_state))).src is terminal_state_1
 
 
-def test_driver_array(alloc_driver: jtrans.JaxprTranslationDriver) -> None:
-    """This function tests the array creation routines.
+def test_driver_scalar(alloc_driver: jtrans.JaxprTranslationDriver) -> None:
+    """This function tests the array creation routines, especially the scalar part.
 
     However, it does so without using Jax variables.
     """
@@ -169,41 +166,91 @@ def test_driver_array(alloc_driver: jtrans.JaxprTranslationDriver) -> None:
     assert scal2.strides == (1,)
     assert scal2.dtype == scal2_j.dtype
 
-    # Create a scalar force it as an array and use symbolic strides.
+    # Using a special name for the variable
     scal3_j = JaCeVar("scal3", (), dace.int64)
+    scal3_n = "scal3_special_name"
     scal3_: str = alloc_driver.add_array(
         arg=scal3_j,
-        force_array=True,
-        symb_strides=True,  # Will have no effect.
-    )
-    scal3: Data = alloc_driver.get_array(scal3_)
-    assert isinstance(scal2, Array)
-    assert scal3_ == scal3_j.name
-    assert scal3.shape == (1,)
-    assert scal3.strides == (1,)
-    assert scal3.dtype == scal3_j.dtype
-
-    # Using a special name for the variable
-    scal4_j = scal3_j
-    scal4_n = "scal4_special_name"
-    scal4_: str = alloc_driver.add_array(
-        arg=scal4_j,
-        alt_name=scal4_n,
+        alt_name=scal3_n,
         update_var_mapping=True,
     )
-    assert scal4_ == scal4_n
-    assert scal4_ == alloc_driver.map_jax_var_to_sdfg(scal4_j)
+    assert scal3_ == scal3_n
+    assert scal3_ == alloc_driver.map_jax_var_to_sdfg(scal3_j)
 
     # Test the prefix functionality
-    scal5_j = JaCeVar("scal5", (), dace.float64)
-    scal5_p = "my_prefix"
-    scal5_: str = alloc_driver.add_array(
-        arg=scal5_j,
-        name_prefix=scal5_p,
+    scal4_j = JaCeVar("scal4", (), dace.float64)
+    scal4_p = "my_prefix"
+    scal4_n = "scal4_unused_name"
+    with pytest.raises(
+        expected_exception=ValueError,
+        match=re.escape(
+            f"Specified 'name_prefix' ('{scal4_p}') but passed '{scal4_n}' as 'alt_name'."
+        ),
+    ):
+        scal4_: str = alloc_driver.add_array(
+            arg=scal4_j,
+            alt_name=scal4_n,
+            name_prefix=scal4_p,
+        )
+    # Now create it correctly
+    scal4_ = alloc_driver.add_array(
+        arg=scal4_j,
+        name_prefix=scal4_p,
     )
-    assert scal5_.startswith(scal5_p)
-    assert scal5_j.name in scal5_
+    assert scal4_.startswith(scal4_p)
+    assert scal4_j.name in scal4_
 
+    # Test the strides, or the inability to use it.
+    scal5_j = JaCeVar("scal5", (), dace.float64)
+    with pytest.raises(
+        expected_exception=ValueError,
+        match="Specified a stride for a scalar.",
+    ):
+        scal5_: str = alloc_driver.add_array(arg=scal5_j, strides=(3,))
+
+    # test the force jax name feature
+    scal6_j = JaCeVar("scal6", (), dace.float64)
+    scal6_n: str = "scal6_name"
+    scal6_np: str = "scal6_name_prefix"
+    with pytest.raises(
+        expected_exception=ValueError,
+        match=f"Specified 'force_jax_name', but passed '{scal6_n}' as 'alt_name'.",
+    ):
+        scal6_: str = alloc_driver.add_array(
+            arg=scal6_j,
+            alt_name=scal6_n,
+            force_jax_name=True,
+        )
+    with pytest.raises(
+        expected_exception=ValueError,
+        match=f"Specified 'force_jax_name', but passed '{scal6_np}' as 'name_prefix'.",
+    ):
+        scal6_ = alloc_driver.add_array(
+            arg=scal6_j,
+            name_prefix=scal6_np,
+            force_jax_name=True,
+        )
+    with pytest.raises(
+        expected_exception=ValueError,
+        match="Specified `force_jax_name` but also wanted a new name.",
+    ):
+        scal6_ = alloc_driver.add_array(
+            arg=scal6_j,
+            force_jax_name=True,
+            find_new_name=True,
+        )
+    scal6_ = alloc_driver.add_array(
+        arg=scal6_j,
+        force_jax_name=True,
+    )
+    assert scal6_ == scal6_j.name
+
+
+def test_driver_array(alloc_driver: jtrans.JaxprTranslationDriver) -> None:
+    """This function tests the array creation routines.
+
+    However, it does so without using Jax variables.
+    """
     # Allocating an array
     arr1_j = JaCeVar("arr1", (5, 3), dace.float32)
     arr1_: str = alloc_driver.add_array(
@@ -216,7 +263,7 @@ def test_driver_array(alloc_driver: jtrans.JaxprTranslationDriver) -> None:
     assert arr1.strides == (3, 1)
     assert arr1.dtype == arr1_j.dtype
 
-    # Create a variable that has a name that is already known.
+    # Create a variable that has a sdfg name that is already known.
     arr2_j = JaCeVar(arr1_, (10,), dace.float64)
     with pytest.raises(
         expected_exception=ValueError,
@@ -224,10 +271,9 @@ def test_driver_array(alloc_driver: jtrans.JaxprTranslationDriver) -> None:
     ):
         arr2_: str = alloc_driver.add_array(arg=arr2_j)
     with pytest.raises(expected_exception=ValueError, match=f"Variable '{arr1_}' already exists."):
-        # `alt_name` will not work because variable still exists.
+        # `alt_name` will not work because name still exists.
         arr2_ = alloc_driver.add_array(arg=arr2_j, alt_name=arr2_j.name)
     # However, specifying `find_new_name` will solve this issue
-    #  NOTE: Doing this is not a good idea.
     arr2_ = alloc_driver.add_array(
         arg=arr2_j,
         find_new_name=True,
@@ -245,36 +291,6 @@ def test_driver_array(alloc_driver: jtrans.JaxprTranslationDriver) -> None:
     assert isinstance(arr3, Array)
     assert arr3.shape == arr3_j.shape
     assert arr3.strides == arr3_st
-
-    # Test if specifying `symb_strides` and a stride at the same time is an error.
-    arr4_j = JaCeVar("arr4", arr3_j.shape, dace.uintp)
-    arr4_st = arr3_st
-    with pytest.raises(
-        expected_exception=ValueError,
-        match="Specified 'symb_strides' and 'stride at the same time.",
-    ):
-        arr4_: str = alloc_driver.add_array(
-            arg=arr4_j,
-            symb_strides=True,
-            strides=arr4_st,
-        )
-
-    # Test if specifying the symbolic stride alone works.
-    #  Because a shape is `1` there should be no symbolic for it.
-    arr4_ = alloc_driver.add_array(
-        arg=arr4_j,
-        symb_strides=True,
-    )
-    arr4: Data = alloc_driver.get_array(arr4_)
-    assert isinstance(arr4, Array)
-    assert arr4.shape == arr4_j.shape
-
-    for shp, stri in zip(arr4.shape, arr4.strides):
-        if shp == 1:
-            assert isinstance(stri, int)
-            assert stri == 0, f"Expected a stride of 0, but got '{stri}'."
-        else:
-            assert isinstance(stri, (str, dace.symbol))
 
 
 def test_driver_array2() -> None:
