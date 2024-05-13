@@ -7,9 +7,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import MutableMapping
 from dataclasses import dataclass
-from typing import Any
 
 import dace
 from jax import core as jax_core
@@ -17,11 +16,14 @@ from jax import core as jax_core
 from jace import util
 
 
-@dataclass(init=True, repr=True, eq=False, frozen=False, kw_only=True, slots=True)
+@dataclass(slots=True)
 class TranslatedJaxprSDFG:
     """Encapsulates the result of a translation run of the `JaxprTranslationDriver` object.
 
-    It defines the following members:
+    This class is also used to represent the internal state of the `JaxprTranslationDriver` during the translation.
+    For that reason the object defines some fields that only have a meaning during the actually translation.
+
+    The fields used to store the result are:
     - `sdfg` the SDFG object that was created.
     - `jax_name_map` a `dict` that maps every Jax variable to its corresponding SDFG variable _name_.
     - `start_state` the first state in the SDFG state machine.
@@ -29,32 +31,71 @@ class TranslatedJaxprSDFG:
     - `inp_names` a `list` of the SDFG variables that are used as input, in the same order as `Jaxpr.invars`.
     - `out_names` a `list` of the SDFG variables that are used as output, in the same order as `Jaxpr.outvars`.
 
-    The SDFG is in a so called canonical form, that is not directly usable, see `JaxprTranslationDriver` for more.
+    Please consider the following important points:
+    - The SDFG is in canonical form, which means that it is not directly usable, see `JaxprTranslationDriver` for more.
+    - It might be that a name appears in both the `inp_names` and `out_names` list.
+        This happens if the corresponding variable is used as both input and output.
+        In Jax this is called argument donation.
 
-    It might be that a name appears in both the `inp_names` and `out_names` list.
-    This happens if the corresponding variable is used as both input and output.
-    In Jax this is called argument donation.
+    During the translation the following members are also allocated:
+    - `rev_idx` the revision index, used for name mangling.
+
+    While they remain allocated, accessing them is considered an error.
     """
 
     sdfg: dace.SDFG
-    jax_name_map: Mapping[jax_core.Var | util.JaCeVar, str]
-    start_state: dace.SDFGState | None = None
-    terminal_state: dace.SDFGState | None = None
-    inp_names: Sequence[str] | None = None
-    out_names: Sequence[str] | None = None
+    jax_name_map: MutableMapping[jax_core.Var | util.JaCeVar, str]
+    start_state: dace.SDFGState
+    terminal_state: dace.SDFGState
+    inp_names: tuple[str, ...]
+    out_names: tuple[str, ...]
+    rev_idx: int
+
+    def __init__(
+        self,
+        rev_idx: int,
+        name: str | None = None,
+    ) -> None:
+        """Initializes the context.
+
+        The function allocates the SDFG and initializes the members properly.
+
+        Args:
+            rev_idx:    The revision index of the context.
+            name:       Name of the SDFG object.
+        """
+        if isinstance(name, str) and not util.VALID_SDFG_OBJ_NAME.fullmatch(name):
+            raise ValueError(f"'{name}' is not a valid SDFG name.")
+
+        self.sdfg: dace.SDFG = dace.SDFG(name=(name or f"unnamed_SDFG_{id(self)}"))
+        self.start_state: dace.SDFGState = self.sdfg.add_state(
+            label="initial_state", is_start_block=True
+        )
+        self.terminal_state: dace.SDFGState = self.start_state
+        self.jax_name_map: MutableMapping[jax_core.Var | util.JaCeVar, str] = {}
+        self.inp_names: tuple[str, ...] = ()
+        self.out_names: tuple[str, ...] = ()
+        self.rev_idx: int = rev_idx
 
     def validate(self) -> bool:
         """Validate the underlying SDFG."""
 
         # To prevent the 'non initialized' data warnings we have to temporary
         #  promote input and output arguments to globals
-        promote_to_glob: set[str] = set()
         org_trans_state: dict[str, bool] = {}
-        if self.inp_names:
-            promote_to_glob.update(self.inp_names)
-        if self.out_names:
-            promote_to_glob.update(self.out_names)
-        for var in promote_to_glob:
+        if not self.inp_names:
+            raise dace.sdfg.InvalidSDFGError(
+                "There are no input arguments.",
+                self.sdfg,
+                self.sdfg.node_id(self.start_state),
+            )
+        if not self.out_names:
+            raise dace.sdfg.InvalidSDFGError(
+                "There are no output arguments.",
+                self.sdfg,
+                self.sdfg.node_id(self.start_state),
+            )
+        for var in set(self.inp_names + self.out_names):  # set is needed for donated args.
             org_trans_state[var] = self.sdfg.arrays[var].transient
             self.sdfg.arrays[var].transient = False
 
@@ -64,11 +105,3 @@ class TranslatedJaxprSDFG:
             for var, orgValue in org_trans_state.items():
                 self.sdfg.arrays[var].transient = orgValue
         return True
-
-    def __getitem__(self, idx: str) -> Any:
-        """Allows member access using brackets."""
-        if not isinstance(idx, str):
-            raise TypeError(f"Expected 'idx' as 'str' but got '{type(str)}'")
-        if not hasattr(self, idx):
-            raise KeyError(f"The key '{idx}' is not known.")
-        return getattr(self, idx)
