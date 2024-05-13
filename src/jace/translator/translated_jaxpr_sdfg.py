@@ -15,7 +15,6 @@ import dace
 from jax import core as jax_core
 
 from jace import util
-from jace.util import dace_helper as jdace
 
 
 @dataclass(init=True, repr=True, eq=False, frozen=False, kw_only=True, slots=True)
@@ -29,7 +28,6 @@ class TranslatedJaxprSDFG:
     - `terminal_state` the last state in the state machine.
     - `inp_names` a `list` of the SDFG variables that are used as input, in the same order as `Jaxpr.invars`.
     - `out_names` a `list` of the SDFG variables that are used as output, in the same order as `Jaxpr.outvars`.
-    - `csdfg` a compiled SDFG object; Optional might be empyt.
 
     The SDFG is in a so called canonical form, that is not directly usable, see `JaxprTranslationDriver` for more.
 
@@ -44,7 +42,6 @@ class TranslatedJaxprSDFG:
     terminal_state: dace.SDFGState | None = None
     inp_names: Sequence[str] | None = None
     out_names: Sequence[str] | None = None
-    csdfg: jdace.CompiledSDFG | None = None
 
     def validate(self) -> bool:
         """Validate the underlying SDFG."""
