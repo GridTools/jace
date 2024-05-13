@@ -445,7 +445,7 @@ class JaxprTranslationDriver:
             if find_new_name:
                 raise ValueError("Specified `force_jax_name` but also wanted a new name.")
             find_new_name = False
-            alt_name = util._propose_jax_name(arg, self._ctx.jax_name_map)
+            alt_name = util.propose_jax_name(arg, self._ctx.jax_name_map)
         if alt_name is not None:
             assert isinstance(alt_name, str)
             find_new_name = False  # If a name was given, then use it no matter what.
@@ -485,7 +485,7 @@ class JaxprTranslationDriver:
         if alt_name is not None:
             prop_name = alt_name  # Just for completion: will be ignored later
         elif isinstance(arg, (jax_core.Var, util.JaCeVar)):
-            prop_name = util._propose_jax_name(arg, self._ctx.jax_name_map)
+            prop_name = util.propose_jax_name(arg, self._ctx.jax_name_map)
             assert not prop_name.startswith("__")
             if name_prefix is not None:
                 prop_name = name_prefix + prop_name

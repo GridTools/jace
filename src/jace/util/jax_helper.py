@@ -212,7 +212,7 @@ def translate_dtype(dtype: Any) -> dace.typeclass:
     raise ValueError(f"Unable to translate '{dtype}' ino a DaCe dtype.")
 
 
-def _propose_jax_name(
+def propose_jax_name(
     jax_var: jax_core.Atom | JaCeVar,
     jax_name_map: Mapping[jax_core.Var | JaCeVar, Any] | None = None,
 ) -> str:
