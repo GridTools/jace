@@ -33,6 +33,7 @@ def compile_jax_sdfg(
         Currently the SDFG must not have any undefined symbols, i.e. no undefined sizes.
     """
     from copy import deepcopy
+    from time import time
 
     if not jsdfg.inp_names:
         raise ValueError("The passed SDFG did not had any input arguments.")
@@ -53,6 +54,11 @@ def compile_jax_sdfg(
     #  And currently we rely on the integrity of this object in the run function,
     #  i.e. in the allocation of the return values as well as `arg_names`.
     sdfg: dace.SDFG = deepcopy(jsdfg.sdfg)
+
+    # We need to give the SDFG another name, this is needed to prevent a DaCe error/warning.
+    #  This happens if we compile the same lowered SDFG multiple times with different options.
+    #  We allow this because Jax allows this too, this is also a reason why we copy the SDFG.
+    sdfg.name = f"{sdfg.name}__comp_{int(time() * 1000)}"
 
     # Canonical SDFGs do not have global memory, so we must transform it
     sdfg_arg_names: list[str] = []

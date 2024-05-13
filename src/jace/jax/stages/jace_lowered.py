@@ -49,6 +49,15 @@ class JaceLowered(stages.Stage):
         Notes:
             Currently no optimization is performed.
         """
+        # TODO(phimuell): Think really hard what we should do here, to avoid strange behaviour.
+        #                   I am not fully sure if we should include the SDFG value in the caching.
+
+        # TODO(phimuell):
+        #   - remove the inplace modification.
+        #   - Somehow integrate it into the caching strategy.
+        #
+        #  If we would not integrate it into the caching strategy, then calling `lower()` on
+        #  the wrapped object would return the original object, but with a modified, already optimized SDFG.
         return self
 
     @tcache.cached_translation
@@ -58,7 +67,7 @@ class JaceLowered(stages.Stage):
     ) -> stages.JaceCompiled:
         """Compile the SDFG.
 
-        Returns an Object that encapsulates a
+        Returns an Object that encapsulates a compiled SDFG object.
         """
         csdfg: jdace.CompiledSDFG = util.compile_jax_sdfg(self._translated_sdfg)
         return stages.JaceCompiled(

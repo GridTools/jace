@@ -63,3 +63,55 @@ def test_decorator_one_go():
     res = testee(A, B)
 
     assert np.allclose(ref, res), f"Expected '{ref}' got '{res}'."
+
+
+def test_decorator_caching():
+    """This tests the caching ability"""
+    jax.config.update("jax_enable_x64", True)
+
+    def testee1_(A: np.ndarray, B: np.ndarray) -> np.ndarray:
+        return A * B
+
+    def testee2_(A: np.ndarray, B: np.ndarray) -> np.ndarray:
+        return A + B
+
+    testee1 = jace.jit(testee1_)
+    testee2 = jace.jit(testee2_)
+
+    assert testee1.__wrapped__ == testee1_
+    assert testee2.__wrapped__ == testee2_
+
+    # This is the first size
+    A = np.arange(12, dtype=np.float64).reshape((4, 3))
+    B = np.full((4, 3), 10, dtype=np.float64)
+
+    # This is the second sizes
+    C = np.arange(16, dtype=np.float64).reshape((4, 4))
+    D = np.full((4, 4), 10, dtype=np.float64)
+
+    # Lower the two functions for the first size.
+    lowered1_size1 = testee1.lower(A, B)
+    lowered2_size1 = testee2.lower(A, B)
+
+    # If we now lower them again, we should get the same objects
+    assert lowered1_size1 is testee1.lower(A, B)
+    assert lowered2_size1 is testee2.lower(A, B)
+
+    # Now we lower them for the second sizes.
+    lowered1_size2 = testee1.lower(C, D)
+    lowered2_size2 = testee2.lower(C, D)
+
+    # Again if we now lower them again, we should get the same objects.
+    assert lowered1_size1 is testee1.lower(A, B)
+    assert lowered2_size1 is testee2.lower(A, B)
+    assert lowered1_size2 is testee1.lower(C, D)
+    assert lowered2_size2 is testee2.lower(C, D)
+
+    # Now use the compilation; since all is the same code path we only use one size.
+    compiled1 = lowered1_size1.compile()
+    compiled2 = lowered1_size1.compile({"dummy_option": True})
+
+    assert compiled1 is lowered1_size1.compile()
+    assert compiled2 is lowered1_size1.compile({"dummy_option": True})
+    assert compiled2 is not lowered1_size1.compile({"dummy_option": False})
+    assert compiled2 is lowered1_size1.compile({"dummy_option": True})
