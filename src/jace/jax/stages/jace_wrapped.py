@@ -51,7 +51,7 @@ class JaceWrapped(stages.Stage):
         """Creates a wrapped jace jitable object of `jax_prim`."""
         assert fun is not None
         self._fun: Callable = fun
-        self._cache: tcache.TranslationCache = tcache.get_cache("lowering")
+        self._cache: tcache.TranslationCache = tcache.get_cache(self)
 
     def __call__(
         self,

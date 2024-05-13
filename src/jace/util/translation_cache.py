@@ -30,7 +30,7 @@ from jace.jax import stages
 
 
 def get_cache(
-    name: str,
+    self: stages.Stage,
     size: int = 128,
 ) -> TranslationCache:
     """Returns the cache associated to `name`.
@@ -40,15 +40,14 @@ def get_cache(
     """
     # Get the caches and if not present, create them.
     if not hasattr(get_cache, "_caches"):
-        _caches: dict[str, TranslationCache] = {}
-        _caches["lowering"] = TranslationCache(size=size)
-        _caches["compiling"] = TranslationCache(size=size)
+        _caches: dict[type[stages.Stage], TranslationCache] = {}
         get_cache._caches = _caches  # type: ignore[attr-defined]  # ruff removes the `getattr()` calls
     _caches = get_cache._caches  # type: ignore[attr-defined]
 
-    if name not in _caches:
-        raise ValueError(f"The cache '{name}' is unknown.")
-    return _caches[name]
+    if type(self) not in _caches:
+        _caches[type(self)] = TranslationCache(size=size)
+
+    return _caches[type(self)]
 
 
 def cached_translation(
@@ -62,86 +61,69 @@ def cached_translation(
         *args: Any,
         **kwargs: Any,
     ) -> stages.Stage:
-        assert hasattr(self, "_cache")
+        assert hasattr(self, "_cache"), f"Type '{type(self).__name__}' does not have `_cache`."
         cache: TranslationCache = self._cache
-        key: _CacheKey = self.make_key(self, *args, **kwargs)
+        key: _CacheKey = cache.make_key(self, *args, **kwargs)
         if cache.has(key):
             return cache.get(key)
-
-        next_stage: stages.Stage = action(*args, **kwargs)
+        next_stage: stages.Stage = action(self, *args, **kwargs)
         cache.add(key, next_stage)
         return next_stage
 
     return _action_wrapper
 
 
-@util.dataclass_with_default_init(init=True, repr=True, frozen=True, slots=True)
-class _JaCeVarWrapper:
-    """Wrapper class around `JaCeVar` for use in `_CacheKey`.
+@dataclass(init=True, eq=True, frozen=True)
+class _AbstarctCallArgument:
+    """Class to represent the call arguments used in the cache."""
 
-    It essentially makes the hash depend on the content, with the exception of name.
-    """
-
-    _slots__ = ("var", "_hash")
-    var: util.JaCeVar
-    _hash: int
-
-    def __init__(self, var: util.JaCeVar) -> None:
-        _hash: int = hash((var.shape, var.dtype, var.storage))
-        if var.name != "":
-            raise ValueError("Key can not have a name.")
-        self.__default_init__(var=var, _hash=_hash)  # type: ignore[attr-defined]
-
-    def __hash__(self) -> int:
-        return self._hash
-
-    def __eq__(self, other: Any) -> bool:
-        if not isinstance(other, _JaCeVarWrapper):
-            return NotImplemented
-        return (self.var.shape, self.var.dtype, self.var.storage) == (
-            other.var.shape,
-            other.var.dtype,
-            other.var.storage,
-        )
+    shape: tuple[int, ...] | tuple[()]
+    dtype: dace.typeclass
+    strides: tuple[int, ...] | tuple[()] | None
+    storage: dace.StorageType
 
     @classmethod
     def from_value(
         cls,
         val: Any,
-    ) -> _JaCeVarWrapper:
-        """Returns a `JaCe` variable constructed from `val`.
-
-        If `val` is on the device, its storage type will be `GPU_Global` otherwise the default.
+    ) -> _AbstarctCallArgument:
+        """Construct an `_AbstarctCallArgument` from a value.
 
         Todo:
             Improve, such that NumPy arrays are on CPU, CuPy on GPU and so on.
+            This function also probably fails for scalars.
         """
         if not util.is_fully_addressable(val):
             raise NotImplementedError("Distributed arrays are not addressed yet.")
-
-        if isinstance(val, util.JaCeVar):
-            return cls(var=val)
-
-        # Define the storage as given by on device.
-        storage: dace.StorageType | None = (
-            dace.StorageType.GPU_Global if util.is_on_device(val) else None
-        )
-
-        if isinstance(val, jax_core.Var):
-            val = val.aval
         if isinstance(val, jax_core.Literal):
             raise TypeError("Jax Literals are not supported as cache keys.")
 
-        # We need at least a shaped array
-        if isinstance(val, jax_core.ShpedArray):
-            return cls(
-                util.JaCeVar(
-                    name="",
-                    shape=val.aval.shape,
-                    dtype=val,
-                    storage=storage,
-                ),
+        # TODO(phimuell): is `CPU_Heap` okay?
+
+        if util.is_array(val):
+            if util.is_jax_array(val):
+                val = val.__array__(copy=False)
+            shape = val.shape
+            dtype = util.translate_dtype(val.dtype)
+            strides = getattr(val, "strides", None)
+            storage = (
+                dace.StorageType.GPU_Global if util.is_on_device(val) else dace.StorageType.CPU_Heap
             )
+
+            return cls(shape=shape, dtype=dtype, strides=strides, storage=storage)
+
+        if isinstance(val, jax_core.ShpedArray):
+            shape = val.aval.shape
+            dtype = val.aval.dtype
+            strides = None
+            storage = (
+                dace.StorageType.GPU_Global
+                if util.is_on_device(val.val)
+                else dace.StorageType.CPU_Heap
+            )
+
+            return cls(shape=shape, dtype=dtype, strides=strides, storage=storage)
+
         if isinstance(val, jax_core.AbstractValue):
             raise TypeError(f"Can not make 'JaCeVar' from '{type(val).__name__}', too abstract.")
 
@@ -154,15 +136,14 @@ class _JaCeVarWrapper:
 class _CacheKey:
     """Wrapper around the arguments"""
 
-    __slots__ = ("fun", "sdfg_hash", "vars", "_hash")
-
     # Note that either `_fun` or `_sdfg_hash` are not `None`.
+    # TODO(phimuell): Static arguments.
     fun: Callable | None
     sdfg_hash: int | None
-    fargs: tuple[_JaCeVarWrapper, ...]
+    fargs: tuple[_AbstarctCallArgument, ...] | tuple[tuple[str, Any], ...]
 
     @classmethod
-    def Create(
+    def make_key(
         cls,
         stage: stages.Stage,
         *args: Any,
@@ -175,13 +156,32 @@ class _CacheKey:
         if isinstance(stage, stages.JaceWrapped):
             fun = stage.__wrapped__
             sdfg_hash = None
+            fargs: Any = tuple(  # Any is here to prevent typeconfusion in mypy.
+                _AbstarctCallArgument.from_value(x) for x in args
+            )
+
         elif isinstance(stage, stages.JaceLowered):
             fun = None
-            sdfg_hash = int(stage.compiler_ir().sdfg.hash_sdfg, 16)
+            sdfg_hash = int(stage.compiler_ir().sdfg.hash_sdfg(), 16)
+
+            # In this mode the inputs are compiler options, which are encapsulated in
+            #  `CompilerOptions` (aka. `dict`), or it is None.
+            assert len(args) <= 1
+            comp_ops: stages.CompilerOptions = (
+                stages.CompilerOptions() if len(args) == 0 else args[0]
+            )
+            assert isinstance(comp_ops, dict)
+
+            # Make `(argname, value)` pairs and sort them to get a concrete key
+            fargs = tuple(
+                sorted(
+                    ((k, v) for k, v in comp_ops.items()),
+                    key=lambda X: X[0],
+                )
+            )
+
         else:
             raise TypeError(f"Can not make key from '{type(stage).__name__}'.")
-
-        fargs = tuple(_JaCeVarWrapper.from_value(x) for x in args)
 
         return cls(fun=fun, sdfg_hash=sdfg_hash, fargs=fargs)
 
@@ -219,7 +219,7 @@ class TranslationCache:
         """Create a key object for `stage`."""
         if len(kwargs) != 0:
             raise NotImplementedError
-        return _CacheKey.Create(stage, *args, **kwargs)
+        return _CacheKey.make_key(stage, *args, **kwargs)
 
     def has(
         self,

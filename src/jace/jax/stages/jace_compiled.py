@@ -35,6 +35,7 @@ class JaceCompiled(stages.Stage):
     _csdfg: jdace.CompiledSDFG  # The compiled SDFG object.
     _inp_names: tuple[str, ...]  # Name of all input arguments.
     _out_names: tuple[str, ...]  # Name of all output arguments.
+    # TODO(phimuell): Also store description of output, such that we do not have to rely on internal sdfg.
 
     def __init__(
         self,

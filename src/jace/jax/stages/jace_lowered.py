@@ -14,15 +14,19 @@ from typing import Any
 
 from jace import translator, util
 from jace.jax import stages
-from jace.util import dace_helper as jdace
+from jace.util import dace_helper as jdace, translation_cache as tcache
 
 
 class JaceLowered(stages.Stage):
     """Represents the original computation that was lowered to SDFG."""
 
-    __slots__ = ("_translated_sdfg",)
+    __slots__ = (
+        "_translated_sdfg",
+        "_cache",
+    )
 
     _translated_sdfg: translator.TranslatedJaxprSDFG
+    _cache: tcache.TranslationCache
 
     def __init__(
         self,
@@ -34,10 +38,11 @@ class JaceLowered(stages.Stage):
         if translated_sdfg.out_names is None:
             raise ValueError("Output names must be defined.")
         self._translated_sdfg = translated_sdfg
+        self._cache: tcache.TranslationCache = tcache.get_cache(self)
 
     def optimize(
         self,
-        **kwargs: Any,  # noqa: ARG002  # Unused agument
+        **kwargs: Any,  # noqa: ARG002  # Unused argument
     ) -> JaceLowered:
         """Perform optimization _inplace_ and return `self`.
 
@@ -46,6 +51,7 @@ class JaceLowered(stages.Stage):
         """
         return self
 
+    @tcache.cached_translation
     def compile(
         self,
         compiler_options: stages.CompilerOptions | None = None,  # noqa: ARG002  # Unused arguments
@@ -54,15 +60,11 @@ class JaceLowered(stages.Stage):
 
         Returns an Object that encapsulates a
         """
-        csdfg: jdace.CompiledSDFG = util.compile_jax_sdfg(
-            self._translated_sdfg,
-            force=True,
-            save=False,
-        )
+        csdfg: jdace.CompiledSDFG = util.compile_jax_sdfg(self._translated_sdfg)
         return stages.JaceCompiled(
             csdfg=csdfg,
-            inp_names=self._translated_sdfg.inp_names,  # type: ignore[arg-type]  # init guarantees this
-            out_names=self._translated_sdfg.out_names,  # type: ignore[arg-type]
+            inp_names=self._translated_sdfg.inp_names,
+            out_names=self._translated_sdfg.out_names,
         )
 
     def compiler_ir(self, dialect: str | None = None) -> translator.TranslatedJaxprSDFG:
