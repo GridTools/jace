@@ -33,7 +33,6 @@ from .util import (
     VALID_SDFG_OBJ_NAME,
     VALID_SDFG_VAR_NAME,
     as_sequence,
-    dataclass_with_default_init,
 )
 
 
