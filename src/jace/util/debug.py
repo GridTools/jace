@@ -63,7 +63,7 @@ def run_jax_sdfg(
 
     # Canonical SDFGs do not have global memory, so we must transform it.
     #  We will afterwards undo it.
-    for glob_name in jsdfg.inp_names + jsdfg.out_names:  # type: ignore[operator]  # concatenation
+    for glob_name in jsdfg.inp_names + jsdfg.out_names:
         jsdfg.sdfg.arrays[glob_name].transient = False
 
     try:
@@ -80,7 +80,7 @@ def run_jax_sdfg(
         return ret_val
 
     finally:
-        for name in jsdfg.inp_names + jsdfg.out_names:  # type: ignore[operator]  # concatenation
+        for name in jsdfg.inp_names + jsdfg.out_names:
             jsdfg.sdfg.arrays[name].transient = True
 
 
@@ -94,6 +94,9 @@ def _jace_run(
     Args:
         *args:      Forwarded to the tracing and final execution of the SDFG.
         **kwargs:   Used to construct the driver.
+
+    Notes:
+        This function will be removed soon.
     """
     jaxpr = jax.make_jaxpr(fun)(*args)
     driver = translator.JaxprTranslationDriver(**kwargs)

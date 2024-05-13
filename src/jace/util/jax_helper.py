@@ -53,10 +53,6 @@ class JaCeVar:
             return NotImplemented
         return id(self) == id(other)
 
-    def __post_init__(self) -> None:
-        if not isinstance(self.shape, tuple):
-            raise ValueError("The 'shape' member of a 'JaCeVar' must be a tuple.")
-
 
 def get_jax_var_name(jax_var: jax_core.Atom | JaCeVar | str) -> str:
     """Returns the name of the Jax variable as a string.
