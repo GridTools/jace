@@ -80,6 +80,7 @@ class JaxprTranslationDriver:
         #  This member is allocated by '_init_sub_translators()' and remains allocated
         #  during the lifetime of the object.
         self._sub_translators: dict[str, translator.PrimitiveTranslator] = None  # type: ignore[assignment]
+        self._init_sub_translators(kwargs)
 
         # These names can not be used for the automatic naming of Jax variables.
         #  They differ from the forbidden names, that they denote valid SDFG names.
@@ -95,9 +96,6 @@ class JaxprTranslationDriver:
         # Context stack and current context.
         #  Only allocated during an ongoing translation
         self._ctx_stack: list[translator.TranslatedJaxprSDFG] = []
-
-        # Creating of the subtranslators.
-        self._init_sub_translators(kwargs)
 
     def translate_jaxpr(
         self,
@@ -122,8 +120,7 @@ class JaxprTranslationDriver:
         Args:
             inp_scalar_as_array:    Translate scalar _input_ arguments to arrays of length 1.
             name:                   Use this name for the SDFG instead some generated one.
-            reserved_names:         Prevent the generation of variables with these names,
-                                        see `self.add_array()` for more.
+            reserved_names:         Prevent the generation of variables with these names, see `self.add_array()` for more.
             allow_empty_jaxpr:      Allows empty Jaxpr.
 
         Notes:
@@ -140,14 +137,15 @@ class JaxprTranslationDriver:
         if not jax.config.read("jax_enable_x64"):
             raise NotImplementedError("The translation only works if 'jax_enable_x64' is enabled.")
 
-        # Consume the hidden flags
+        # The point of this flag is, that one can have the translator, but still have access
+        #  the the function of self, such as `add_array()` (is needed in later stages).
         _clear_translation_ctx: bool = kwargs.pop("_clear_translation_ctx", True)
 
-        # NOTE: If `self` is already allocated, i.e. has an ongoing translation process
-        #       This function will create a new translation context. Thus the driver
-        #       will start to translate a second (nested) SDFG.
-        #       Also note that there is no mechanism that forces the integration of the
-        #       nested SDFG/Jaxpr.
+        # NOTE: If `self` is already allocated, i.e. has an ongoing translation process,
+        #       the `_allocate_translation_ctx()` function will start a new context.
+        #       Thus the driver will start to translate a second (nested) SDFG.
+        #       Also note that there is no mechanism that forces the integration of the nested SDFG/Jaxpr,
+        #       this must be done manually.
         self._allocate_translation_ctx(
             name=name,
             reserved_names=reserved_names,
@@ -159,10 +157,8 @@ class JaxprTranslationDriver:
             jaxpr=jaxpr,
             inp_scalar_as_array=inp_scalar_as_array,
         )
+        # Note that `self` and `jsdfg` still share the same underlying memory, i.e. context.
         jsdfg: translator.TranslatedJaxprSDFG = self._translate_jaxpr_internal(jaxpr)
-
-        # If the translation context is not cleared `self` and `jsdfg` will share the same data.
-        #  There is some legitimate use for that.
         if _clear_translation_ctx:
             self._clear_translation_ctx()
 
@@ -362,7 +358,6 @@ class JaxprTranslationDriver:
         reserved_names: None | str | Collection[str],
     ) -> JaxprTranslationDriver:
         """Adds the names listed in `reserved_names` to the internal list."""
-        assert isinstance(self._reserved_names, set)
 
         if reserved_names is None:
             return self
@@ -784,9 +779,9 @@ class JaxprTranslationDriver:
         The function forwards `kwargs` to the constructor of the subtranslators.
         However, it will remove all arguments starting with an underscore.
         """
-        assert self._sub_translators is None
+        from jace.translator import sub_translators  # Cyclic import
 
-        subtrans_args = {k: v for k, v in subtrans_args.items() if not k.startswith("_")}  # type: ignore[unreachable]
+        subtrans_args = {k: v for k, v in subtrans_args.items() if not k.startswith("_")}
         prim_translators: dict[str, translator.PrimitiveTranslator] = {}
         for prim_translator_cls in sub_translators._get_subtranslators_cls():
             prim_translator: translator.PrimitiveTranslator = prim_translator_cls.CREATE(
@@ -937,15 +932,11 @@ class JaxprTranslationDriver:
                 this is used by Jax to indicate that they are never read.
                 Such variables are included by some transformations such as `grad()`.
         """
-        assert isinstance(jaxpr, jax_core.ClosedJaxpr)
-        assert self.is_allocated()
-
         nb_translated_eqn: int = 0
         out_var_names: Sequence[str] = []
 
         # Translate the equations one by one.
         for eqn in jaxpr.jaxpr.eqns:
-            assert len(eqn.effects) == 0
             if any(util.is_drop_var(outVar) for outVar in eqn.outvars):
                 assert all(util.is_drop_var(outVar) for outVar in eqn.outvars)
                 continue
