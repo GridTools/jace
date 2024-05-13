@@ -75,8 +75,6 @@ class JaxprTranslationDriver:
                 the shared part. This flag is provided only for implementing
                 `self.fork()` using it is an error and undefined behaviour.
         """
-        from ._translation_context import _TranslationContext
-
         # Contains all the subtranslators that we need.
         #  They are partitioned by the names of the primitive they have registered for.
         #  This member is allocated by '_init_sub_translators()' and remains allocated
@@ -97,7 +95,7 @@ class JaxprTranslationDriver:
 
         # Context stack and current context.
         #  Only allocated during an ongoing translation
-        self._ctx_stack: list[_TranslationContext] = []
+        self._ctx_stack: list[translator.TranslatedJaxprSDFG] = []
 
     def translate_jaxpr(
         self,
@@ -671,7 +669,6 @@ class JaxprTranslationDriver:
         Notes:
             This function will fill the internal list of inputs.
         """
-
         if not self.is_allocated():
             raise RuntimeError("Driver is not allocated, can not create constants.")
         if len(self._ctx.inp_names) != 0:
@@ -745,11 +742,9 @@ class JaxprTranslationDriver:
             name:               The name of the SDFG.
             reserved_names:     Add these name to the set of resered names of `self`.
         """
-        from ._translation_context import _TranslationContext
-
         # Create a new translation context and put it on the stack.
         self._ctx_stack.append(
-            _TranslationContext(
+            translator.TranslatedJaxprSDFG(
                 rev_idx=next(self._rev_manager),
                 name=name,
             )
@@ -770,7 +765,7 @@ class JaxprTranslationDriver:
         return self
 
     @property
-    def _ctx(self) -> _TranslationContext:
+    def _ctx(self) -> translator.TranslatedJaxprSDFG:
         """Returns the currently active translation context."""
         assert len(self._ctx_stack) != 0, "No context is active."
         return self._ctx_stack[-1]
@@ -967,15 +962,7 @@ class JaxprTranslationDriver:
         assert self.is_allocated()
         assert all((isinstance(x, str) and (len(x) > 0)) for x in self._ctx.inp_names)
         assert all((isinstance(x, str) and (len(x) > 0)) for x in self._ctx.out_names)
-
-        return translator.TranslatedJaxprSDFG(
-            sdfg=self._ctx.sdfg,
-            start_state=self._ctx.start_state,
-            terminal_state=self._ctx.terminal_state,
-            jax_name_map=self._ctx.jax_name_map,
-            inp_names=self._ctx.inp_names,
-            out_names=self._ctx.out_names,
-        )
+        return self._ctx
 
     def _handle_null_jaxpr(
         self,
