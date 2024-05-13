@@ -17,7 +17,6 @@ from dace import data as ddata, properties as dprop
 from jax import core as jax_core
 
 from jace import translator, util
-from jace.translator import sub_translators
 
 
 class JaxprTranslationDriver:

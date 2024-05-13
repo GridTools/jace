@@ -10,18 +10,19 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from .a_primitive_translator import PrimitiveTranslator  # has to be the first import.
+from jace import translator
+
 from .alu_translator import ALUTranslator
 
 
 # List of all subtranslators that ships with JaCe.
-_KNOWN_SUBTRANSLATORS: list[type[PrimitiveTranslator]] = [
+_KNOWN_SUBTRANSLATORS: list[type[translator.PrimitiveTranslator]] = [
     ALUTranslator,
 ]
 
 
 def add_subtranslator(
-    subtrans: type[PrimitiveTranslator],
+    subtrans: type[translator.PrimitiveTranslator],
 ) -> bool:
     """Add `subtrans` to the externally defined subtranslators.
 
@@ -36,7 +37,7 @@ def add_subtranslator(
     return True
 
 
-def _get_subtranslators_cls() -> Sequence[type[PrimitiveTranslator]]:
+def _get_subtranslators_cls() -> Sequence[type[translator.PrimitiveTranslator]]:
     """Returns the list of all subtranslator known to JaCe.
 
     The translators are returned in FIFO order.

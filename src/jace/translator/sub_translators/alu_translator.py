@@ -18,10 +18,9 @@ from jax import core as jax_core
 from typing_extensions import override
 
 from jace import translator
-from jace.translator import sub_translators
 
 
-class ALUTranslator(sub_translators.PrimitiveTranslator):
+class ALUTranslator(translator.PrimitiveTranslator):
     """This translator handles all arithmetic and logical operations."""
 
     __slots__ = ()
