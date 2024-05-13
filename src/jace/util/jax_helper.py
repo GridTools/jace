@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import itertools
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from typing import Any, overload
 
 import dace
@@ -25,40 +26,53 @@ import jax.dtypes as jax_dtypes
 import numpy as np
 
 from jace import util
-from jace.util import util as dcutil  # Partially initialized module
 
 
-@dcutil.dataclass_with_default_init(init=True, repr=True, frozen=True, slots=True)
+@dataclass(init=True, repr=True, frozen=True, eq=False)
 class JaCeVar:
     """Substitute class for Jax' `Var` instance.
 
     This class can be seen as some kind of substitute `jax.core.Var`.
     The main intention of this class is as an internal representation of values,
     as they are used in Jax, but without the Jax machinery.
-    The main differences to Jax variable is, that this class has a name and also a storage type.
+    The main differences to Jax variable is that this class has a name.
 
     Notes:
         Main intention is to test functionality.
         If the name of a `JaCeVar` is '_' it is considered a drop variable.
         If the name of a `JaCeVar` is empty, the automatic naming will consider it as a Jax variable.
         The definition of `__hash__` and `__eq__` is in accordance how Jax variable works.
-
-    Todo:
-        Do we need strides for caching; I would say so.
     """
 
     name: str
     shape: tuple[int | dace.symbol | str, ...] | tuple[()]
     dtype: dace.typeclass
-    storage: dace.StorageType = dace.StorageType.Default
 
-    def __init__(
-        self,
+    def __hash__(self) -> int:
+        return id(self)
+
+    def __eq__(self, other: Any) -> bool:
+        if not isinstance(other, JaCeVar):
+            return NotImplemented
+        return id(self) == id(other)
+
+    @classmethod
+    def Create(
+        cls,
         name: str,
         shape: Sequence[int | dace.symbol | str] | int | dace.symbol | str,
         dtype: Any,
-        storage: dace.StorageType = dace.StorageType.Default,
     ) -> None:
+        """Creates a `JaCeVar` object.
+
+        Performs some sanity checks on the input.
+        It is also possible that `shape` can be an integer or symbol, that is then translated into an tuple.
+
+        Args:
+            name:       Name of the variable, might be empty.
+            shape:      The shape of the array.
+            dtype:      The datatype, will be transformed into a dace datatype.
+        """
         if name == "":
             pass  # Explicit allowed in the interface, but a bit strange.
         elif (name != "_") and (not util.VALID_SDFG_VAR_NAME.fullmatch(name)):
@@ -70,16 +84,7 @@ class JaCeVar:
         if not isinstance(dtype, dace.typeclass):
             dtype = translate_dtype(dtype)
         assert all(isinstance(x, (int, dace.symbol, str)) for x in shape)
-        assert isinstance(storage, dace.StorageType)
-        self.__default_init__(name=name, shape=shape, dtype=dtype, storage=storage)  # type: ignore[attr-defined]  # __default_init__ is existing.
-
-    def __hash__(self) -> int:
-        return id(self)
-
-    def __eq__(self, other: Any) -> bool:
-        if not isinstance(other, JaCeVar):
-            return NotImplemented
-        return id(self) == id(other)
+        return cls(name=name, shape=shape, dtype=dtype)
 
 
 def get_jax_var_name(jax_var: jax_core.Atom | JaCeVar | str) -> str:
