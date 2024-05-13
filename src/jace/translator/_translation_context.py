@@ -70,7 +70,7 @@ class _TranslationContext:
             rev_idx:    The revision index of the context.
             name:       Name of the SDFG object.
         """
-        if isinstance(name, str) and not util._VALID_SDFG_OBJ_NAME.fullmatch(name):
+        if isinstance(name, str) and not util.VALID_SDFG_OBJ_NAME.fullmatch(name):
             raise ValueError(f"'{name}' is not a valid SDFG name.")
 
         self.sdfg: dace.SDFG = dace.SDFG(name=(name or f"unnamed_SDFG_{id(self)}"))

@@ -18,9 +18,13 @@ from .jax_helper import (
     get_jax_var_shape,
     translate_dtype,
 )
-from .re_pattern import _VALID_JAX_VAR_NAME, _VALID_SDFG_OBJ_NAME, _VALID_SDFG_VAR_NAME
 from .traits import is_drop_var, is_non_string_iterable
-from .util import as_sequence
+from .util import (
+    VALID_JAX_VAR_NAME,
+    VALID_SDFG_OBJ_NAME,
+    VALID_SDFG_VAR_NAME,
+    as_sequence,
+)
 
 
 __all__ = [
@@ -35,7 +39,7 @@ __all__ = [
     "run_jax_sdfg",
     "_jace_run",
     "_propose_jax_name",
-    "_VALID_JAX_VAR_NAME",
-    "_VALID_SDFG_OBJ_NAME",
-    "_VALID_SDFG_VAR_NAME",
+    "VALID_JAX_VAR_NAME",
+    "VALID_SDFG_OBJ_NAME",
+    "VALID_SDFG_VAR_NAME",
 ]

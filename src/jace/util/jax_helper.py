@@ -91,7 +91,7 @@ def get_jax_var_name(jax_var: jax_core.Atom | JaCeVar | str) -> str:
             )
     assert isinstance(jax_name, str)
 
-    if not util._VALID_JAX_VAR_NAME.fullmatch(jax_name):
+    if not util.VALID_JAX_VAR_NAME.fullmatch(jax_name):
         raise ValueError(f"Deduced Jax name '{jax_name}' is invalid.")
     return jax_name
 

@@ -196,7 +196,7 @@ class JaxprTranslationDriver:
             prev_state:     Alternative `SDFGState` at which we should append the new state.
 
         """
-        if isinstance(label, str) and (not util._VALID_SDFG_OBJ_NAME.fullmatch(label)):
+        if isinstance(label, str) and (not util.VALID_SDFG_OBJ_NAME.fullmatch(label)):
             raise ValueError(f"Can not create state with label '{label}' since it is invalid.")
 
         # Decide if appending to that state will modify the terminal state.
@@ -385,7 +385,7 @@ class JaxprTranslationDriver:
             raise TypeError(f"Does not know how to handle the type '{type(reserved_names)}'.")
         for rev_name in reserved_names:
             assert isinstance(rev_name, str)
-            if not util._VALID_SDFG_VAR_NAME.fullmatch(rev_name):
+            if not util.VALID_SDFG_VAR_NAME.fullmatch(rev_name):
                 raise ValueError(
                     f"Can not use '{rev_name}' as reserved name as it is not a valid SDFG name."
                 )
@@ -504,7 +504,7 @@ class JaxprTranslationDriver:
                 raise ValueError("Passed an empty 'alt_name'.")
             if alt_name in self._forbidden_names:
                 raise ValueError("'alt_name' is a forbidden name.")
-            if not util._VALID_SDFG_VAR_NAME.fullmatch(alt_name):
+            if not util.VALID_SDFG_VAR_NAME.fullmatch(alt_name):
                 raise ValueError(f"The passed name 'alt_name' '{alt_name}' is invalid.")
             if name_prefix is not None:
                 raise ValueError(
@@ -591,7 +591,7 @@ class JaxprTranslationDriver:
             raise ValueError(f"Can't create variable '{arg_name}', name is forbidden.")
         if arg_name in self._ctx.sdfg.arrays:
             raise ValueError(f"Can't create variable '{arg_name}', variable is already created.")
-        if not util._VALID_SDFG_VAR_NAME.fullmatch(arg_name):
+        if not util.VALID_SDFG_VAR_NAME.fullmatch(arg_name):
             raise ValueError(f"The requested variable name '{arg_name}' is invalid.")
 
         # Promotion of scalar to array.
