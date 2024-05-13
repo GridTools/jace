@@ -129,7 +129,6 @@ known-third-party = [
   'cupy',
   'dace',
   'jax',
-  'jaxlib',
   'numpy',
   'pytest',
   'typing_extensions'
@@ -153,5 +152,4 @@ section-order = [
   "T10",
   "T20",  # Ignore `flake8-debugger` and `flake8-print`
   "F841",  # Ignore assigned but not used; inside `with` to test if throw.
-  "RUF018"  # Ignore assignment in `assert`s; for printing
 ]
