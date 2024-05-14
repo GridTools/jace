@@ -10,7 +10,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, Final
 
 from jace import translator, util
 from jace.jax import stages
@@ -27,6 +27,11 @@ class JaceLowered(stages.Stage):
 
     _translated_sdfg: translator.TranslatedJaxprSDFG
     _cache: tcache.TranslationCache
+
+    DEF_COMPILER_OPTIONS: Final[dict[str, Any]] = {
+        "auto_opt": True,
+        "simplify": True,
+    }
 
     def __init__(
         self,

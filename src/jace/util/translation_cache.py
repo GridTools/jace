@@ -17,10 +17,11 @@ Both are implemented as a singleton.
 from __future__ import annotations
 
 import functools as ft
+from abc import abstractmethod
 from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Protocol, runtime_checkable
 
 import dace
 from jax import core as jax_core
@@ -63,7 +64,7 @@ def cached_translation(
     ) -> stages.Stage:
         assert hasattr(self, "_cache"), f"Type '{type(self).__name__}' does not have `_cache`."
         cache: TranslationCache = self._cache
-        key: _CacheKey = cache.make_key(self, *args, **kwargs)
+        key: _CachedCall = cache.make_key(self, *args, **kwargs)
         if cache.has(key):
             return cache.get(key)
         next_stage: stages.Stage = action(self, *args, **kwargs)
@@ -75,7 +76,12 @@ def cached_translation(
 
 @dataclass(init=True, eq=True, frozen=True)
 class _AbstarctCallArgument:
-    """Class to represent the call arguments used in the cache."""
+    """Class to represent one argument to the call in an abstract way.
+
+    It is used as part of the key in the cache.
+    It represents the structure of the argument, i.e. its shape, type and so on, but nots its value.
+    To construct it you should use the `from_value()` class function which interfere the characteristics from a value.
+    """
 
     shape: tuple[int, ...] | tuple[()]
     dtype: dace.typeclass
@@ -98,14 +104,13 @@ class _AbstarctCallArgument:
         if isinstance(val, jax_core.Literal):
             raise TypeError("Jax Literals are not supported as cache keys.")
 
-        # TODO(phimuell): is `CPU_Heap` okay?
-
         if util.is_array(val):
             if util.is_jax_array(val):
                 val = val.__array__(copy=False)
             shape = val.shape
             dtype = util.translate_dtype(val.dtype)
             strides = getattr(val, "strides", None)
+            # TODO(phimuell): is `CPU_Heap` always okay? There would also be `CPU_Pinned`.
             storage = (
                 dace.StorageType.GPU_Global if util.is_on_device(val) else dace.StorageType.CPU_Heap
             )
@@ -132,15 +137,52 @@ class _AbstarctCallArgument:
         return cls.from_value(jax_core.get_aval(val))
 
 
-@dataclass(init=True, eq=True, frozen=True, unsafe_hash=True)
-class _CacheKey:
-    """Wrapper around the arguments"""
+@runtime_checkable
+class _ConcreteCallArgument(Protocol):
+    """Type for encoding a concrete arguments in the cache."""
 
-    # Note that either `_fun` or `_sdfg_hash` are not `None`.
-    # TODO(phimuell): Static arguments.
+    @abstractmethod
+    def __hash__(self) -> int:
+        pass
+
+    @abstractmethod
+    def __eq__(self, other: Any) -> bool:
+        pass
+
+
+@dataclass(init=True, eq=True, frozen=True)
+class _CachedCall:
+    """Represents the structure of the entire call in the cache.
+
+    This class represents both the `JaceWrapped.lower()` and `JaceLowered.compile()` call.
+    The key combines the "origin of the call", i.e. `self` and the call arguments.
+
+    Arguments are represented in two ways:
+    - `_AbstarctCallArgument`: Which encode only the structure of the arguments.
+        These are essentially the tracer used by Jax.
+    - `_ConcreteCallArgument`: Which represents actual values of the call.
+        These are either the static arguments or compile options.
+
+    Depending of the origin the call, the key used for caching is different.
+    For `JaceWrapped` only the wrapped callable is included in the cache.
+
+    For the `JaceLowered` the SDFG is used as key, however, in a very special way.
+    `dace.SDFG` does not define `__hash__()` or `__eq__()` thus these operations fall back to `object`.
+    However, an SDFG defines the `hash_sdfg()` function, which generates a hash based on the structure of the SDFG.
+    We use the SDFG because we want to cache on it, but since it is not immutable, we have to account for that, by including this structural hash.
+    This is not ideal but it should work in the beginning.
+    """
+
     fun: Callable | None
+    sdfg: dace.SDFG | None
     sdfg_hash: int | None
-    fargs: tuple[_AbstarctCallArgument, ...] | tuple[tuple[str, Any], ...]
+    fargs: tuple[
+        _AbstarctCallArgument
+        | _ConcreteCallArgument
+        | tuple[str, _AbstarctCallArgument]
+        | tuple[str, _ConcreteCallArgument],
+        ...,
+    ]
 
     @classmethod
     def make_key(
@@ -148,34 +190,53 @@ class _CacheKey:
         stage: stages.Stage,
         *args: Any,
         **kwargs: Any,
-    ) -> _CacheKey:
-        """Creates a cache key for the stage object `stage` that was called to advance."""
-        if len(kwargs) != 0:
-            raise NotImplementedError("kwargs are not implemented.")
+    ) -> _CachedCall:
+        """Creates a cache key for the stage object `stage` that was called to advance to the next stage."""
 
         if isinstance(stage, stages.JaceWrapped):
+            # JaceWrapped.lower() to JaceLowered
+            #   Currently we only allow positional arguments and no static arguments.
+            #   Thus the function argument part of the key only consists of abstract arguments.
+            if len(kwargs) != 0:
+                raise NotImplementedError("'kwargs' are not implemented in 'JaceWrapped.lower()'.")
             fun = stage.__wrapped__
+            sdfg = None
             sdfg_hash = None
-            fargs: Any = tuple(  # Any is here to prevent typeconfusion in mypy.
+            fargs: tuple[_AbstarctCallArgument, ...] = tuple(
                 _AbstarctCallArgument.from_value(x) for x in args
             )
 
         elif isinstance(stage, stages.JaceLowered):
+            # JaceLowered.compile() to JaceCompiled
+            #   We only accepts compiler options, which the Jax interface mandates
+            #   are inside a `dict` thus we will get at most one argument.
             fun = None
-            sdfg_hash = int(stage.compiler_ir().sdfg.hash_sdfg(), 16)
+            sdfg = stage.compiler_ir().sdfg
+            sdfg_hash = int(sdfg.hash_sdfg(), 16)
 
-            # In this mode the inputs are compiler options, which are encapsulated in
-            #  `CompilerOptions` (aka. `dict`), or it is None.
-            assert len(args) <= 1
-            comp_ops: stages.CompilerOptions = (
-                stages.CompilerOptions() if len(args) == 0 else args[0]
-            )
+            if len(kwargs) != 0:
+                raise ValueError(
+                    "All arguments to 'JaceLowered.compile()' must be inside a 'dict'."
+                )
+            if len(args) >= 2:
+                raise ValueError("Only a 'dict' is allowed as argument to 'JaceLowered.compile()'.")
+            if (len(args) == 0) or (args[0] is None):
+                # No compiler options where specified, so we use the default ones.
+                comp_ops: stages.CompilerOptions = stages.JaceLowered.DEF_COMPILER_OPTIONS
+            else:
+                # Compiler options where given.
+                comp_ops = args[0]
             assert isinstance(comp_ops, dict)
+            assert all(
+                isinstance(k, str) and isinstance(v, _ConcreteCallArgument)
+                for k, v in comp_ops.items()
+            )
 
-            # Make `(argname, value)` pairs and sort them to get a concrete key
-            fargs = tuple(
+            # We will now make `(argname, argvalue)` pairs and sort them according to `argname`.
+            #  This guarantees a stable order.
+            fargs: tuple[tuple[str, _ConcreteCallArgument], ...] = tuple(  # type: ignore[no-redef]  # Type confusion.
                 sorted(
-                    ((k, v) for k, v in comp_ops.items()),
+                    ((argname, argvalue) for argname, argvalue in comp_ops.items()),
                     key=lambda X: X[0],
                 )
             )
@@ -183,21 +244,23 @@ class _CacheKey:
         else:
             raise TypeError(f"Can not make key from '{type(stage).__name__}'.")
 
-        return cls(fun=fun, sdfg_hash=sdfg_hash, fargs=fargs)
+        return cls(fun=fun, sdfg=sdfg, sdfg_hash=sdfg_hash, fargs=fargs)
 
 
 class TranslationCache:
     """The _internal_ cache object.
 
-    It implements a simple LRU cache.
+    It implements a simple LRU cache, for storing the results of the `JaceWrapped.lower()` and `JaceLowered.compile()` calls.
+    You should not use this cache directly but instead use the `cached_translation` decorator.
 
-    Todo:
-        Also handle abstract values.
+    Notes:
+        The most recently used entry is at the end of the `OrderedDict`.
+            The reason for this is, because there the new entries are added.
     """
 
     __slots__ = ["_memory", "_size"]
 
-    _memory: OrderedDict[_CacheKey, stages.Stage]
+    _memory: OrderedDict[_CachedCall, stages.Stage]
     _size: int
 
     def __init__(
@@ -207,7 +270,7 @@ class TranslationCache:
         """Creates a cache instance of size `size`."""
         if size <= 0:
             raise ValueError(f"Invalid cache size of '{size}'")
-        self._memory: OrderedDict[_CacheKey, stages.Stage] = OrderedDict()
+        self._memory: OrderedDict[_CachedCall, stages.Stage] = OrderedDict()
         self._size = size
 
     @staticmethod
@@ -215,63 +278,76 @@ class TranslationCache:
         stage: stages.Stage,
         *args: Any,
         **kwargs: Any,
-    ) -> _CacheKey:
+    ) -> _CachedCall:
         """Create a key object for `stage`."""
-        if len(kwargs) != 0:
-            raise NotImplementedError
-        return _CacheKey.make_key(stage, *args, **kwargs)
+        return _CachedCall.make_key(stage, *args, **kwargs)
 
     def has(
         self,
-        key: _CacheKey,
+        key: _CachedCall,
     ) -> bool:
         """Check if `self` have a record of `key`.
 
-        To generate `key` use the `make_key` function.
+        Notes:
+            For generating `key` use the `make_key()` function.
+            This function will not modify the order of the cached entries.
         """
         return key in self._memory
 
     def get(
         self,
-        key: _CacheKey,
+        key: _CachedCall,
     ) -> stages.Stage:
         """Get the next stage associated with `key`.
 
-        It is an error if `key` does not exists.
-        This function will move `key` to front of `self`.
+        Notes:
+            It is an error if `key` does not exist.
+            This function will mark `key` as most recently used.
         """
         if not self.has(key):
             raise KeyError(f"Key '{key}' is unknown.")
-        self._memory.move_to_end(key, last=False)
+        self._memory.move_to_end(key, last=True)
         return self._memory.get(key)  # type: ignore[return-value]  # type confusion
 
     def add(
         self,
-        key: _CacheKey,
+        key: _CachedCall,
         res: stages.Stage,
     ) -> TranslationCache:
         """Adds `res` under `key` to `self`.
 
-        In case `key` is already known, it will first be eviceted and then reinserted.
-        If `self` is larger than specified the oldest one will be evicted.
+        Notes:
+            It is not an error if if `key` is already present.
         """
-        self._evict(key)
-        while len(self._memory) >= self._size:
-            self._memory.popitem(last=True)
-        self._memory[key] = res
-        self._memory.move_to_end(key, last=False)
+        if self.has(key):
+            # `key` is known, so move it to the end and update the mapped value.
+            self._memory.move_to_end(key, last=True)
+            self._memory[key] = res
+
+        else:
+            # `key` is not known so we have to add it
+            while len(self._memory) >= self._size:
+                self._evict(None)
+            self._memory[key] = res
         return self
 
     def _evict(
         self,
-        key: _CacheKey,
+        key: _CachedCall | None,
     ) -> bool:
-        """Evict `key` from `self`.
+        """Evict `key` from `self` and return `True`.
 
-        Returns if it was evicted or not.
+        In case `key` is not known the function returns `False`.
+        If `key` is `None` then evict the oldest one unconditionally.
         """
+        if key is None:
+            if len(self._memory) == 0:
+                return False
+            self._memory.popitem(last=False)
+            return True
+
         if not self.has(key):
             return False
-        self._memory.move_to_end(key, last=True)
-        self._memory.popitem(last=True)
+        self._memory.move_to_end(key, last=False)
+        self._memory.popitem(last=False)
         return True
