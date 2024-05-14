@@ -21,10 +21,7 @@ import jax
 from jace import translator
 
 
-def run_jax_sdfg(
-    jsdfg: translator.TranslatedJaxprSDFG,
-    *args: Any,
-) -> tuple[Any, ...] | Any:
+def run_jax_sdfg(jsdfg: translator.TranslatedJaxprSDFG, *args: Any) -> tuple[Any, ...] | Any:
     """Calls the SDFG that is encapsulated with the supplied arguments.
 
     Notes:
@@ -84,11 +81,7 @@ def run_jax_sdfg(
             jsdfg.sdfg.arrays[name].transient = True
 
 
-def _jace_run(
-    fun: Callable,
-    *args: Any,
-    **kwargs: Any,
-) -> Any:
+def _jace_run(fun: Callable, *args: Any, **kwargs: Any) -> Any:
     """Traces and run function `fun` using `Jax | DaCe`.
 
     Args:

@@ -8,8 +8,8 @@
 from __future__ import annotations
 
 import itertools
-from collections.abc import Collection, Iterable, Mapping, MutableSequence, Sequence
-from typing import Any, Final, cast, overload
+from collections.abc import Iterable, Mapping, MutableSequence, Sequence
+from typing import Any, Final, cast, overload, Literal
 
 import dace
 import jax
@@ -102,7 +102,7 @@ class JaxprTranslationDriver:
         *,
         inp_scalar_as_array: bool = False,
         name: str | None = None,
-        reserved_names: str | Collection[str] | None = None,
+        reserved_names: str | Iterable[str] = (),
         allow_empty_jaxpr: bool = False,
     ) -> translator.TranslatedJaxprSDFG:
         """Perform the translation of a Jaxpr into a SDFG.
@@ -203,11 +203,12 @@ class JaxprTranslationDriver:
             self._ctx.terminal_state = new_state
         return new_state
 
-    def get_arrays(self) -> Mapping[str, ddata.Data]:
+    @property
+    def arrays(self) -> Mapping[str, ddata.Data]:
         """Get all `Data` descriptors that are currently known to the SDFG.
 
         Notes:
-            Essentially a shorthand and preferred way for `self.get_sdfg().arrays`.
+            Essentially a shorthand and preferred way for `self.sdfg.arrays`.
             For getting a specific data descriptor use `self.get_array()`.
         """
         return cast(Mapping[str, ddata.Data], self._ctx.sdfg.arrays)
@@ -270,14 +271,16 @@ class JaxprTranslationDriver:
             )
         return sdfg_name
 
-    def get_sdfg(self) -> dace.SDFG:
+    @property
+    def sdfg(self) -> dace.SDFG:
         """Returns the SDFG that is currently constructed.
 
-        If you want access to the arrays of the SDFG use `self.get_arrays()`/`self.get_array()`.
+        If you want access to the arrays of the SDFG use `self.arrays()`/`self.get_array()`.
         """
         return self._ctx.sdfg
 
-    def get_terminal_sdfg_state(self) -> dace.SDFGState:
+    @property
+    def terminal_sdfg_state(self) -> dace.SDFGState:
         """Returns the current terminal state of the SDFG under construction.
 
         The SDFGs that are constructed by the driver are essentially a list of states.
@@ -303,11 +306,11 @@ class JaxprTranslationDriver:
         if not self.is_allocated():
             raise RuntimeError("Driver is not allocated.")
         if self._ctx.rev_idx == 0:
-            assert len(self._ctx_stack) == 1
             return True
         return False
 
-    def get_rev_idx(self) -> int:
+    @property
+    def rev_idx(self) -> int:
         """Returns the revision index of `self`."""
         if not self.is_allocated():
             raise RuntimeError("Driver is not allocated.")
@@ -338,7 +341,7 @@ class JaxprTranslationDriver:
                 f"Tried to create the mapping '{jax_var} -> {sdfg_name}', but '{jax_var}'"
                 f" already points to '{self.map_jax_var_to_sdfg(jax_var)}'."
             )
-        if sdfg_name not in self.get_arrays():
+        if sdfg_name not in self._ctx.sdfg.arrays:
             raise KeyError(f"Mapping '{jax_var} -> {sdfg_name}': SDFG target unknown.")
         if sdfg_name in self._forbidden_names:
             raise NameError(f"Mapping '{jax_var} -> {sdfg_name}': Forbidden name.")
@@ -348,15 +351,15 @@ class JaxprTranslationDriver:
 
     def add_reserved_names(
         self,
-        reserved_names: None | str | Collection[str],
+        reserved_names: str | Iterable[str],
     ) -> JaxprTranslationDriver:
         """Adds the names listed in `reserved_names` to the internal list."""
 
-        if reserved_names is None:
+        if not reserved_names:
             return self
         if isinstance(reserved_names, str):
             reserved_names = [reserved_names]
-        elif isinstance(reserved_names, Collection):
+        elif isinstance(reserved_names, Iterable):
             pass
         else:
             raise TypeError(f"Does not know how to handle the type '{type(reserved_names)}'.")
@@ -723,7 +726,7 @@ class JaxprTranslationDriver:
     def _allocate_translation_ctx(
         self,
         name: str | None = None,
-        reserved_names: str | Collection[str] | None = None,
+        reserved_names: str | Iterable[str] = (),
     ) -> JaxprTranslationDriver:
         """This function allocates and initialize the members of the translation context of `self`.
 
@@ -772,12 +775,11 @@ class JaxprTranslationDriver:
         The function forwards `kwargs` to the constructor of the subtranslators.
         However, it will remove all arguments starting with an underscore.
         """
-        from jace.translator import sub_translators  # Cyclic import
 
         subtrans_args = {k: v for k, v in subtrans_args.items() if not k.startswith("_")}
         prim_translators: dict[str, translator.PrimitiveTranslator] = {}
-        for prim_translator_cls in sub_translators._get_subtranslators_cls():
-            prim_translator: translator.PrimitiveTranslator = prim_translator_cls.CREATE(
+        for prim_translator_cls in translator.get_subtranslators_cls():
+            prim_translator: translator.PrimitiveTranslator = prim_translator_cls.build_translator(
                 **subtrans_args
             )
             handled_primitives: Iterable[str] = util.as_sequence(prim_translator.primitive)
@@ -864,7 +866,7 @@ class JaxprTranslationDriver:
         subtranslator: translator.PrimitiveTranslator = self._find_sub_translator_for(eqn)
 
         # Create the state into which the equation should be translated
-        last_term_state: dace.SDFGState = self.get_terminal_sdfg_state()  # noqa: F841 # Will be used later
+        last_term_state: dace.SDFGState = self.terminal_sdfg_state  # noqa: F841 # Will be used later
         eqn_state = self.append_new_state(
             label=f"{eqn.primitive.name}_{out_var_names[0]}",
             prev_state=None,  # forces terminal state to use

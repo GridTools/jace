@@ -7,7 +7,6 @@
 
 from __future__ import annotations
 
-from collections.abc import MutableMapping
 from dataclasses import dataclass
 
 import dace
@@ -16,7 +15,7 @@ from jax import core as jax_core
 from jace import util
 
 
-@dataclass(slots=True)
+@dataclass
 class TranslatedJaxprSDFG:
     """Encapsulates the result of a translation run of the `JaxprTranslationDriver` object.
 
@@ -44,7 +43,7 @@ class TranslatedJaxprSDFG:
     """
 
     sdfg: dace.SDFG
-    jax_name_map: MutableMapping[jax_core.Var | util.JaCeVar, str]
+    jax_name_map: dict[jax_core.Var | util.JaCeVar, str]
     start_state: dace.SDFGState
     terminal_state: dace.SDFGState
     inp_names: tuple[str, ...]
@@ -67,15 +66,13 @@ class TranslatedJaxprSDFG:
         if isinstance(name, str) and not util.VALID_SDFG_OBJ_NAME.fullmatch(name):
             raise ValueError(f"'{name}' is not a valid SDFG name.")
 
-        self.sdfg: dace.SDFG = dace.SDFG(name=(name or f"unnamed_SDFG_{id(self)}"))
-        self.start_state: dace.SDFGState = self.sdfg.add_state(
-            label="initial_state", is_start_block=True
-        )
-        self.terminal_state: dace.SDFGState = self.start_state
-        self.jax_name_map: MutableMapping[jax_core.Var | util.JaCeVar, str] = {}
-        self.inp_names: tuple[str, ...] = ()
-        self.out_names: tuple[str, ...] = ()
-        self.rev_idx: int = rev_idx
+        self.sdfg = dace.SDFG(name=(name or f"unnamed_SDFG_{id(self)}"))
+        self.start_state = self.sdfg.add_state(label="initial_state", is_start_block=True)
+        self.terminal_state = self.start_state
+        self.jax_name_map = {}
+        self.inp_names = ()
+        self.out_names = ()
+        self.rev_idx = rev_idx
 
     def validate(self) -> bool:
         """Validate the underlying SDFG."""

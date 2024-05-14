@@ -38,14 +38,14 @@ def test_driver_alloc() -> None:
     sdfg_name = "qwertzuiopasdfghjkl"
     driver._allocate_translation_ctx(name=sdfg_name)
 
-    sdfg: dace.SDFG = driver.get_sdfg()
+    sdfg: dace.SDFG = driver.sdfg
 
     assert driver._ctx.sdfg is sdfg
-    assert driver.get_sdfg().name == sdfg_name
+    assert driver.sdfg.name == sdfg_name
     assert sdfg.number_of_nodes() == 1
     assert sdfg.number_of_edges() == 0
     assert sdfg.start_block is driver._ctx.start_state
-    assert driver.get_terminal_sdfg_state() is driver._ctx.start_state
+    assert driver.terminal_sdfg_state is driver._ctx.start_state
 
 
 def test_driver_nested() -> None:
@@ -78,11 +78,6 @@ def test_driver_nested() -> None:
     assert driver._ctx is driver._ctx_stack[-1]
     assert driver._ctx is not driver._ctx_stack[0]
 
-    for member_name in driver._ctx.__slots__:
-        org = getattr(org_ctx, member_name)
-        nest = getattr(driver._ctx, member_name)
-        assert org is not nest, f"Detected sharing for '{member_name}'"
-
     assert org_ctx.rev_idx < driver._ctx.rev_idx
 
     # Now we go back one state, i.e. pretend that we are done with translating the nested jaxpr.
@@ -99,13 +94,13 @@ def test_driver_nested() -> None:
 
 def test_driver_append_state(alloc_driver: jtrans.JaxprTranslationDriver) -> None:
     """Tests the functionality of appending states."""
-    sdfg: dace.SDFG = alloc_driver.get_sdfg()
+    sdfg: dace.SDFG = alloc_driver.sdfg
 
     terminal_state_1: dace.SDFGState = alloc_driver.append_new_state("terminal_state_1")
     assert sdfg.number_of_nodes() == 2
     assert sdfg.number_of_edges() == 1
-    assert terminal_state_1 is alloc_driver.get_terminal_sdfg_state()
-    assert alloc_driver.get_terminal_sdfg_state() is alloc_driver._ctx.terminal_state
+    assert terminal_state_1 is alloc_driver.terminal_sdfg_state
+    assert alloc_driver.terminal_sdfg_state is alloc_driver._ctx.terminal_state
     assert alloc_driver._ctx.start_state is sdfg.start_block
     assert alloc_driver._ctx.start_state is not terminal_state_1
     assert next(iter(sdfg.edges())).src is sdfg.start_block
@@ -117,7 +112,7 @@ def test_driver_append_state(alloc_driver: jtrans.JaxprTranslationDriver) -> Non
     )
     assert sdfg.number_of_nodes() == 3
     assert sdfg.number_of_edges() == 2
-    assert terminal_state_2 is alloc_driver.get_terminal_sdfg_state()
+    assert terminal_state_2 is alloc_driver.terminal_sdfg_state
     assert sdfg.out_degree(terminal_state_1) == 1
     assert sdfg.out_degree(terminal_state_2) == 0
     assert sdfg.in_degree(terminal_state_2) == 1
@@ -127,7 +122,7 @@ def test_driver_append_state(alloc_driver: jtrans.JaxprTranslationDriver) -> Non
     non_terminal_state: dace.SDFGState = alloc_driver.append_new_state(
         "non_terminal_state", prev_state=terminal_state_1
     )
-    assert alloc_driver.get_terminal_sdfg_state() is not non_terminal_state
+    assert alloc_driver.terminal_sdfg_state is not non_terminal_state
     assert sdfg.in_degree(non_terminal_state) == 1
     assert sdfg.out_degree(non_terminal_state) == 0
     assert next(iter(sdfg.in_edges(non_terminal_state))).src is terminal_state_1

@@ -20,6 +20,7 @@ from typing_extensions import override
 from jace import translator
 
 
+@translator.add_subtranslator
 class ALUTranslator(translator.PrimitiveTranslator):
     """This translator handles all arithmetic and logical operations."""
 
@@ -70,7 +71,7 @@ class ALUTranslator(translator.PrimitiveTranslator):
     }
 
     @classmethod
-    def CREATE(
+    def build_translator(
         cls,
         *args: Any,
         **kwargs: Any,
@@ -168,7 +169,7 @@ class ALUTranslator(translator.PrimitiveTranslator):
                     raise ValueError(f"Invalid shapes in dimension {dim} for broadcasting.")
 
         # Now we create the Tasklet in which the calculation is performed.
-        tskl_code: str = self._writeTaskletCode(in_var_names, eqn)
+        tskl_code: str = self._write_tasklet_code(in_var_names, eqn)
         tskl_name: str = eqn.primitive.name
         tskl_map_ranges: list[tuple[str, str]] = [
             (f"__i{dim}", f"0:{N}") for dim, N in enumerate(eqn.outvars[0].aval.shape)
@@ -240,7 +241,7 @@ class ALUTranslator(translator.PrimitiveTranslator):
 
         return eqn_state
 
-    def _writeTaskletCode(
+    def _write_tasklet_code(
         self,
         in_var_names: Sequence[str | None],
         eqn: jax_core.JaxprEqn,
