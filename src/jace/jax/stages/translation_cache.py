@@ -30,7 +30,46 @@ from jace import util
 from jace.jax import stages
 
 
-def get_cache(
+def cached_translation(
+    action: Callable,
+) -> Callable:
+    """Decorator for making the transfer method, i.e. `JaceWrapped.lower()` and `JaceLowered.compile()` cacheable.
+
+    The cache is global and the function will add the respecifve cache object to the object upon its first call.
+    To clear the caches use the `clear_translation_cache()` function.
+    """
+
+    @ft.wraps(action)
+    def _action_wrapper(
+        self: stages.Stage,
+        *args: Any,
+        **kwargs: Any,
+    ) -> stages.Stage:
+        if hasattr(self, "_cache"):
+            cache: TranslationCache = self._cache
+        else:
+            cache = _get_cache(self)
+            self._cache = cache
+        key: _CachedCall = cache.make_key(self, *args, **kwargs)
+        if cache.has(key):
+            return cache.get(key)
+        next_stage: stages.Stage = action(self, *args, **kwargs)
+        cache.add(key, next_stage)
+        return next_stage
+
+    return _action_wrapper
+
+
+def clear_translation_cache() -> None:
+    """Clear all caches associated to translation."""
+
+    if not hasattr(_get_cache, "_caches"):
+        return
+    _get_cache._caches.clear()
+    return
+
+
+def _get_cache(
     self: stages.Stage,
     size: int = 128,
 ) -> TranslationCache:
@@ -40,38 +79,15 @@ def get_cache(
     In all later calls this value is ignored.
     """
     # Get the caches and if not present, create them.
-    if not hasattr(get_cache, "_caches"):
+    if not hasattr(_get_cache, "_caches"):
         _caches: dict[type[stages.Stage], TranslationCache] = {}
-        get_cache._caches = _caches  # type: ignore[attr-defined]  # ruff removes the `getattr()` calls
-    _caches = get_cache._caches  # type: ignore[attr-defined]
+        _get_cache._caches = _caches  # type: ignore[attr-defined]  # ruff removes the `getattr()` calls
+    _caches = _get_cache._caches  # type: ignore[attr-defined]
 
     if type(self) not in _caches:
         _caches[type(self)] = TranslationCache(size=size)
 
     return _caches[type(self)]
-
-
-def cached_translation(
-    action: Callable,
-) -> Callable:
-    """Decorator for making the function cacheable."""
-
-    @ft.wraps(action)
-    def _action_wrapper(
-        self: stages.Stage,
-        *args: Any,
-        **kwargs: Any,
-    ) -> stages.Stage:
-        assert hasattr(self, "_cache"), f"Type '{type(self).__name__}' does not have `_cache`."
-        cache: TranslationCache = self._cache
-        key: _CachedCall = cache.make_key(self, *args, **kwargs)
-        if cache.has(key):
-            return cache.get(key)
-        next_stage: stages.Stage = action(self, *args, **kwargs)
-        cache.add(key, next_stage)
-        return next_stage
-
-    return _action_wrapper
 
 
 @dataclass(init=True, eq=True, frozen=True)

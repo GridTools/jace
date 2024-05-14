@@ -16,7 +16,7 @@ import jax as jax_jax
 
 from jace import translator, util
 from jace.jax import stages
-from jace.util import translation_cache as tcache
+from jace.jax.stages import translation_cache as tcache
 
 
 class JaceWrapped(stages.Stage):
@@ -36,13 +36,7 @@ class JaceWrapped(stages.Stage):
         Copy the `jax._src.pjit.make_jit()` functionality to remove `jax.make_jaxpr()`.
     """
 
-    __slots__ = (
-        "fun_",
-        "_cache",
-    )
-
     _fun: Callable
-    _cache: tcache.TranslationCache
 
     def __init__(
         self,
@@ -51,7 +45,6 @@ class JaceWrapped(stages.Stage):
         """Creates a wrapped jace jitable object of `jax_prim`."""
         assert fun is not None
         self._fun: Callable = fun
-        self._cache: tcache.TranslationCache = tcache.get_cache(self)
 
     def __call__(
         self,

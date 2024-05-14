@@ -14,19 +14,14 @@ from typing import Any, Final
 
 from jace import translator, util
 from jace.jax import stages
-from jace.util import dace_helper as jdace, translation_cache as tcache
+from jace.jax.stages import translation_cache as tcache
+from jace.util import dace_helper as jdace
 
 
 class JaceLowered(stages.Stage):
     """Represents the original computation that was lowered to SDFG."""
 
-    __slots__ = (
-        "_translated_sdfg",
-        "_cache",
-    )
-
     _translated_sdfg: translator.TranslatedJaxprSDFG
-    _cache: tcache.TranslationCache
 
     DEF_COMPILER_OPTIONS: Final[dict[str, Any]] = {
         "auto_opt": True,
@@ -43,7 +38,6 @@ class JaceLowered(stages.Stage):
         if translated_sdfg.out_names is None:
             raise ValueError("Output names must be defined.")
         self._translated_sdfg = translated_sdfg
-        self._cache: tcache.TranslationCache = tcache.get_cache(self)
 
     def optimize(
         self,
