@@ -31,7 +31,8 @@ class JaxprTranslationDriver:
     - the `arg_names` parameter is not set.
 
     For these reasons the SDFG is not directly usable, and further manipulations have to be performed.
-    TBA where to look for them.
+    Especially, DaCe's validation function will fail and it is unable to be perocessed by the optimization pipeline.
+    For more information also see `jace.translator.post_translation` module for more information.
 
     The idea of the translator is extremely simple. Since Jaxpr is a list
     consisting of more or less simple instructions/equations, they get processed

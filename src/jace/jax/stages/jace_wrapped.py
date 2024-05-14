@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from functools import update_wrapper
 from typing import Any
 
 import jax as jax_jax
@@ -17,6 +18,7 @@ import jax as jax_jax
 from jace import translator, util
 from jace.jax import stages
 from jace.jax.stages import translation_cache as tcache
+from jace.translator import post_translation as ptrans
 
 
 class JaceWrapped(stages.Stage):
@@ -46,6 +48,11 @@ class JaceWrapped(stages.Stage):
         assert fun is not None
         self._fun: Callable = fun
 
+        # Makes that `self` is a true stand-in for `fun`
+        #  This will also add a `__wrapped__` property to `self` which is not part of the interface.
+        # TODO(phimuell): modify text to make it clear that it is wrapped, Jax does the same.
+        update_wrapper(self, self._fun)
+
     def __call__(
         self,
         *args: Any,
@@ -62,7 +69,7 @@ class JaceWrapped(stages.Stage):
 
         # TODO(phimuell): Handle static arguments correctly
         #                   https://jax.readthedocs.io/en/latest/aot.html#lowering-with-static-arguments
-        return self.lower(*args, **kwargs).optimize().compile()(*args, **kwargs)
+        return self.lower(*args, **kwargs).compile()(*args, **kwargs)
 
     @tcache.cached_translation
     def lower(
@@ -84,13 +91,10 @@ class JaceWrapped(stages.Stage):
 
         jaxpr = jax_jax.make_jaxpr(self._fun)(*real_args)
         driver = translator.JaxprTranslationDriver()
-        translated_sdfg: translator.TranslatedJaxprSDFG = driver.translate_jaxpr(jaxpr)
-        return stages.JaceLowered(translated_sdfg)
+        trans_sdfg: translator.TranslatedJaxprSDFG = driver.translate_jaxpr(jaxpr)
 
-    @property
-    def __wrapped__(self) -> Callable:
-        """Returns the wrapped function.
+        fin_sdfg: ptrans.FinalizedJaxprSDFG = ptrans.postprocess_jaxpr_sdfg(
+            tsdfg=trans_sdfg, fun=self.__wrapped__
+        )
 
-        This is a Jace extension.
-        """
-        return self._fun
+        return stages.JaceLowered(fin_sdfg)

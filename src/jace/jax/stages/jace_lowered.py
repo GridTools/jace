@@ -12,16 +12,17 @@ from __future__ import annotations
 import json
 from typing import Any, Final
 
-from jace import translator, util
+from jace import optimization, util
 from jace.jax import stages
 from jace.jax.stages import translation_cache as tcache
+from jace.translator import post_translation as ptrans
 from jace.util import dace_helper as jdace
 
 
 class JaceLowered(stages.Stage):
     """Represents the original computation that was lowered to SDFG."""
 
-    _translated_sdfg: translator.TranslatedJaxprSDFG
+    _trans_sdfg: ptrans.FinalizedJaxprSDFG
 
     DEF_COMPILER_OPTIONS: Final[dict[str, Any]] = {
         "auto_opt": True,
@@ -30,54 +31,49 @@ class JaceLowered(stages.Stage):
 
     def __init__(
         self,
-        translated_sdfg: translator.TranslatedJaxprSDFG,
+        trans_sdfg: ptrans.FinalizedJaxprSDFG,
     ) -> None:
         """Constructs the wrapper."""
-        if translated_sdfg.inp_names is None:
+        if trans_sdfg.inp_names is None:
             raise ValueError("Input names must be defined.")
-        if translated_sdfg.out_names is None:
+        if trans_sdfg.out_names is None:
             raise ValueError("Output names must be defined.")
-        self._translated_sdfg = translated_sdfg
-
-    def optimize(
-        self,
-        **kwargs: Any,  # noqa: ARG002  # Unused argument
-    ) -> JaceLowered:
-        """Perform optimization _inplace_ and return `self`.
-
-        Notes:
-            Currently no optimization is performed.
-        """
-        # TODO(phimuell): Think really hard what we should do here, to avoid strange behaviour.
-        #                   I am not fully sure if we should include the SDFG value in the caching.
-
-        # TODO(phimuell):
-        #   - remove the inplace modification.
-        #   - Somehow integrate it into the caching strategy.
-        #
-        #  If we would not integrate it into the caching strategy, then calling `lower()` on
-        #  the wrapped object would return the original object, but with a modified, already optimized SDFG.
-        return self
+        if trans_sdfg.csdfg is not None:
+            raise ValueError("SDFG is already compiled.")
+        self._trans_sdfg = trans_sdfg
 
     @tcache.cached_translation
     def compile(
         self,
-        compiler_options: stages.CompilerOptions | None = None,  # noqa: ARG002  # Unused arguments
+        compiler_options: stages.CompilerOptions | None = None,  # Unused arguments
     ) -> stages.JaceCompiled:
         """Compile the SDFG.
 
         Returns an Object that encapsulates a compiled SDFG object.
         """
-        csdfg: jdace.CompiledSDFG = util.compile_jax_sdfg(self._translated_sdfg)
+        from copy import deepcopy
+
+        # The reason why we have to deepcopy the SDFG
+        #  All optimization DaCe functions works in place, if we would not copy the SDFG first, then we would have a problem.
+        #  Because, these optimization would then have a feedback of the SDFG object which is stored inside `self`.
+        #  Thus if we would run this code `(jaceLoweredObject := jaceWrappedObject.lower()).compile({opti=True})` would return an optimized object.
+        #  However, if we would now call `jaceWrappedObject.lower()` (with the same arguments as before, we would get `jaceLoweredObject`,
+        #  but it would actually contain an already optimized SDFG, which is not what we want.
+        fsdfg: ptrans.FinalizedJaxprSDFG = deepcopy(self._trans_sdfg)
+        optimization.jace_auto_optimize(
+            fsdfg, **({} if compiler_options is None else compiler_options)
+        )
+        csdfg: jdace.CompiledSDFG = util.compile_jax_sdfg(fsdfg, cache=False)
+
         return stages.JaceCompiled(
             csdfg=csdfg,
-            inp_names=self._translated_sdfg.inp_names,
-            out_names=self._translated_sdfg.out_names,
+            inp_names=fsdfg.inp_names,
+            out_names=fsdfg.out_names,
         )
 
-    def compiler_ir(self, dialect: str | None = None) -> translator.TranslatedJaxprSDFG:
+    def compiler_ir(self, dialect: str | None = None) -> ptrans.FinalizedJaxprSDFG:
         if (dialect is None) or (dialect.upper() == "SDFG"):
-            return self._translated_sdfg
+            return self._trans_sdfg
         raise ValueError(f"Unknown dialect '{dialect}'.")
 
     def as_html(self, filename: str | None = None) -> None:

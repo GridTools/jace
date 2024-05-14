@@ -18,21 +18,22 @@ from typing import Any
 
 import dace
 
-from jace import translator
+from jace.translator import post_translation as ptrans
 from jace.util import dace_helper as jdace
 
 
 def compile_jax_sdfg(
-    jsdfg: translator.TranslatedJaxprSDFG,
+    jsdfg: ptrans.FinalizedJaxprSDFG,
+    cache: bool = True,
 ) -> jdace.CompiledSDFG:
-    """This function compiles the embedded SDFG and return it.
+    """This function compiles the sdfg embedded in the `FinalizedJaxpr` object and returns it.
 
-    The SDFG is compiled in a very special way, i.e. all arguments and return values have to be passed as arguments.
+    By default the function will store the resulting `CompiledSDFG` object inside `jsdfg` (`FinalizedJaxprSDFG`).
+    However, by setting `cache` to `False` the respective field will not be modified.
 
     Notes:
         Currently the SDFG must not have any undefined symbols, i.e. no undefined sizes.
     """
-    from copy import deepcopy
     from time import time
 
     if not jsdfg.inp_names:
@@ -49,64 +50,39 @@ def compile_jax_sdfg(
             f"No externally defined symbols are allowed, found: {jsdfg.sdfg.free_symbols}"
         )
 
-    # We will now deepcopy the SDFG.
-    #  We do this because the SDFG is also a member of the `CompiledSDFG` object.
-    #  And currently we rely on the integrity of this object in the run function,
-    #  i.e. in the allocation of the return values as well as `arg_names`.
-    sdfg: dace.SDFG = deepcopy(jsdfg.sdfg)
+    # To ensure that the SDFG is compiled and to get rid of a warning we must modify
+    #  some settings of the SDFG. To fake an immutable SDFG, we will restore them later.
+    sdfg: dace.SDFG = jsdfg.sdfg
+    org_sdfg_name: str = sdfg.name
+    org_recompile: bool = sdfg._recompile
+    org_regenerate_code: bool = sdfg._regenerate_code
 
-    # We need to give the SDFG another name, this is needed to prevent a DaCe error/warning.
-    #  This happens if we compile the same lowered SDFG multiple times with different options.
-    #  We allow this because Jax allows this too, this is also a reason why we copy the SDFG.
-    sdfg.name = f"{sdfg.name}__comp_{int(time() * 1000)}"
+    try:
+        # We need to give the SDFG another name, this is needed to prevent a DaCe error/warning.
+        #  This happens if we compile the same lowered SDFG multiple times with different options.
+        sdfg.name = f"{sdfg.name}__comp_{int(time() * 1000)}"
 
-    # Canonical SDFGs do not have global memory, so we must transform it
-    sdfg_arg_names: list[str] = []
-    for glob_name in jsdfg.inp_names + jsdfg.out_names:
-        if glob_name in sdfg_arg_names:  # Donated arguments
-            continue
-        sdfg.arrays[glob_name].transient = False
-        sdfg_arg_names.append(glob_name)
+        # Actual compiling the stuff; forcing that a recompilation happens
+        with dace.config.temporary_config():
+            sdfg._recompile = True
+            sdfg._regenerate_code = True
+            dace.Config.set("compiler", "use_cache", value=False)
+            csdfg: jdace.CompiledSDFG = sdfg.compile()
 
-    # This forces the signature of the SDFG to include all arguments in order they appear.
-    sdfg.arg_names = sdfg_arg_names
+    finally:
+        sdfg.name = org_sdfg_name
+        sdfg._recompile = org_recompile
+        sdfg._regenerate_code = org_regenerate_code
 
-    # Actual compiling the stuff
-    csdfg: jdace.CompiledSDFG = sdfg.compile()
+    # Storing the compiled SDFG for later use.
+    if cache:
+        jsdfg.csdfg = csdfg
+
     return csdfg
 
 
 @singledispatch
 def run_jax_sdfg(
-    jsdfg: translator.TranslatedJaxprSDFG,
-    /,
-    *args: Any,
-    **kwargs: Any,
-) -> tuple[Any, ...] | Any:
-    """Execute a `TranslatedJaxprSDFG` object directly.
-
-    Notes:
-        This function is used for debugging purposes and you should use the `jace.jit` annotation instead.
-        The function either returns a value or a tuple of values, i.e. no pytree.
-        There is an overload of this function that accepts an already compiled SDFG and runs it.
-    """
-    if jsdfg.inp_names is None:
-        raise ValueError("Input names are not specified.")
-    if jsdfg.out_names is None:
-        raise ValueError("Output names are not specified.")
-    csdfg: jdace.CompiledSDFG = compile_jax_sdfg(jsdfg)
-
-    return run_jax_sdfg(
-        csdfg,
-        jsdfg.inp_names,
-        jsdfg.out_names,
-        *args,
-        **kwargs,
-    )
-
-
-@run_jax_sdfg.register(jdace.CompiledSDFG)
-def _(
     csdfg: jdace.CompiledSDFG,
     inp_names: Sequence[str],
     out_names: Sequence[str],
@@ -114,7 +90,10 @@ def _(
     *args: Any,
     **kwargs: Any,
 ) -> tuple[Any, ...] | Any:
-    """Call the compiled SDFG.
+    """Run the compiled SDFG.
+
+    The function assumes that the `(csdfg, inp_names, out_names)` together form a `FinalizedJaxprSDFG` object.
+    Further, it assumes that it was compiled according to this rule.
 
     Notes:
         This function is used for debugging purposes and you should use the `jace.jit` annotation instead.
@@ -129,7 +108,8 @@ def _(
 
     # We need the SDFG to construct/allocate the memory for the return values.
     #  Actually, we would only need the descriptors, but this is currently the only way to get them.
-    #  Note that this is safe to do, because in the compile function we decoupled the SDFG from all.
+    # Note that this is save to do, under the assumption that the SDFG, which is inside the CompiledSDFG is still accurate.
+    #  But since it is by assumption finalized we should be fine.
     sdfg: dace.SDFG = csdfg.sdfg
 
     # Build the argument list that we will pass to the compiled object.
@@ -170,3 +150,29 @@ def _(
     if len(out_names) == 1:
         return ret_val[0]
     return ret_val
+
+
+@run_jax_sdfg.register(ptrans.FinalizedJaxprSDFG)
+def _(
+    jsdfg: ptrans.FinalizedJaxprSDFG,
+    /,
+    *args: Any,
+    **kwargs: Any,
+) -> tuple[Any, ...] | Any:
+    """Execute the `FinalizedJaxprSDFG` object.
+
+    If `jsdfg` does not have an embedded `CompiledSDFG` already the function will compile it first.
+    However, it will not modify the field.
+    """
+
+    if jsdfg.csdfg is None:
+        csdfg: jdace.CompiledSDFG = compile_jax_sdfg(jsdfg, cache=False)
+    else:
+        csdfg = jsdfg.csdfg
+    return run_jax_sdfg(
+        csdfg=csdfg,
+        inp_names=jsdfg.inp_names,
+        out_names=jsdfg.out_names,
+        *args,  # noqa: B026  # star expansion.
+        **kwargs,
+    )

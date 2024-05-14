@@ -38,8 +38,7 @@ def test_decorator_individually():
     B = np.full((4, 3), 10, dtype=np.float64)
 
     lowered = testee.lower(A, B)
-    optimized = lowered.optimize()
-    compiled = optimized.compile()
+    compiled = lowered.compile()
 
     ref = testee_(A, B)
     res = compiled(A, B)
