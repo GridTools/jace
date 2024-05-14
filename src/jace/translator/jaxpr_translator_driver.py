@@ -241,7 +241,7 @@ class JaxprTranslationDriver:
     def map_jax_var_to_sdfg(
         self,
         jax_var: str | jax_core.Atom | util.JaCeVar,
-        allow_fail: bool,
+        allow_fail: Literal[True],
     ) -> str | None: ...
 
     def map_jax_var_to_sdfg(

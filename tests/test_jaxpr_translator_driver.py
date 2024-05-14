@@ -20,7 +20,7 @@ from jace.util import JaCeVar
 
 
 @pytest.fixture(scope="module")
-def alloc_driver():
+def translation_driver():
     """Returns an allocated driver instance."""
     name = "fixture_driver"
     driver = jtrans.JaxprTranslationDriver()
