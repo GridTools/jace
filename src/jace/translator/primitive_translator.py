@@ -32,7 +32,7 @@ class PrimitiveTranslator(Protocol):
     A translator for a primitive translates a single equation of a Jaxpr into its SDFG equivalent.
     A type that implements this interface must fulfil the following properties:
     - It must be immutable after construction.
-    - All subclass must implement the class method `CREATE()` to construct an instance.
+    - All subclass must implement the class method `build_translator()` to construct an instance.
 
     Subtranslators are simple, but highly specialized objects that are only able to perform the translation of a single primitive.
     The overall translation process itself is managed by a driver object, which also owns and manage the subtranslators.
@@ -49,7 +49,7 @@ class PrimitiveTranslator(Protocol):
 
     @classmethod
     @abstractmethod
-    def CREATE(
+    def build_translator(
         cls,
         *args: Any,
         **kwargs: Any,
@@ -90,7 +90,7 @@ class PrimitiveTranslator(Protocol):
             They are passed as `out_var_names`, same order as in the equation.
         - The driver will create a new terminal state and pass it as
             `eqn_state` argument. This state is guaranteed to be empty and
-            `translator.get_terminal_sdfg_state() is eqn_state` holds.
+            `translator.terminal_sdfg_state is eqn_state` holds.
 
         Then the subtranslator is called.
         Usually a subtranslator should construct the dataflow graph inside `eqn_state`.

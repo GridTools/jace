@@ -45,7 +45,7 @@ class JaCeVar:
     """
 
     name: str
-    shape: tuple[int | dace.symbol | str, ...] | tuple[()]
+    shape: tuple[int | dace.symbol | str, ...]
     dtype: dace.typeclass
 
     def __hash__(self) -> int:
@@ -126,16 +126,18 @@ def get_jax_var_name(jax_var: jax_core.Atom | JaCeVar | str) -> str:
 
 
 @overload
+<<<<<<< HEAD
 def get_jax_var_shape(jax_var: JaCeVar) -> tuple[int | dace.symbol | str, ...] | tuple[()]: ...  # type: ignore[overload-overlap]
+=======
+def get_jax_var_shape(jax_var: JaCeVar) -> tuple[int | dace.symbol | str, ...]: ...  # type: ignore[overload-overlap]
+>>>>>>> initial_implementation
 
 
 @overload
-def get_jax_var_shape(jax_var: jax_core.Atom) -> tuple[int, ...] | tuple[()]: ...
+def get_jax_var_shape(jax_var: jax_core.Atom) -> tuple[int, ...]: ...
 
 
-def get_jax_var_shape(
-    jax_var: jax_core.Atom | JaCeVar,
-) -> tuple[int | dace.symbol | str, ...] | tuple[()]:
+def get_jax_var_shape(jax_var: jax_core.Atom | JaCeVar) -> tuple[int | dace.symbol | str, ...]:
     """Returns the shape of a Jax variable.
 
     Args:
