@@ -7,9 +7,6 @@
 
 from __future__ import annotations
 
-from collections.abc import MutableMapping
-from dataclasses import dataclass
-
 import dace
 from jax import core as jax_core
 
@@ -29,7 +26,7 @@ class TranslatedJaxprSDFG:
     - `terminal_state` the last state in the state machine.
     - `inp_names` a `list` of the SDFG variables that are used as input, in the same order as `Jaxpr.invars`.
     - `out_names` a `list` of the SDFG variables that are used as output, in the same order as `Jaxpr.outvars`.
-    - `is_finalized` a bool that indicates if `self` represents a finalized or canonical SDFG, see bellow.
+    - `is_finalized` a bool that indicates if `self` represents a finalized or canonical SDFG, see below.
     - `rev_idx` the revision index, used for name mangling, however, outside of a translation process,
         the value carries no meaning.
 
@@ -85,17 +82,17 @@ class TranslatedJaxprSDFG:
 
         Only a finalized SDFG can be validated.
         """
-        if self.is_finalized:
+        if not self.is_finalized:
             raise dace.sdfg.InvalidSDFGError(
                 "SDFG is not finalized.",
                 self.sdfg,
-                self.sdfg.node_id(self.start_state),
+                self.sdfg.node_id(self.sdfg.start_state),
             )
         if len(self.inp_names) == 0:
             raise dace.sdfg.InvalidSDFGError(
                 "There are no input arguments.",
                 self.sdfg,
-                self.sdfg.node_id(self.start_state),
+                self.sdfg.node_id(self.sdfg.start_state),
             )
         if len(self.out_names) == 0:
             raise dace.sdfg.InvalidSDFGError(

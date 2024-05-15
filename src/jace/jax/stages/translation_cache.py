@@ -21,7 +21,7 @@ from abc import abstractmethod
 from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Protocol, TypeAlias, runtime_checkable
 
 import dace
 from jax import core as jax_core
@@ -35,8 +35,19 @@ def cached_translation(
 ) -> Callable:
     """Decorator for making the transfer method, i.e. `JaceWrapped.lower()` and `JaceLowered.compile()` cacheable.
 
-    The cache is global and the function will add the respecifve cache object to the object upon its first call.
-    To clear the caches use the `clear_translation_cache()` function.
+    The main issue is that we can not simply cache on the actual arguments we pass to them, but on an abstract
+    (or concrete; static arguments + compiling) description on them, and this is what this decorator is for.
+    Based on its argument it will generate a key of the call, see `TranslationCache.make_key()` for more.
+    Then it will check if the result is known and if needed it will perform the actual call.
+
+    Beside this the function will two two things.
+    The first is, that it will set the `_cache` member of `self` to the associated cache.
+    Thus an annotated object need to define such a member.
+
+    The second thing it will do is optional, if the call is not cached inside the cache the wrapped function has to be run.
+    In that case the wrapper will first check if the object defines the `_call_description` member.
+    If this is the case the wrapper will set this object to an abstract description of the call, which is also used as key in the cache.
+    After the function return this member is set to `None`.
     """
 
     @ft.wraps(action)
@@ -45,16 +56,30 @@ def cached_translation(
         *args: Any,
         **kwargs: Any,
     ) -> stages.Stage:
-        if hasattr(self, "_cache"):
-            cache: TranslationCache = self._cache
-        else:
-            cache = _get_cache(self)
-            self._cache = cache
-        key: _CachedCall = cache.make_key(self, *args, **kwargs)
-        if cache.has(key):
-            return cache.get(key)
-        next_stage: stages.Stage = action(self, *args, **kwargs)
-        cache.add(key, next_stage)
+        # If not initialized initialize the cache.
+        if self._cache is None:
+            self._cache = _get_cache(self)
+
+        # Get the key (abstract description of the call).
+        key: CachedCallDescription = self._cache.make_key(self, *args, **kwargs)
+        if self._cache.has(key):
+            return self._cache.get(key)
+
+        # We must actually perform the call
+        wants_description: bool = hasattr(self, "_call_description")
+        try:
+            if wants_description:
+                assert (
+                    self._call_description is None
+                ), f"call description already set for `{self}` (probably another call going on?)."
+                self._call_description = key.fargs
+            next_stage: stages.Stage = action(self, *args, **kwargs)
+        finally:
+            if wants_description:
+                self._call_description = None
+
+        # Store the result.
+        self._cache.add(key, next_stage)
         return next_stage
 
     return _action_wrapper
@@ -81,7 +106,7 @@ def _get_cache(
     # Get the caches and if not present, create them.
     if not hasattr(_get_cache, "_caches"):
         _caches: dict[type[stages.Stage], TranslationCache] = {}
-        _get_cache._caches = _caches  # type: ignore[attr-defined]  # ruff removes the `getattr()` calls
+        _get_cache._caches = _caches  # type: ignore[attr-defined]
     _caches = _get_cache._caches  # type: ignore[attr-defined]
 
     if type(self) not in _caches:
@@ -99,9 +124,9 @@ class _AbstarctCallArgument:
     To construct it you should use the `from_value()` class function which interfere the characteristics from a value.
     """
 
-    shape: tuple[int, ...] | tuple[()]
+    shape: tuple[int, ...]
     dtype: dace.typeclass
-    strides: tuple[int, ...] | tuple[()] | None
+    strides: tuple[int, ...] | None
     storage: dace.StorageType
 
     @classmethod
@@ -166,70 +191,79 @@ class _ConcreteCallArgument(Protocol):
         pass
 
 
+"""This type is the abstract description of a function call.
+It is part of the key used in the cache.
+"""
+CallArgsDescription: TypeAlias = tuple[
+    _AbstarctCallArgument
+    | _ConcreteCallArgument
+    | tuple[str, _AbstarctCallArgument]
+    | tuple[str, _ConcreteCallArgument],
+    ...,
+]
+
+
 @dataclass(init=True, eq=True, frozen=True)
-class _CachedCall:
-    """Represents the structure of the entire call in the cache.
+class CachedCallDescription:
+    """Represents the structure of the entire call in the cache and used as key in the cache.
 
-    This class represents both the `JaceWrapped.lower()` and `JaceLowered.compile()` call.
-    The key combines the "origin of the call", i.e. `self` and the call arguments.
+    This class represents both the `JaceWrapped.lower()` and `JaceLowered.compile()` calls.
 
-    Arguments are represented in two ways:
+    The actual key is composed of two parts, first the "origin of the call".
+    For the `JaceWrapped` this includes the wrapped callable, while for `JaceLowered` the lowered SDFG is used.
+    In both cases we rely on their `__hash__()` and `__eq__()` implementation, which should only involve the address.
+    Since we do not allow in place modification, this is not a problem, especially for the lowering.
+
+    The second part is of the key are a description of the actual arguments, see `CallArgsDescription` type alias.
+    There are two ways for describing the arguments:
     - `_AbstarctCallArgument`: Which encode only the structure of the arguments.
         These are essentially the tracer used by Jax.
     - `_ConcreteCallArgument`: Which represents actual values of the call.
         These are either the static arguments or compile options.
 
-    Depending of the origin the call, the key used for caching is different.
-    For `JaceWrapped` only the wrapped callable is included in the cache.
+    While `JaceWrapped.lower()` uses both, `JaceLowered.compile()` will only use concrete arguments.
+    In addition an argument can be positional or a named argument,
+    in which case it consists of a `tuple[str, _AbstarctCallArgument  | _ConcreteCallArgument]`.
 
-    For the `JaceLowered` the SDFG is used as key, however, in a very special way.
-    `dace.SDFG` does not define `__hash__()` or `__eq__()` thus these operations fall back to `object`.
-    However, an SDFG defines the `hash_sdfg()` function, which generates a hash based on the structure of the SDFG.
-    We use the SDFG because we want to cache on it, but since it is not immutable, we have to account for that, by including this structural hash.
-    This is not ideal but it should work in the beginning.
+    Todo:
+        - pytrees.
     """
 
     fun: Callable | None
     sdfg: dace.SDFG | None
-    sdfg_hash: int | None
-    fargs: tuple[
-        _AbstarctCallArgument
-        | _ConcreteCallArgument
-        | tuple[str, _AbstarctCallArgument]
-        | tuple[str, _ConcreteCallArgument],
-        ...,
-    ]
+    fargs: CallArgsDescription
 
     @classmethod
-    def make_key(
+    def make_call_description(
         cls,
         stage: stages.Stage,
         *args: Any,
         **kwargs: Any,
-    ) -> _CachedCall:
-        """Creates a cache key for the stage object `stage` that was called to advance to the next stage."""
+    ) -> CachedCallDescription:
+        """Creates an abstract description of the call."""
 
         if isinstance(stage, stages.JaceWrapped):
             # JaceWrapped.lower() to JaceLowered
-            #   Currently we only allow positional arguments and no static arguments.
-            #   Thus the function argument part of the key only consists of abstract arguments.
-            if len(kwargs) != 0:
-                raise NotImplementedError("'kwargs' are not implemented in 'JaceWrapped.lower()'.")
             fun = stage.__wrapped__
             sdfg = None
-            sdfg_hash = None
+
+            if len(kwargs) != 0:
+                raise NotImplementedError("'kwargs' are not implemented in 'JaceWrapped.lower()'.")
+
+            # Currently we only allow positional arguments and no static arguments.
+            #   Thus the function argument part of the key only consists of abstract arguments.
             fargs: tuple[_AbstarctCallArgument, ...] = tuple(
                 _AbstarctCallArgument.from_value(x) for x in args
             )
 
         elif isinstance(stage, stages.JaceLowered):
             # JaceLowered.compile() to JaceCompiled
-            #   We only accepts compiler options, which the Jax interface mandates
-            #   are inside a `dict` thus we will get at most one argument.
+            #  We do not have to deepcopy the sdfg, since we assume immutability.
             fun = None
             sdfg = stage.compiler_ir().sdfg
-            sdfg_hash = int(sdfg.hash_sdfg(), 16)
 
+            #   We only accepts compiler options, which the Jax interface mandates
+            #   are inside a `dict` thus we will get at most one argument.
             if len(kwargs) != 0:
                 raise ValueError(
                     "All arguments to 'JaceLowered.compile()' must be inside a 'dict'."
@@ -237,7 +271,8 @@ class _CachedCall:
             if len(args) >= 2:
                 raise ValueError("Only a 'dict' is allowed as argument to 'JaceLowered.compile()'.")
             if (len(args) == 0) or (args[0] is None):
-                # No compiler options where specified, so we use the default ones.
+                # Currently we consider no argument and `None` as "use the default argument".
+                #  This should be in accordance with Jax. See also `JaceLowered.compile()`.
                 comp_ops: stages.CompilerOptions = stages.JaceLowered.DEF_COMPILER_OPTIONS
             else:
                 # Compiler options where given.
@@ -260,7 +295,7 @@ class _CachedCall:
         else:
             raise TypeError(f"Can not make key from '{type(stage).__name__}'.")
 
-        return cls(fun=fun, sdfg=sdfg, sdfg_hash=sdfg_hash, fargs=fargs)
+        return cls(fun=fun, sdfg=sdfg, fargs=fargs)
 
 
 class TranslationCache:
@@ -276,7 +311,7 @@ class TranslationCache:
 
     __slots__ = ["_memory", "_size"]
 
-    _memory: OrderedDict[_CachedCall, stages.Stage]
+    _memory: OrderedDict[CachedCallDescription, stages.Stage]
     _size: int
 
     def __init__(
@@ -286,7 +321,7 @@ class TranslationCache:
         """Creates a cache instance of size `size`."""
         if size <= 0:
             raise ValueError(f"Invalid cache size of '{size}'")
-        self._memory: OrderedDict[_CachedCall, stages.Stage] = OrderedDict()
+        self._memory: OrderedDict[CachedCallDescription, stages.Stage] = OrderedDict()
         self._size = size
 
     @staticmethod
@@ -294,13 +329,13 @@ class TranslationCache:
         stage: stages.Stage,
         *args: Any,
         **kwargs: Any,
-    ) -> _CachedCall:
+    ) -> CachedCallDescription:
         """Create a key object for `stage`."""
-        return _CachedCall.make_key(stage, *args, **kwargs)
+        return CachedCallDescription.make_call_description(stage, *args, **kwargs)
 
     def has(
         self,
-        key: _CachedCall,
+        key: CachedCallDescription,
     ) -> bool:
         """Check if `self` have a record of `key`.
 
@@ -312,7 +347,7 @@ class TranslationCache:
 
     def get(
         self,
-        key: _CachedCall,
+        key: CachedCallDescription,
     ) -> stages.Stage:
         """Get the next stage associated with `key`.
 
@@ -327,7 +362,7 @@ class TranslationCache:
 
     def add(
         self,
-        key: _CachedCall,
+        key: CachedCallDescription,
         res: stages.Stage,
     ) -> TranslationCache:
         """Adds `res` under `key` to `self`.
@@ -349,7 +384,7 @@ class TranslationCache:
 
     def _evict(
         self,
-        key: _CachedCall | None,
+        key: CachedCallDescription | None,
     ) -> bool:
         """Evict `key` from `self` and return `True`.
 

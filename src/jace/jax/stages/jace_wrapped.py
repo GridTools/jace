@@ -9,8 +9,8 @@
 
 from __future__ import annotations
 
+import functools as ft
 from collections.abc import Callable
-from functools import update_wrapper
 from typing import Any
 
 import jax as jax_jax
@@ -40,6 +40,13 @@ class JaceWrapped(stages.Stage):
 
     _fun: Callable
 
+    # Managed by the caching infrastructure and only defined during `lower()`.
+    #  If defined it contains an abstract description of the function arguments.
+    _call_description: tcache.CallArgsDescription | None = None
+
+    # Cache for the lowering. Managed by the caching infrastructure.
+    _cache: tcache.TranslationCache | None = None
+
     def __init__(
         self,
         fun: Callable,
@@ -51,7 +58,7 @@ class JaceWrapped(stages.Stage):
         # Makes that `self` is a true stand-in for `fun`
         #  This will also add a `__wrapped__` property to `self` which is not part of the interface.
         # TODO(phimuell): modify text to make it clear that it is wrapped, Jax does the same.
-        update_wrapper(self, self._fun)
+        ft.update_wrapper(self, self._fun)
 
     def __call__(
         self,
@@ -92,9 +99,6 @@ class JaceWrapped(stages.Stage):
         jaxpr = jax_jax.make_jaxpr(self._fun)(*real_args)
         driver = translator.JaxprTranslationDriver()
         trans_sdfg: translator.TranslatedJaxprSDFG = driver.translate_jaxpr(jaxpr)
-
-        fin_sdfg: ptrans.FinalizedJaxprSDFG = ptrans.postprocess_jaxpr_sdfg(
-            tsdfg=trans_sdfg, fun=self.__wrapped__
-        )
-
-        return stages.JaceLowered(fin_sdfg)
+        ptrans.postprocess_jaxpr_sdfg(tsdfg=trans_sdfg, fun=self.__wrapped__)
+        # The `JaceLowered` assumes complete ownership of `trans_sdfg`!
+        return stages.JaceLowered(trans_sdfg)

@@ -26,16 +26,9 @@ class JaceCompiled(stages.Stage):
         Handle pytrees.
     """
 
-    __slots__ = (
-        "_csdfg",
-        "_inp_names",
-        "_out_names",
-    )
-
     _csdfg: jdace.CompiledSDFG  # The compiled SDFG object.
     _inp_names: tuple[str, ...]  # Name of all input arguments.
     _out_names: tuple[str, ...]  # Name of all output arguments.
-    # TODO(phimuell): Also store description of output, such that we do not have to rely on internal sdfg.
 
     def __init__(
         self,
@@ -59,6 +52,6 @@ class JaceCompiled(stages.Stage):
             self._csdfg,
             self._inp_names,
             self._out_names,
-            *args,
-            **kwargs,
+            args,
+            kwargs,
         )

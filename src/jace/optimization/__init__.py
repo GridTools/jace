@@ -12,26 +12,38 @@ Currently it is just a dummy that exports some functions that do nothing.
 
 from __future__ import annotations
 
-import dace
-
-from jace.translator import post_translation as ptrans
+from jace import translator
 
 
-def jace_auto_optimize(
-    fsdfg: ptrans.FinalizedJaxprSDFG,
-    simplify: bool = True,
+def jace_optimize(
+    tsdfg: translator.TranslatedJaxprSDFG,
+    simplify: bool = False,
+    auto_optimize: bool = False,
     **kwargs: str | bool,  # noqa: ARG001  # Unused argument, for now
-) -> dace.SDFG:
-    """Performs optimization of the `fsdfg` _inplace_ and returns it.
+) -> None:
+    """Performs optimization of the `fsdfg` _inplace_.
 
     Currently this function only supports simplification.
     Its main job is to exists that we have something that we can call in the tool chain.
-    """
-    if simplify:
-        fsdfg.sdfg.simplify()
 
-    fsdfg.validate()
-    return fsdfg
+    Args:
+        simplify:       Run the simplification pilepline.
+        auto_optimize:  Run the auto optimization pipeline (currently does nothing)
+
+    Notes:
+        All optimization flags must be disabled by default!
+            The reason for this is that `jaceLowered.compile({})` will disable all optimizations.
+    """
+    if not tsdfg.is_finalized:
+        raise ValueError("Can only optimize finalized SDFGs.")
+
+    if simplify:
+        tsdfg.sdfg.simplify()
+
+    if auto_optimize:
+        pass
+
+    tsdfg.validate()
 
 
 __all__ = [

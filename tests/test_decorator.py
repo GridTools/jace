@@ -114,3 +114,33 @@ def test_decorator_caching():
     assert compiled2 is lowered1_size1.compile({"dummy_option": True})
     assert compiled2 is not lowered1_size1.compile({"dummy_option": False})
     assert compiled2 is lowered1_size1.compile({"dummy_option": True})
+
+
+def test_decorator_sharing():
+    """Tests if there is no false sharing in the cache."""
+    jax.config.update("jax_enable_x64", True)
+
+    @jace.jit
+    def jaceWrapped(A: np.ndarray, B: np.ndarray) -> np.ndarray:
+        C = A * B
+        D = C + A
+        E = D + B  # Just enough state.
+        return A + B + C + D + E
+
+    # These are the argument
+    A = np.arange(12, dtype=np.float64).reshape((4, 3))
+    B = np.full((4, 3), 10, dtype=np.float64)
+
+    # Now we lower it.
+    jaceLowered = jaceWrapped.lower(A, B)
+
+    # Now we compile it with enabled optimization.
+    optiCompiled = jaceLowered.compile({"auto_optimize": True, "simplify": True})
+
+    # Now we compile it without any optimization.
+    unoptiCompiled = jaceLowered.compile({})
+
+    # Because of the way how things work the optimized must have more than the unoptimized.
+    #  If there is sharing, then this would not be the case.
+    assert optiCompiled._csdfg.sdfg.number_of_nodes() == 1
+    assert optiCompiled._csdfg.sdfg.number_of_nodes() < unoptiCompiled._csdfg.sdfg.number_of_nodes()

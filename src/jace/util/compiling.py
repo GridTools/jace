@@ -12,47 +12,42 @@ Everything in this module is experimental and might vanish anytime.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from functools import singledispatch
+import functools as ft
+import time
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 import dace
 
-from jace.translator import post_translation as ptrans
+from jace import translator
 from jace.util import dace_helper as jdace
 
 
 def compile_jax_sdfg(
-    jsdfg: ptrans.FinalizedJaxprSDFG,
-    cache: bool = True,
+    tsdfg: translator.TranslatedJaxprSDFG,
 ) -> jdace.CompiledSDFG:
-    """This function compiles the sdfg embedded in the `FinalizedJaxpr` object and returns it.
-
-    By default the function will store the resulting `CompiledSDFG` object inside `jsdfg` (`FinalizedJaxprSDFG`).
-    However, by setting `cache` to `False` the respective field will not be modified.
+    """This function compiles the SDFG embedded in the embedded `tsdfg` (`TranslatedJaxprSDFG`).
 
     Notes:
         Currently the SDFG must not have any undefined symbols, i.e. no undefined sizes.
     """
-    from time import time
-
-    if not jsdfg.inp_names:
+    if not tsdfg.is_finalized:
+        raise ValueError("Can only compile a finalized SDFG.")
+    if not tsdfg.inp_names:
         raise ValueError("The passed SDFG did not had any input arguments.")
-    if not jsdfg.out_names:
+    if not tsdfg.out_names:
         raise ValueError("The passed SDFG did not had any output arguments.")
-    if any(out_name.startswith("__return") for out_name in jsdfg.out_names):
-        raise NotImplementedError("No return statement is supported yet.")
 
     # This is a simplification that makes our life simply.
     #  However, we should consider lifting it at some point.
-    if len(jsdfg.sdfg.free_symbols) != 0:
+    if len(tsdfg.sdfg.free_symbols) != 0:
         raise ValueError(
-            f"No externally defined symbols are allowed, found: {jsdfg.sdfg.free_symbols}"
+            f"No externally defined symbols are allowed, found: {tsdfg.sdfg.free_symbols}"
         )
 
     # To ensure that the SDFG is compiled and to get rid of a warning we must modify
     #  some settings of the SDFG. To fake an immutable SDFG, we will restore them later.
-    sdfg: dace.SDFG = jsdfg.sdfg
+    sdfg: dace.SDFG = tsdfg.sdfg
     org_sdfg_name: str = sdfg.name
     org_recompile: bool = sdfg._recompile
     org_regenerate_code: bool = sdfg._regenerate_code
@@ -60,7 +55,7 @@ def compile_jax_sdfg(
     try:
         # We need to give the SDFG another name, this is needed to prevent a DaCe error/warning.
         #  This happens if we compile the same lowered SDFG multiple times with different options.
-        sdfg.name = f"{sdfg.name}__comp_{int(time() * 1000)}"
+        sdfg.name = f"{sdfg.name}__comp_{int(time.time() * 1000)}"
 
         # Actual compiling the stuff; forcing that a recompilation happens
         with dace.config.temporary_config():
@@ -74,47 +69,48 @@ def compile_jax_sdfg(
         sdfg._recompile = org_recompile
         sdfg._regenerate_code = org_regenerate_code
 
-    # Storing the compiled SDFG for later use.
-    if cache:
-        jsdfg.csdfg = csdfg
-
     return csdfg
 
 
-@singledispatch
+@ft.singledispatch
 def run_jax_sdfg(
     csdfg: jdace.CompiledSDFG,
     inp_names: Sequence[str],
     out_names: Sequence[str],
-    /,
-    *args: Any,
-    **kwargs: Any,
+    cargs: Sequence[Any],
+    ckwargs: Mapping[str, Any],
 ) -> tuple[Any, ...] | Any:
     """Run the compiled SDFG.
 
-    The function assumes that the `(csdfg, inp_names, out_names)` together form a `FinalizedJaxprSDFG` object.
-    Further, it assumes that it was compiled according to this rule.
+    The function assumes that the SDFG was finalized and then compiled by `compile_jax_sdfg()`.
+
+    Args:
+        csdfg:      The `CompiledSDFG` object.
+        inp_names:  List of names of the input arguments.
+        out_names:  List of names of the output arguments.
+        cargs:      All positional arguments of the call.
+        ckwargs:    All keyword arguments of the call.
 
     Notes:
-        This function is used for debugging purposes and you should use the `jace.jit` annotation instead.
-        The function assumes that the SDFG was compiled in accordance with `compile_jax_sdfg()`
+        There is no pytree mechanism jet, thus the return values are returned inside a `tuple`
+            or in case of one value, directly, in the order determined by Jax.
     """
     from dace.data import Array, Data, Scalar, make_array_from_descriptor
 
-    if len(inp_names) != len(args):
+    if len(inp_names) != len(cargs):
         raise RuntimeError("Wrong number of arguments.")
-    if len(kwargs) != 0:
+    if len(ckwargs) != 0:
         raise NotImplementedError("No kwargs are supported yet.")
 
     # We need the SDFG to construct/allocate the memory for the return values.
     #  Actually, we would only need the descriptors, but this is currently the only way to get them.
-    # Note that this is save to do, under the assumption that the SDFG, which is inside the CompiledSDFG is still accurate.
-    #  But since it is by assumption finalized we should be fine.
+    #  As far as I know the dace performs a deepcopy before compilation, thus it should be safe.
+    #  However, regardless of this this also works if we are inside the stages, which have exclusive ownership.
     sdfg: dace.SDFG = csdfg.sdfg
 
     # Build the argument list that we will pass to the compiled object.
     call_args: dict[str, Any] = {}
-    for in_name, in_val in zip(inp_names, args, strict=True):
+    for in_name, in_val in zip(inp_names, cargs, strict=True):
         call_args[in_name] = in_val
     for out_name in out_names:
         assert not ((out_name == "__return") or (out_name.startswith("__return_")))  # noqa: PT018 # Assert split
@@ -152,27 +148,21 @@ def run_jax_sdfg(
     return ret_val
 
 
-@run_jax_sdfg.register(ptrans.FinalizedJaxprSDFG)
+@run_jax_sdfg.register(translator.TranslatedJaxprSDFG)
 def _(
-    jsdfg: ptrans.FinalizedJaxprSDFG,
-    /,
-    *args: Any,
-    **kwargs: Any,
+    tsdfg: translator.TranslatedJaxprSDFG,
+    cargs: Sequence[Any],
+    ckwargs: Mapping[str, Any],
 ) -> tuple[Any, ...] | Any:
-    """Execute the `FinalizedJaxprSDFG` object.
+    """Execute the `TranslatedJaxprSDFG` object directly.
 
-    If `jsdfg` does not have an embedded `CompiledSDFG` already the function will compile it first.
-    However, it will not modify the field.
+    This function is a convenience function provided for debugging.
     """
-
-    if jsdfg.csdfg is None:
-        csdfg: jdace.CompiledSDFG = compile_jax_sdfg(jsdfg, cache=False)
-    else:
-        csdfg = jsdfg.csdfg
+    csdfg: jdace.CompiledSDFG = compile_jax_sdfg(tsdfg)
     return run_jax_sdfg(
         csdfg=csdfg,
-        inp_names=jsdfg.inp_names,
-        out_names=jsdfg.out_names,
-        *args,  # noqa: B026  # star expansion.
-        **kwargs,
+        inp_names=tsdfg.inp_names,
+        out_names=tsdfg.out_names,
+        cargs=cargs,
+        ckwargs=ckwargs,
     )

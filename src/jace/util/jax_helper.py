@@ -126,11 +126,7 @@ def get_jax_var_name(jax_var: jax_core.Atom | JaCeVar | str) -> str:
 
 
 @overload
-<<<<<<< HEAD
-def get_jax_var_shape(jax_var: JaCeVar) -> tuple[int | dace.symbol | str, ...] | tuple[()]: ...  # type: ignore[overload-overlap]
-=======
 def get_jax_var_shape(jax_var: JaCeVar) -> tuple[int | dace.symbol | str, ...]: ...  # type: ignore[overload-overlap]
->>>>>>> initial_implementation
 
 
 @overload

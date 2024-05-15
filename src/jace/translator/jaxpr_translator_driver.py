@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import itertools
 from collections.abc import Iterable, Mapping, MutableSequence, Sequence
-from typing import Any, Final, cast, overload, Literal
+from typing import Any, Final, Literal, cast, overload
 
 import dace
 import jax
@@ -259,8 +259,8 @@ class JaxprTranslationDriver:
         """
         if isinstance(jax_var, jax_core.Literal):
             raise RuntimeError("There is no SDFG variable for literal '{jax_var}'.")
-        if jax_var in self._ctx.jax_name_map:
-            sdfg_name = self._ctx.jax_name_map[jax_var]
+        if jax_var in self._jax_name_map:
+            sdfg_name = self._jax_name_map[jax_var]
         elif allow_fail:
             return None
         else:
@@ -288,7 +288,7 @@ class JaxprTranslationDriver:
         New states are appended at the current terminal/end state and becoming the new terminal state.
         This function returns the current terminal state.
         """
-        return self._ctx.terminal_state
+        return cast(dace.SDFGState, self._ctx.terminal_state)
 
     def is_allocated(self) -> bool:
         """Tests if `self` has an allocated context.
@@ -315,7 +315,7 @@ class JaxprTranslationDriver:
         """Returns the revision index of `self`."""
         if not self.is_allocated():
             raise RuntimeError("Driver is not allocated.")
-        return self._ctx.rev_idx
+        return cast(int, self._ctx.rev_idx)
 
     def add_jax_name_mapping(
         self,
@@ -335,8 +335,8 @@ class JaxprTranslationDriver:
         """
         assert isinstance(sdfg_name, str) and (len(sdfg_name) > 0)  # noqa: PT018  # Should be one assertion.
 
-        if jax_var in self._ctx.jax_name_map:
-            if self._ctx.jax_name_map[jax_var] == sdfg_name:  # noops.
+        if jax_var in self._jax_name_map:
+            if self._jax_name_map[jax_var] == sdfg_name:  # noops.
                 return self
             raise ValueError(
                 f"Tried to create the mapping '{jax_var} -> {sdfg_name}', but '{jax_var}'"
@@ -347,7 +347,7 @@ class JaxprTranslationDriver:
         if sdfg_name in self._forbidden_names:
             raise NameError(f"Mapping '{jax_var} -> {sdfg_name}': Forbidden name.")
 
-        self._ctx.jax_name_map[jax_var] = sdfg_name
+        self._jax_name_map[jax_var] = sdfg_name
         return self
 
     def add_reserved_names(
@@ -449,7 +449,7 @@ class JaxprTranslationDriver:
             if find_new_name:
                 raise ValueError("Specified `force_jax_name` but also wanted a new name.")
             find_new_name = False
-            alt_name = util.propose_jax_name(arg, self._ctx.jax_name_map)
+            alt_name = util.propose_jax_name(arg, self._jax_name_map)
         if alt_name is not None:
             assert isinstance(alt_name, str)
             find_new_name = False  # If a name was given, then use it no matter what.
@@ -459,7 +459,7 @@ class JaxprTranslationDriver:
                 raise ValueError("'alt_name' is a forbidden name.")
             if not util.VALID_SDFG_VAR_NAME.fullmatch(alt_name):
                 raise ValueError(f"The passed name 'alt_name' '{alt_name}' is invalid.")
-            if update_var_mapping and arg in self._ctx.jax_name_map:
+            if update_var_mapping and arg in self._jax_name_map:
                 raise ValueError(f"Variable '{alt_name}' already registered.")
             if alt_name in self._ctx.sdfg.arrays:
                 raise ValueError(f"Variable '{alt_name}' already exists.")
@@ -489,7 +489,7 @@ class JaxprTranslationDriver:
         if alt_name is not None:
             prop_name = alt_name  # Just for completion: will be ignored later
         elif isinstance(arg, (jax_core.Var, util.JaCeVar)):
-            prop_name = util.propose_jax_name(arg, self._ctx.jax_name_map)
+            prop_name = util.propose_jax_name(arg, self._jax_name_map)
             assert not prop_name.startswith("__")
             if name_prefix is not None:
                 prop_name = name_prefix + prop_name
@@ -1006,9 +1006,9 @@ class JaxprTranslationDriver:
             out_var_names.append(sdfg_out_name)
 
             # Now we perform the copy from the input variable in the newly created output variable.
-            inp_acc = self._ctx.start_state.add_read(sdfg_in_name)
-            out_acc = self._ctx.start_state.add_write(sdfg_out_name)
-            self._ctx.start_state.add_nedge(
+            inp_acc = self._start_state.add_read(sdfg_in_name)
+            out_acc = self._start_state.add_write(sdfg_out_name)
+            self._start_state.add_nedge(
                 src=inp_acc,
                 dst=out_acc,
                 data=dace.Memlet.from_array(
@@ -1021,9 +1021,17 @@ class JaxprTranslationDriver:
             #  But we can not add this to the mapping, because of this situation we will now remove
             #  the variable from the mapping. I am open for different approaches.
             #  Note that input variables that are not used, will remain in the mapping.
-            self._ctx.jax_name_map.pop(jax_out_var)
+            self._jax_name_map.pop(jax_out_var)
 
         return tuple(out_var_names)
+
+    @property
+    def _jax_name_map(self) -> dict[jax_core.Var | util.JaCeVar, str]:
+        return cast(dict[jax_core.Var | util.JaCeVar, str], self._ctx.jax_name_map)
+
+    @property
+    def _start_state(self) -> dace.SDFGState:
+        return cast(dace.SDFGState, self._ctx.start_state)
 
     # fmt: off
     _forbidden_names: Final[set[str]] = {
