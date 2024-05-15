@@ -16,7 +16,6 @@ from jax import core as jax_core
 from jace import util
 
 
-@dataclass(slots=True)
 class TranslatedJaxprSDFG:
     """Encapsulates the result of a translation run of the `JaxprTranslationDriver` object.
 
@@ -30,26 +29,31 @@ class TranslatedJaxprSDFG:
     - `terminal_state` the last state in the state machine.
     - `inp_names` a `list` of the SDFG variables that are used as input, in the same order as `Jaxpr.invars`.
     - `out_names` a `list` of the SDFG variables that are used as output, in the same order as `Jaxpr.outvars`.
+    - `is_finalized` a bool that indicates if `self` represents a finalized or canonical SDFG, see bellow.
+    - `rev_idx` the revision index, used for name mangling, however, outside of a translation process,
+        the value carries no meaning.
 
-    Please consider the following important points:
-    - The SDFG is in canonical form, which means that it is not directly usable, see `JaxprTranslationDriver` for more.
-    - It might be that a name appears in both the `inp_names` and `out_names` list.
-        This happens if the corresponding variable is used as both input and output.
-        In Jax this is called argument donation.
+    Note, that it might happen that a name appears in both the `inp_names` and `out_names` lists.
+    This happens if an argument is used both as input and output, and it is not an error.
+    In Jax this is called argument donation.
 
-    During the translation the following members are also allocated:
-    - `rev_idx` the revision index, used for name mangling.
-
-    While they remain allocated, accessing them is considered an error.
+    If the flag `is_finalized` is `True` `self` carries a so called finalized SDFG.
+    In this case only the `sdfg`, `inp_names`, `out_names` and `is_finalized` fields remain allocated, all others are set to `None`.
+    Furthermore the SDFG is in the so called finalized form which is:
+    - All input an output arrays are marked as global.
+    - However, there are no `__return` arrays, i.e. all arguments are passed as arguments.
+    - Its `arg_names` are set with set `inp_names + out_names`, however,
+        arguments that are input and outputs are only listed as inputs.
     """
 
     sdfg: dace.SDFG
-    jax_name_map: MutableMapping[jax_core.Var | util.JaCeVar, str]
-    start_state: dace.SDFGState
-    terminal_state: dace.SDFGState
     inp_names: tuple[str, ...]
     out_names: tuple[str, ...]
-    rev_idx: int
+    jax_name_map: dict[jax_core.Var | util.JaCeVar, str] | None
+    start_state: dace.SDFGState | None
+    terminal_state: dace.SDFGState | None
+    rev_idx: int | None
+    is_finalized: bool
 
     def __init__(
         self,
@@ -67,41 +71,37 @@ class TranslatedJaxprSDFG:
         if isinstance(name, str) and not util.VALID_SDFG_OBJ_NAME.fullmatch(name):
             raise ValueError(f"'{name}' is not a valid SDFG name.")
 
-        self.sdfg: dace.SDFG = dace.SDFG(name=(name or f"unnamed_SDFG_{id(self)}"))
-        self.start_state: dace.SDFGState = self.sdfg.add_state(
-            label="initial_state", is_start_block=True
-        )
-        self.terminal_state: dace.SDFGState = self.start_state
-        self.jax_name_map: MutableMapping[jax_core.Var | util.JaCeVar, str] = {}
-        self.inp_names: tuple[str, ...] = ()
-        self.out_names: tuple[str, ...] = ()
-        self.rev_idx: int = rev_idx
+        self.sdfg = dace.SDFG(name=(name or f"unnamed_SDFG_{id(self)}"))
+        self.start_state = self.sdfg.add_state(label="initial_state", is_start_block=True)
+        self.terminal_state = self.start_state
+        self.jax_name_map = {}
+        self.inp_names = ()
+        self.out_names = ()
+        self.rev_idx = rev_idx
+        self.is_finalized = False
 
     def validate(self) -> bool:
-        """Validate the underlying SDFG."""
+        """Validate the underlying SDFG.
 
-        # To prevent the 'non initialized' data warnings we have to temporary
-        #  promote input and output arguments to globals
-        org_trans_state: dict[str, bool] = {}
-        if not self.inp_names:
+        Only a finalized SDFG can be validated.
+        """
+        if self.is_finalized:
+            raise dace.sdfg.InvalidSDFGError(
+                "SDFG is not finalized.",
+                self.sdfg,
+                self.sdfg.node_id(self.start_state),
+            )
+        if len(self.inp_names) == 0:
             raise dace.sdfg.InvalidSDFGError(
                 "There are no input arguments.",
                 self.sdfg,
                 self.sdfg.node_id(self.start_state),
             )
-        if not self.out_names:
+        if len(self.out_names) == 0:
             raise dace.sdfg.InvalidSDFGError(
                 "There are no output arguments.",
                 self.sdfg,
                 self.sdfg.node_id(self.start_state),
             )
-        for var in set(self.inp_names + self.out_names):  # set is needed for donated args.
-            org_trans_state[var] = self.sdfg.arrays[var].transient
-            self.sdfg.arrays[var].transient = False
-
-        try:
-            self.sdfg.validate()
-        finally:
-            for var, orgValue in org_trans_state.items():
-                self.sdfg.arrays[var].transient = orgValue
+        self.sdfg.validate()
         return True
