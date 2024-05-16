@@ -75,7 +75,7 @@ class JaxprTranslationDriver:
         Notes:
             `sub_translators` is not copied, thus the user has to guarantee,
                 that it will not change during translation.
-                It is highly advised but not requiered to use the output of
+                It is highly advised but not required to use the output of
                 `get_subtranslators()` or pass a copy as argument.
         """
 
@@ -106,7 +106,6 @@ class JaxprTranslationDriver:
         inp_scalar_as_array: bool = False,
         name: str | None = None,
         reserved_names: str | Iterable[str] = (),
-        allow_empty_jaxpr: bool = False,
     ) -> translator.TranslatedJaxprSDFG:
         """Perform the translation of a Jaxpr into a SDFG.
 
@@ -122,19 +121,9 @@ class JaxprTranslationDriver:
             inp_scalar_as_array:    Translate scalar _input_ arguments to arrays of length 1.
             name:                   Use this name for the SDFG instead some generated one.
             reserved_names:         Prevent the generation of variables with these names, see `self.add_array()` for more.
-            allow_empty_jaxpr:      Allows empty Jaxpr.
-
-        Notes:
-            Every time this function is called a new revision index is generated.
         """
-        if (len(jaxpr.eqns) == 0) and (not allow_empty_jaxpr):
-            raise ValueError("Passed an empty Jaxpr, but did not allow for empty Jaxpr.")
-        if not isinstance(jaxpr, jax_core.ClosedJaxpr):
-            raise TypeError(f"Expected a 'jax.core.ClosedJaxp' instance but got '{type(jaxpr)}'")
         if len(jaxpr.effects) != 0:
             raise NotImplementedError("'Jaxpr' with side effects are not supported.")
-        if len(jaxpr.out_avals) == 0:
-            raise ValueError("Jaxpr has zero output variables.")
         if not jax.config.read("jax_enable_x64"):
             raise NotImplementedError("The translation only works if 'jax_enable_x64' is enabled.")
 
@@ -165,7 +154,6 @@ class JaxprTranslationDriver:
         label: str | None = None,
         condition: dprop.CodeBlock | None = None,
         assignments: Mapping[str, Any] | None = None,
-        *,
         prev_state: dace.SDFGState | None = None,
     ) -> dace.SDFGState:
         """Creates a new `SDFGState` and adds it to the SDFG.
@@ -335,7 +323,7 @@ class JaxprTranslationDriver:
             jax_var:     The Jax variable.
             sdfg_name:   The name of the corresponding SDFG variable.
         """
-        assert isinstance(sdfg_name, str) and (len(sdfg_name) > 0)  # noqa: PT018  # Should be one assertion.
+        assert len(sdfg_name) > 0
 
         if jax_var in self._jax_name_map:
             if self._jax_name_map[jax_var] == sdfg_name:  # noops.
@@ -362,10 +350,6 @@ class JaxprTranslationDriver:
             return self
         if isinstance(reserved_names, str):
             reserved_names = [reserved_names]
-        elif isinstance(reserved_names, Iterable):
-            pass
-        else:
-            raise TypeError(f"Does not know how to handle the type '{type(reserved_names)}'.")
         self._reserved_names.update(reserved_names)
         return self
 
@@ -424,9 +408,7 @@ class JaxprTranslationDriver:
             If you need to create a special array, you can use `jace.util.JaCeVar`
                 to create a pseudo Jax variable.
         """
-        assert self.is_allocated()
-
-        shape: Sequence[int] = util.get_jax_var_shape(arg)
+        shape: tuple[int] = util.get_jax_var_shape(arg)
         dtype = util.get_jax_var_dtype(arg)
         offset = None  # i.e. no offset
         storage: dace.StorageType = dace.StorageType.Default  # Set at later stages (optimization)
@@ -453,7 +435,6 @@ class JaxprTranslationDriver:
             find_new_name = False
             alt_name = util.propose_jax_name(arg, self._jax_name_map)
         if alt_name is not None:
-            assert isinstance(alt_name, str)
             find_new_name = False  # If a name was given, then use it no matter what.
             if len(alt_name) == 0:
                 raise ValueError("Passed an empty 'alt_name'.")
@@ -469,10 +450,8 @@ class JaxprTranslationDriver:
                 raise ValueError(
                     f"Specified 'name_prefix' ('{name_prefix}') but passed '{alt_name}' as 'alt_name'."
                 )
-        if name_prefix is not None:
-            assert isinstance(name_prefix, str)
-            if len(name_prefix) == 0:
-                raise ValueError("Specified an empty 'name_prefix'.")
+        if (name_prefix is not None) and (len(name_prefix) == 0):
+            raise ValueError("Specified an empty 'name_prefix'.")
 
         # Checking the strides.
         if strides is not None:
@@ -480,7 +459,8 @@ class JaxprTranslationDriver:
                 raise ValueError("Specified a stride for a scalar.")
             if isinstance(strides, (str, dace.symbol, int)):
                 strides = (strides,)
-            assert isinstance(strides, tuple)
+            elif not isinstance(strides, tuple):
+                strides = tuple(strides)
             if len(strides) != len(shape):
                 raise ValueError(
                     f"'strides' has length {len(strides)}, but array rank is {len(shape)}."
@@ -500,8 +480,6 @@ class JaxprTranslationDriver:
                 raise NotImplementedError("Jax Literals are not supported.")
             if alt_name is None:
                 raise ValueError(f"Passed literal '{arg}', but not specified a name to use.")
-        else:
-            raise TypeError(f"Does not know how to handle '{type(arg).__name__}'.")
 
         if alt_name is None:
             # If we are the root translator, then we will use `prop_name` directly;
@@ -624,7 +602,9 @@ class JaxprTranslationDriver:
         """
         if only_creation and prevent_creation:
             raise ValueError("Specified both 'only_creation' and 'prevent_creation'.")
-        assert "update_var_mapping" not in kwargs
+        assert (
+            "update_var_mapping" not in kwargs
+        ), "You can not pass 'update_var_mapping' as argument to 'create_jax_var_list()'."
 
         ret_list: list[None | str] = []
         for jax_var in jax_var_list:
@@ -632,7 +612,7 @@ class JaxprTranslationDriver:
                 if not handle_literals:
                     raise ValueError("Encountered a literal but `handle_literals` was `False`.")
                 sdfg_name = None
-            elif isinstance(jax_var, (jax_core.Var, util.JaCeVar)):
+            else:
                 mapped_sdfg_name: str | None = self.map_jax_var_to_sdfg(jax_var, allow_fail=True)
                 if (mapped_sdfg_name is None) and prevent_creation:
                     raise ValueError(f"'prevent_creation' given but have to create '{jax_var}'.")
@@ -644,8 +624,6 @@ class JaxprTranslationDriver:
                     sdfg_name = mapped_sdfg_name
                 # Calling `add_jax_name_mapping` is save, because if the mapping does already exists it is a no ops.
                 self.add_jax_name_mapping(jax_var, sdfg_name)
-            else:
-                raise TypeError(f"Does not know how to handle '{type(jax_var).__name__}'")
 
             ret_list.append(sdfg_name)
 
@@ -672,7 +650,6 @@ class JaxprTranslationDriver:
             raise RuntimeError("Driver is not allocated, can not create constants.")
         if len(self._ctx.inp_names) != 0:
             raise RuntimeError("Called '_create_initial_input()' twice?")
-        assert len(self._ctx.out_names) == 0
 
         # Handle the initial input arguments
         sdfg: dace.SDFG = self._ctx.sdfg
@@ -710,7 +687,7 @@ class JaxprTranslationDriver:
         if not self.is_allocated():
             raise RuntimeError("Driver is not allocated, can not create constants.")
         if len(jaxpr.consts) == 0:
-            return []
+            return ()
 
         sdfg_const_names: Sequence[str] = self.create_jax_var_list(
             jax_var_list=jaxpr.jaxpr.constvars,
@@ -831,9 +808,7 @@ class JaxprTranslationDriver:
         # Find the subtranslator
         prim_name: str = eqn.primitive.name
         if prim_name not in self._sub_translators:
-            raise NotImplementedError(
-                f"No subtranslators known to handle '{prim_name}' || {type(self._sub_translators)}."
-            )
+            raise NotImplementedError(f"No subtranslators known to handle '{prim_name}'.")
         subtranslator = self._sub_translators[prim_name]
 
         # Create the state into which the equation should be translated
@@ -857,11 +832,6 @@ class JaxprTranslationDriver:
             if eqn_state is not self._ctx.terminal_state:
                 raise RuntimeError("Inconsistent terminal state was detected.")
             new_sdfg_term_state = eqn_state
-        elif isinstance(new_sdfg_term_state, dace.SDFGState):
-            # TODO(phimuell): use `last_term_state` to test if `new_sdfg_term_state` is reachable.
-            pass
-        else:
-            raise TypeError(f"Encountered illegal types '{type(new_sdfg_term_state)}'")
 
         # In case a subtranslator decided to not use the variables we created for it, which is allowed
         #  but he must update the `out_var_names` list correctly, we will now verify this.
@@ -899,7 +869,7 @@ class JaxprTranslationDriver:
                 Such variables are included by some transformations such as `grad()`.
         """
         nb_translated_eqn: int = 0
-        out_var_names: Sequence[str] = []
+        out_var_names: Sequence[str] = ()
 
         # Translate the equations one by one.
         for eqn in jaxpr.jaxpr.eqns:

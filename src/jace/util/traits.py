@@ -86,9 +86,7 @@ def is_array(
     obj: Any,
 ) -> bool:
     """Identifies arrays, this also includes Jax arrays."""
-    if is_jax_array(obj):
-        return True
-    return dace.is_array(obj)
+    return is_jax_array(obj) or dace.is_array(obj)
 
 
 def is_on_device(

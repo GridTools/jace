@@ -152,7 +152,6 @@ def add_fsubtranslator(
 
         return wrapper
 
-    assert inspect.isfunction(fun)
     if getattr(fun, "primitive", prim_name) != prim_name:
         raise ValueError(f"Passed 'fun' already '{fun.primitive}' as 'primitive' property.")  # type: ignore[attr-defined]
 
