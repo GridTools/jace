@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from collections.abc import MutableSequence, Sequence
-from typing import Any, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 import dace
 from jax import core as jax_core
@@ -30,44 +30,25 @@ class PrimitiveTranslator(Protocol):
     """Interface for all Jax primitive translators, also known as subtranslator.
 
     A translator for a primitive translates a single equation of a Jaxpr into its SDFG equivalent.
-    A type that implements this interface must fulfil the following properties:
-    - It must be immutable after construction.
-    - All subclass must implement the class method `build_translator()` to construct an instance.
+    For satisfying this interface a concrete implementation must be immutable after construction.
 
     Subtranslators are simple, but highly specialized objects that are only able to perform the translation of a single primitive.
     The overall translation process itself is managed by a driver object, which also owns and manage the subtranslators.
     In the end this implements the delegation pattern.
 
-    After instantiation a driver calls the subtranslator's `get_handled_primitive()` method.
-    This function returns the name of the Jax primitive the subtranslator is able to handle.
-    In case a subtranslator is able to handle multiple primitives, it should return a list with their names.
-    While there is no limit to the numbers of primitive a subtranslator can register itself for,
-    only one subtranslator can be register for any primitive.
+    You can use `jace.translator.add_subtranslator()` to register your translator to Jace.
     """
 
     __slots__ = ()
 
-    @classmethod
-    @abstractmethod
-    def build_translator(
-        cls,
-        *args: Any,
-        **kwargs: Any,
-    ) -> PrimitiveTranslator:
-        """Creates an instance of a subtranslator."""
-        ...
-
     @property
     @abstractmethod
-    def primitive(self) -> str | Sequence[str]:
-        """Returns the names of the Jax primitive that `self` is able to handle.
-
-        In case `self` can handle multiple primitives, it should return a list with these names.
-        """
+    def primitive(self) -> str:
+        """Returns the name of the Jax primitive that `self` is able to handle."""
         ...
 
     @abstractmethod
-    def translate_jaxeqn(
+    def __call__(
         self,
         driver: translator.JaxprTranslationDriver,
         in_var_names: Sequence[str | None],

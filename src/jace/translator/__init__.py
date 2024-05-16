@@ -10,7 +10,7 @@
 from __future__ import annotations
 
 from .jaxpr_translator_driver import JaxprTranslationDriver
-from .managing import add_subtranslator, get_subtranslators_cls
+from .managing import add_fsubtranslator, add_subtranslator, add_subtranslators, get_subtranslators
 from .primitive_translator import PrimitiveTranslator
 from .translated_jaxpr_sdfg import TranslatedJaxprSDFG
 
@@ -20,5 +20,7 @@ __all__ = [
     "PrimitiveTranslator",
     "TranslatedJaxprSDFG",
     "add_subtranslator",
-    "get_subtranslators_cls",
+    "add_subtranslators",
+    "add_fsubtranslator",
+    "get_subtranslators",
 ]

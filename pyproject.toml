@@ -65,7 +65,7 @@ warn_unused_ignores = true
 disallow_incomplete_defs = false
 disallow_untyped_defs = false
 ignore_missing_imports = true
-module = "tests.*"
+module = ["tests.*"]
 
 # -- pytest  --
 [tool.pytest]
@@ -149,7 +149,8 @@ section-order = [
 "!tests/**.py" = ["PT"]  # Ignore `flake8-pytest-style` everywhere except in `tests/`
 "noxfile.py" = ["T20"]  # Ignore `flake8-print`
 "tests/**" = [
-  "T10", # Ignore `flake8-debugger`
+  "T10",  # Ignore `flake8-debugger`
   "T20",  # Ignore `flake8-print`
   "F841",  # Ignore `unused-variable` (inside `with` to test if throws)
+  "ARG001"  # Ignore `unused function argument` (to create simple fake stand ins)
 ]
