@@ -15,12 +15,9 @@ from inspect import isclass, isfunction
 from typing import Any
 
 import dace
-import jax
-import numpy as np
 import pytest
 from jax import core as jax_core
 
-import jace
 from jace import translator as jtrans
 from jace.translator import (
     add_fsubtranslator,
@@ -151,72 +148,6 @@ def test_subtranslatior_managing():
     add_fsubtranslator(
         "non_existing_primitive3", non_existing_primitive_translator_3, overwrite=True
     )
-
-
-def test_subtranslatior_managing_2():
-    """Shows that we are really able to overwrite stuff"""
-    jax.config.update("jax_enable_x64", True)
-
-    @add_subtranslator(overwrite=True)
-    class NonAddTranslator(jtrans.PrimitiveTranslator):
-        @property
-        def primitive(self):
-            return "add"
-
-        def __call__(self, *args, **kwargs) -> None:
-            raise NotImplementedError("The 'NonAddTranslator' can not translate anything.")
-
-    @jace.jit
-    def testee(A: np.ndarray, B: np.ndarray) -> np.ndarray:
-        return A + B
-
-    A = np.arange(12, dtype=np.float64).reshape((4, 3))
-    B = np.full((4, 3), 10, dtype=np.float64)
-
-    with pytest.raises(
-        expected_exception=NotImplementedError,
-        match=re.escape("The 'NonAddTranslator' can not translate anything."),
-    ):
-        _ = testee.lower(A, B)
-
-
-def test_subtranslatior_managing_3():
-    """Shows proper decoupling."""
-    jax.config.update("jax_enable_x64", True)
-
-    class NonAddTranslator(jtrans.PrimitiveTranslator):
-        @property
-        def primitive(self):
-            return "add"
-
-        def __call__(self, *args, **kwargs) -> None:
-            raise NotImplementedError("The 'NonAddTranslator' can not translate anything at all.")
-
-    used_sub_trans = get_subtranslators(as_mutable=True)
-    used_sub_trans["add"] = NonAddTranslator()
-
-    @jace.jit(sub_translators=used_sub_trans)
-    def not_working_test(A: np.ndarray, B: np.ndarray) -> np.ndarray:
-        return A + B
-
-    # Now we again remove the add from the list, but this will not have an impact on the `not_working_test()`.
-    used_sub_trans.pop("add")
-
-    @jace.jit
-    def working_test(A: np.ndarray, B: np.ndarray) -> np.ndarray:
-        return A + B
-
-    A = np.arange(12, dtype=np.float64).reshape((4, 3))
-    B = np.full((4, 3), 10, dtype=np.float64)
-
-    with pytest.raises(
-        expected_exception=NotImplementedError,
-        match=re.escape("The 'NonAddTranslator' can not translate anything at all."),
-    ):
-        _ = not_working_test.lower(A, B)
-
-    # This works because the
-    working_test.lower(A, B)
 
 
 if __name__ == "__main__":

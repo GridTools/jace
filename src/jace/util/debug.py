@@ -81,17 +81,16 @@ def run_jax_sdfg(jsdfg: translator.TranslatedJaxprSDFG, *args: Any) -> tuple[Any
             jsdfg.sdfg.arrays[name].transient = True
 
 
-def _jace_run(fun: Callable, *args: Any, **kwargs: Any) -> Any:
+def _jace_run(fun: Callable, *args: Any) -> Any:
     """Traces and run function `fun` using `Jax | DaCe`.
 
     Args:
         *args:      Forwarded to the tracing and final execution of the SDFG.
-        **kwargs:   Used to construct the driver.
 
     Notes:
         This function will be removed soon.
     """
     jaxpr = jax.make_jaxpr(fun)(*args)
-    driver = translator.JaxprTranslationDriver(**kwargs)
+    driver = translator.JaxprTranslationDriver(translator.get_subtranslators())
     jsdfg = driver.translate_jaxpr(jaxpr)
     return run_jax_sdfg(jsdfg, *args)
