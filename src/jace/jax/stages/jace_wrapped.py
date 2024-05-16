@@ -10,7 +10,7 @@
 from __future__ import annotations
 
 import functools as ft
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import Any
 
 import jax as jax_jax
@@ -18,7 +18,7 @@ import jax as jax_jax
 from jace import translator, util
 from jace.jax import stages
 from jace.jax.stages import translation_cache as tcache
-from jace.translator import post_translation as ptrans
+from jace.translator import managing, post_translation as ptrans
 
 
 class JaceWrapped(stages.Stage):
@@ -28,17 +28,19 @@ class JaceWrapped(stages.Stage):
     Calling it results in jit (just-in-time) lowering, compilation, and execution.
     It can also be explicitly lowered prior to compilation, and the result compiled prior to execution.
 
+    You should not create `JaceWrapped` instances directly, instead you should use `jace.jit`.
+
     Notes:
-        Reimplementation of `jax.stages.Wrapped` protocol.
-        Function wrapped by this class are again tracable by Jax.
+        The wrapped function is accessible through the `__wrapped__` property.
 
     Todo:
         Handles pytrees.
-        Configuration of the driver?
         Copy the `jax._src.pjit.make_jit()` functionality to remove `jax.make_jaxpr()`.
     """
 
     _fun: Callable
+    _sub_translators: Mapping[str, translator.PrimitiveTranslator]
+    _jit_ops: Mapping[str, Any]
 
     # Managed by the caching infrastructure and only defined during `lower()`.
     #  If defined it contains an abstract description of the function arguments.
@@ -50,15 +52,58 @@ class JaceWrapped(stages.Stage):
     def __init__(
         self,
         fun: Callable,
+        sub_translators: Mapping[str, translator.PrimitiveTranslator],
+        jit_ops: Mapping[str, Any],
     ) -> None:
-        """Creates a wrapped jace jitable object of `jax_prim`."""
-        assert fun is not None
-        self._fun: Callable = fun
+        """Creates a wrapped jace jitable object of `jax_prim`.
+
+        You should not create `JaceWrapped` instances directly, instead you should use `jace.jit`.
+
+        Args:
+            fun:                The function that is wrapped.
+            sub_translators:    The list of subtranslators that that should be used.
+            jit_ops:            All options that we forward to `jax.jit`.
+
+        Notes:
+            Both the `sub_translators` and `jit_ops` are shallow copied.
+        """
 
         # Makes that `self` is a true stand-in for `fun`
-        #  This will also add a `__wrapped__` property to `self` which is not part of the interface.
-        # TODO(phimuell): modify text to make it clear that it is wrapped, Jax does the same.
-        ft.update_wrapper(self, self._fun)
+        self._fun: Callable = fun
+        ft.update_wrapper(self, self._fun)  # TODO(phimuell): modify text; Jax does the same.
+
+        # Why do we have to make a copy (shallow copy is enough as the translators themselves are immutable)?
+        #  The question is a little bit tricky so let's consider the following situation:
+        #  The user has created a Jace annotated function, and calls it, which leads to lowering and translation.
+        #  Then he goes on and in the process modifies the internal list of translators.
+        #  Then he calls the same annotated function again, then in case the arguments happens to be structurally the same,
+        #  lowering and translation will be skipped if the call is still inside the cache, this is what Jax does.
+        #  However, if they are different (or a cache eviction has happened), then tracing and translation will happen again.
+        #  Thus depending on the situation the user might get different behaviour.
+        #  In my expectation, Jace should always do the same thing, i.e. being deterministic, but what?
+        #  In my view, the simplest one and the one that is most functional is, to always use the translators,
+        #  that were _passed_ (although implicitly) at construction, making it independent on the global state.
+        #  One could argue, that the "dynamical modification of the translator list from the outside" is an actual legitimate use case, however, it is not.
+        #  Since `JaceWrapped.lower()` is cached, we would have to modify the caching to include the dynamic state of the set.
+        #  Furthermore, we would have to implement to make a distinction between this and the normal use case.
+        #  Thus we simply forbid it! If this is desired use `jace.jit()` as function to create an object dynamically.
+        # We could either here or in `jace.jit` perform the copy, but since `jace.jit` is at the end
+        #  just a glorified constructor and "allowing dynamic translator list" is not a use case, see above, we do it here.
+        #
+        # Because we know that the global state is immutable, we must not copy in this case.
+        #  See also `make_call_description()` in the cache implementation.
+        if sub_translators is managing._CURRENT_SUBTRANSLATORS_VIEW:
+            self._sub_translators = sub_translators
+        else:
+            # Note this is the canonical way to shallow copy a mapping since `Mapping` does not has `.copy()`
+            # and `copy.copy()` can not handle `MappingProxyType`.
+            self._sub_translators = dict(sub_translators)
+
+        # Following the same logic as above we should also copy `jit_ops`.
+        #  However, do we have to make a shallow copy or a deepcopy?
+        #  I looked at the Jax code and it seems that there is nothing that copies it,
+        #  so for now we will just go ahead and shallow copy it.
+        self._jit_ops = dict(jit_ops)
 
     def __call__(
         self,
@@ -73,6 +118,7 @@ class JaceWrapped(stages.Stage):
         # TODO(phimuell): Handle the case of gradients:
         #                   It seems that this one uses special tracers, since they can handle comparisons.
         #                   https://jax.readthedocs.io/en/latest/notebooks/Common_Gotchas_in_JAX.html#python-control-flow-autodiff
+        # TODO(phimuell): Handle the `disable_jit` context manager of Jax.
 
         # TODO(phimuell): Handle static arguments correctly
         #                   https://jax.readthedocs.io/en/latest/aot.html#lowering-with-static-arguments
@@ -89,6 +135,9 @@ class JaceWrapped(stages.Stage):
         Performs the first two steps of the AOT steps described above,
         i.e. transformation into Jaxpr and then to SDFG.
         The result is encapsulated into a `Lowered` object.
+
+        Todo:
+            Add a context manager to disable caching.
         """
         if len(kwargs) != 0:
             raise NotImplementedError("Currently only positional arguments are supported.")
@@ -97,7 +146,7 @@ class JaceWrapped(stages.Stage):
         real_args: tuple[Any, ...] = args
 
         jaxpr = jax_jax.make_jaxpr(self._fun)(*real_args)
-        driver = translator.JaxprTranslationDriver()
+        driver = translator.JaxprTranslationDriver(sub_translators=self._sub_translators)
         trans_sdfg: translator.TranslatedJaxprSDFG = driver.translate_jaxpr(jaxpr)
         ptrans.postprocess_jaxpr_sdfg(tsdfg=trans_sdfg, fun=self.__wrapped__)
         # The `JaceLowered` assumes complete ownership of `trans_sdfg`!

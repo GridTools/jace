@@ -210,9 +210,11 @@ class CachedCallDescription:
     This class represents both the `JaceWrapped.lower()` and `JaceLowered.compile()` calls.
 
     The actual key is composed of two parts, first the "origin of the call".
-    For the `JaceWrapped` this includes the wrapped callable, while for `JaceLowered` the lowered SDFG is used.
-    In both cases we rely on their `__hash__()` and `__eq__()` implementation, which should only involve the address.
-    Since we do not allow in place modification, this is not a problem, especially for the lowering.
+    For `JaceLowered` the lowered SDFG is used, because we assume immutability across the whole translation chain,
+    we relay on its built-in  `__hash__()` and `__eq__`, which fall back to their address.
+
+    For `JaceWrapped` objects the first part includes the wrapped function.
+    Then it also includes the addresses of the jit options and the set of used subtranslators.
 
     The second part is of the key are a description of the actual arguments, see `CallArgsDescription` type alias.
     There are two ways for describing the arguments:
@@ -227,10 +229,19 @@ class CachedCallDescription:
 
     Todo:
         - pytrees.
+        - Turn the references into week references, Jax does this and I am sure there is a reason for it.
+        - Turn this into a strategy.
     """
 
+    # Origin Part for `JaceWrapped`:
     fun: Callable | None
+    sub_trans_id: int | None
+    jit_ops_id: int | None
+
+    # Origin Part for `JaceLowered`:
     sdfg: dace.SDFG | None
+
+    # Argument Part of the key
     fargs: CallArgsDescription
 
     @classmethod
@@ -244,11 +255,29 @@ class CachedCallDescription:
 
         if isinstance(stage, stages.JaceWrapped):
             # JaceWrapped.lower() to JaceLowered
-            fun = stage.__wrapped__
-            sdfg = None
 
             if len(kwargs) != 0:
                 raise NotImplementedError("'kwargs' are not implemented in 'JaceWrapped.lower()'.")
+
+            fun = stage.__wrapped__
+            sdfg = None
+
+            # We have to guard ourselves from the case of annotating the same function, but using different translators.
+            #  Thus we have to include the translators somehow in the cache description.
+            #  As outlined in `JaceWrapped.__init__()`, the list of subtranslators is copied by the constructor,
+            #  thus it is unique, and its address serves as a key.
+            #  The special design of the copying in `JaceWrapped.__init__()`, will not make a copy if the set is the current global set.
+            #  This design will cache most aggressively, if the subtranslator are set up at the beginning and then never again.
+            #  Which should also be the main use case.
+            # The best we could probably do is some kind of content hash, i.e. creating a sorted list of `(prim_name, id(prim_trans))` tuples.
+            #  However, this is relatively expensive and probably an overkill.
+            sub_trans_id = id(stage._sub_translators)
+
+            # From the discussion above it becomes clear that we also have to include the Jax options in the hash.
+            #  Currently `JaceWrapper.__init__()` shallow copies it, in the assumption that this is enough.
+            #  We could also do some kind of semantic hash, but currently we just cache on its address,
+            #  with the optimization that "supplying no options" is handled explicitly.
+            jit_ops_id = id(stage._jit_ops) if len(stage._jit_ops) != 0 else None
 
             # Currently we only allow positional arguments and no static arguments.
             #   Thus the function argument part of the key only consists of abstract arguments.
@@ -260,6 +289,8 @@ class CachedCallDescription:
             # JaceLowered.compile() to JaceCompiled
             #  We do not have to deepcopy the sdfg, since we assume immutability.
             fun = None
+            sub_trans_id = None
+            jit_ops_id = None
             sdfg = stage.compiler_ir().sdfg
 
             #   We only accepts compiler options, which the Jax interface mandates
@@ -295,7 +326,9 @@ class CachedCallDescription:
         else:
             raise TypeError(f"Can not make key from '{type(stage).__name__}'.")
 
-        return cls(fun=fun, sdfg=sdfg, fargs=fargs)
+        return cls(
+            fun=fun, sdfg=sdfg, sub_trans_id=sub_trans_id, jit_ops_id=jit_ops_id, fargs=fargs
+        )
 
 
 class TranslationCache:
@@ -402,3 +435,7 @@ class TranslationCache:
         self._memory.move_to_end(key, last=False)
         self._memory.popitem(last=False)
         return True
+
+    def __repr__(self) -> str:
+        """Textual representation for debugging."""
+        return f"TranslationCache({len(self._memory)} / {self._size} || {', '.join( '[' + repr(k) + ']' for k in self._memory)})"

@@ -9,12 +9,12 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import Any
 
 import jax as _jax_jax
 
-from jace import jax as jjax, util
+from jace import jax as jjax, translator
 from jace.jax import api_helper
 
 
@@ -22,51 +22,51 @@ from jace.jax import api_helper
 def jit(
     fun: Callable | None = None,
     /,
+    sub_translators: Mapping[str, translator.PrimitiveTranslator] | None = None,
     **kwargs: Any,
 ) -> jjax.JaceWrapped:
-    """Jace wrapper for `jax.jit`.
+    """Jace's replacement for `jax.jit` (just-in-time) wrapper.
 
-    Wraps the computation `fun` into a wrapped instance, that can either be traced or compiled.
-    For more information see `jace.jax.stages`.
+    It works the same way as `jax.jit` does, but instead of using XLA the computation is lowered to DaCe.
+    It supports the same arguments as `jax.jit` (although currently not) does.
+    In addition it accepts some Jace specific arguments.
+
+    Args:
+        sub_translators:    Use these subtranslators for the lowering to DaCe.
 
     Notes:
-        The function can either be used as decorator or as a command.
+        If no subtranslators are specified then the ones that are currently active,
+            i.e. the output of `get_subtranslators()`, are used.
+            After construction the set of subtranslators that are used by the wrapped object can not be changed.
     """
-    import jax
-    from jax._src import sharding_impls
-
-    if any(kwargs.get(arg, None) is not None for arg in ["static_argnums", "static_argnames"]):
-        raise NotImplementedError("Static arguments are not yet supported.")
     if any(kwargs.get(arg, None) is not None for arg in ["donate_argnums", "donate_argnames"]):
-        # Donated arguments are not yet (fully) supported, since they are more like a "hint"
-        #  to jax we will silently ignore them.
-        kwargs["donate_argnums"] = None
-        kwargs["donate_argnames"] = None
-    if any(
-        kwargs.get(x, sharding_impls.UNSPECIFIED) is not sharding_impls.UNSPECIFIED
-        for x in ["in_shardings", "out_shardings"]
-    ):
-        raise NotImplementedError("Sharding is not yet supported.")
-    if kwargs.get("device", None) is not None:
-        raise NotImplementedError("Selecting of device is not yet supported.")
-    if kwargs.get("backend", None) is not None:
-        raise NotImplementedError("Selecting of backend is not yet supported.")
+        # Donated arguments are not yet fully supported, the prototype supported something similar.
+        #  However, the documentation mentioned that they are only a hint, thus we ignore them.
+        kwargs.pop("donate_argnums", None)
+        kwargs.pop("donate_argnames", None)
+
+    if len(kwargs) != 0:
+        raise NotImplementedError(
+            f"The following arguments of 'jax.jit' are not yet supported by jace: {', '.join(kwargs.keys())}."
+        )
 
     # fmt: off
     if fun is None:
-        assert len(kwargs) > 0
+        # TODO: Is there an obscure case where it makes sense to copy `sub_translators`?
         def wrapper(f: Callable) -> jjax.JaceWrapped:
-            return jit(f, **kwargs)
+            return jit(f, sub_translators=sub_translators, **kwargs)
         return wrapper  # type: ignore[return-value]
     # fmt: on
 
-    if util.is_jaceified(fun):
-        return jit(fun.__wrapped__, **kwargs)
-    if len(kwargs) == 0:
-        # Prevents the creation of a level of unnecessary jit.
-        #  TODO(philmuell): Find a better way, probably better hijacking or `inline`.
-        return jjax.JaceWrapped(fun)
-    return jjax.JaceWrapped(jax.jit(fun, **kwargs))
+    # If no subtranslators were specified then use the ones that are currently installed.
+    if sub_translators is None:
+        sub_translators = translator.get_subtranslators()
+
+    return jjax.JaceWrapped(
+        fun=fun,
+        sub_translators=sub_translators,
+        jit_ops=kwargs,
+    )
 
 
 @api_helper.jax_wrapper(_jax_jax.pmap)
@@ -100,11 +100,9 @@ def vmap(
         "You are using the highly untested 'vamp' interface.",
         stacklevel=2,
     )
-    return jit(
-        _jax_jax.vmap(
-            fun,
-            **kwargs,
-        ),
+    return _jax_jax.vmap(
+        fun,
+        **kwargs,
     )
 
 

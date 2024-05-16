@@ -12,10 +12,15 @@ Also see the `test_jax_api.py` test file, that tests composability.
 
 from __future__ import annotations
 
+from collections.abc import MutableSequence, Sequence
+
+import dace
 import jax
 import numpy as np
+from jax import core as jax_core
 
 import jace
+from jace import translator
 
 
 def test_decorator_annotation():
@@ -114,6 +119,60 @@ def test_decorator_caching():
     assert compiled2 is lowered1_size1.compile({"dummy_option": True})
     assert compiled2 is not lowered1_size1.compile({"dummy_option": False})
     assert compiled2 is lowered1_size1.compile({"dummy_option": True})
+
+
+def test_decorator_double_annot():
+    """Tests the behaviour for double annotations."""
+    jax.config.update("jax_enable_x64", True)
+
+    lower_cnt = [0, 0]
+
+    def testee1(A: np.ndarray, B: np.ndarray) -> np.ndarray:
+        lower_cnt[0] += 1
+        return A * B
+
+    def testee2(A: np.ndarray, B: np.ndarray) -> np.ndarray:
+        lower_cnt[1] += 1
+        return A * B
+
+    A = np.arange(12, dtype=np.float64).reshape((4, 3))
+    B = np.full((4, 3), 10, dtype=np.float64)
+
+    jaceWrapped1_1 = jace.jit(testee1)
+    jaceWrapped1_2 = jace.jit(testee1)
+    assert jaceWrapped1_1 is not jaceWrapped1_2
+
+    # Lower them right after the other.
+    lower1_1 = jaceWrapped1_1.lower(A, B)
+    lower1_2 = jaceWrapped1_2.lower(A, B)
+    assert lower1_1 is lower1_2
+    assert (
+        lower_cnt[0] == 1
+    ), f"Annotated right after each other, but lowered {lower_cnt[0]} times instead of once."
+
+    # Now modify the state in between.
+    jaceWrapped2_1 = jace.jit(testee2)
+    lower2_1 = jaceWrapped2_1.lower(A, B)
+
+    @jace.translator.add_fsubtranslator("non_existing_primitive")
+    def non_existing_primitive_translator(
+        driver: translator.JaxprTranslationDriver,
+        in_var_names: Sequence[str | None],
+        out_var_names: MutableSequence[str],
+        eqn: jax_core.JaxprEqn,
+        eqn_state: dace.SDFGState,
+    ) -> dace.SDFGState | None:
+        raise NotImplementedError
+
+    jaceWrapped2_2 = jace.jit(testee2)
+    lower2_2 = jaceWrapped2_2.lower(A, B)
+    assert lower2_1 is not lower2_2
+    assert lower_cnt[1] == 2
+
+    # Now lower 2_1 again, to see if there is really no influence.
+    lower2_1_ = jaceWrapped2_1.lower(A, B)
+    assert lower2_1_ is lower2_1
+    assert lower_cnt[1] == 2
 
 
 def test_decorator_sharing():
