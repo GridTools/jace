@@ -41,16 +41,16 @@ def compile_jax_sdfg(
     # This is a simplification that makes our life simply.
     #  However, we should consider lifting it at some point.
     if len(tsdfg.sdfg.free_symbols) != 0:
-        raise ValueError(
+        raise NotImplementedError(
             f"No externally defined symbols are allowed, found: {tsdfg.sdfg.free_symbols}"
         )
 
     # To ensure that the SDFG is compiled and to get rid of a warning we must modify
     #  some settings of the SDFG. To fake an immutable SDFG, we will restore them later.
-    sdfg: dace.SDFG = tsdfg.sdfg
-    org_sdfg_name: str = sdfg.name
-    org_recompile: bool = sdfg._recompile
-    org_regenerate_code: bool = sdfg._regenerate_code
+    sdfg = tsdfg.sdfg
+    org_sdfg_name = sdfg.name
+    org_recompile = sdfg._recompile
+    org_regenerate_code = sdfg._regenerate_code
 
     try:
         # We need to give the SDFG another name, this is needed to prevent a DaCe error/warning.
@@ -97,10 +97,10 @@ def run_jax_sdfg(
     """
     from dace.data import Array, Data, Scalar, make_array_from_descriptor
 
-    if len(inp_names) != len(cargs):
-        raise RuntimeError("Wrong number of arguments.")
     if len(ckwargs) != 0:
         raise NotImplementedError("No kwargs are supported yet.")
+    if len(inp_names) != len(cargs):
+        raise RuntimeError("Wrong number of arguments.")
 
     # We need the SDFG to construct/allocate the memory for the return values.
     #  Actually, we would only need the descriptors, but this is currently the only way to get them.
