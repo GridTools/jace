@@ -20,77 +20,30 @@ from typing_extensions import override
 from jace import translator
 
 
-@translator.add_subtranslator
 class ALUTranslator(translator.PrimitiveTranslator):
-    """This translator handles all arithmetic and logical operations."""
+    """This translator handles all arithmetic and logical operations.
 
-    __slots__ = ()
+    This translator will be reworked soon, it just exists that the initial PR can do anything at all!!
+    """
 
-    # Contains all translation templates for unary operations.
-    _unary_ops: Final[dict[str, str]] = {
-        "pos": "__out0 = +(__in0)",
-        "neg": "__out0 = -(__in0)",
-        "not": "__out0 = not (__in0)",
-        "floor": "__out0 = floor(__in0)",
-        "ceil": "__out0 = ceil(__in0)",
-        "round": "__out0 = round(__in0)",
-        "abs": "__out0 = abs(__in0)",
-        "sign": "__out0 = sign(__in0)",
-        "sqrt": "__out0 = sqrt(__in0)",
-        "log": "__out0 = log(__in0)",
-        "exp": "__out0 = exp(__in0)",
-        "integer_pow": "__out0 = (__in0)**({y})",  # 'y' is a parameter of the primitive
-        "sin": "__out0 = sin(__in0)",
-        "asin": "__out0 = asin(__in0)",
-        "cos": "__out0 = cos(__in0)",
-        "acos": "__out0 = acos(__in0)",
-        "tan": "__out0 = tan(__in0)",
-        "atan": "__out0 = atan(__in0)",
-        "tanh": "__out0 = tanh(__in0)",
-    }
-    # Transformation for all binary operations
-    _binary_ops: Final[dict[str, str]] = {
-        "add": "__out0 = (__in0)+(__in1)",
-        "add_any": "__out0 = (__in0)+(__in1)",  # No idea what makes `add_any` differ from `add`
-        "sub": "__out0 = (__in0)-(__in1)",
-        "mul": "__out0 = (__in0)*(__in1)",
-        "div": "__out0 = (__in0)/(__in1)",
-        "rem": "__out0 = (__in0)%(__in1)",
-        "and": "__out0 = (__in0) and (__in1)",
-        "or": "__out0 = (__in0) or  (__in1)",
-        "pow": "__out0 = (__in0)**(__in1)",
-        "ipow": "__out0 = (__in0)**(int(__in1))",
-        "min": "__out0 = min(__in0, __in1)",
-        "max": "__out0 = max(__in0, __in1)",
-        "eq": "__out0 = __in0 == __in1",
-        "ne": "__out0 = __in0 != __in1",
-        "ge": "__out0 = __in0 >= __in1",
-        "gt": "__out0 = __in0 > __in1",
-        "le": "__out0 = __in0 <= __in1",
-        "lt": "__out0 = __in0 < __in1",
-    }
+    __slots__ = ("_prim_name", "_prim_tmpl")
 
-    @classmethod
-    def build_translator(
-        cls,
-        *args: Any,
-        **kwargs: Any,
-    ) -> ALUTranslator:
-        """Creates an `ALUTranslator` instance."""
-        return cls(*args, **kwargs)
-
-    def __init__(self, **kwargs: Any) -> None:
+    def __init__(
+        self,
+        prim_name: str,
+        prim_tmpl: str,
+    ) -> None:
         """Initialize the `ALUTranslator`."""
-        super().__init__(**kwargs)
+        self._prim_name = prim_name
+        self._prim_tmpl = prim_tmpl
 
     @property
     @override
-    def primitive(self) -> Sequence[str]:
-        """Returns the list of all known primitives."""
-        return list(self._unary_ops.keys()) + list(self._binary_ops.keys())
+    def primitive(self) -> str:
+        return self._prim_name
 
     @override
-    def translate_jaxeqn(
+    def __call__(
         self,
         driver: translator.JaxprTranslationDriver,
         in_var_names: Sequence[str | None],
@@ -111,6 +64,7 @@ class ALUTranslator(translator.PrimitiveTranslator):
             eqn:            The Jax equation that is translated.
             eqn_state:      State into which the primitive's SDFG representation is constructed.
         """
+        assert self._prim_name == eqn.primitive.name
 
         # Determine what kind of input we got and how we should proceed.
         is_scalar = len(eqn.outvars[0].aval.shape) == 0
@@ -253,31 +207,8 @@ class ALUTranslator(translator.PrimitiveTranslator):
         Args:
             in_var_names:   The list of SDFG variables used as input.
         """
-        t_name = eqn.primitive.name
-        if t_name == "integer_pow":
-            # INTEGER POWER
-            exponent = int(eqn.params["y"])
-            if exponent == 0:
-                t_code = f"__out0 = dace.{eqn.outvars[0].aval.dtype!s}(1)"
-            elif exponent == 1:
-                t_code = "__out0 = __in0"
-            elif exponent == 2:
-                t_code = "__out0 = __in0 * __in0"
-            elif exponent == 3:
-                t_code = "__out0 = (__in0 * __in0) * __in0"
-            elif exponent == 4:
-                t_code = "__tmp0 = __in0 * __in0\n__out0 = __tmp0 * __tmp0"
-            elif exponent == 5:
-                t_code = "__tmp0 = __in0 * __in0\n__tmp1 = __tmp0 * __tmp0\n__out0 = __tmp1 * __in0"
-            else:
-                t_code = self._unary_ops[t_name]
 
-        else:
-            # GENERAL CASE
-            if t_name in self._unary_ops:
-                t_code = self._unary_ops[t_name]
-            elif t_name in self._binary_ops:
-                t_code = self._binary_ops[t_name]
+        t_code = self._prim_tmpl
 
         # Now we handle Literal substitution
         for i, in_var_name in enumerate(in_var_names):
@@ -308,3 +239,51 @@ def _list_to_dict(inp: Sequence[tuple[None | Any, Any]]) -> dict[Any, Any]:
     The function will only include pairs whose key, i.e. first element is not `None`.
     """
     return {k: v for k, v in inp if k is not None}
+
+
+# Contains all the templates for ALU operations.
+_ALU_OPS_TMPL: Final[dict[str, str]] = {
+    # Unary operations
+    "pos": "__out0 = +(__in0)",
+    "neg": "__out0 = -(__in0)",
+    "not": "__out0 = not (__in0)",
+    "floor": "__out0 = floor(__in0)",
+    "ceil": "__out0 = ceil(__in0)",
+    "round": "__out0 = round(__in0)",
+    "abs": "__out0 = abs(__in0)",
+    "sign": "__out0 = sign(__in0)",
+    "sqrt": "__out0 = sqrt(__in0)",
+    "log": "__out0 = log(__in0)",
+    "exp": "__out0 = exp(__in0)",
+    "integer_pow": "__out0 = (__in0)**({y})",  # 'y' is a parameter of the primitive
+    "sin": "__out0 = sin(__in0)",
+    "asin": "__out0 = asin(__in0)",
+    "cos": "__out0 = cos(__in0)",
+    "acos": "__out0 = acos(__in0)",
+    "tan": "__out0 = tan(__in0)",
+    "atan": "__out0 = atan(__in0)",
+    "tanh": "__out0 = tanh(__in0)",
+    # Binary operations
+    "add": "__out0 = (__in0)+(__in1)",
+    "add_any": "__out0 = (__in0)+(__in1)",  # No idea what makes `add_any` differ from `add`
+    "sub": "__out0 = (__in0)-(__in1)",
+    "mul": "__out0 = (__in0)*(__in1)",
+    "div": "__out0 = (__in0)/(__in1)",
+    "rem": "__out0 = (__in0)%(__in1)",
+    "and": "__out0 = (__in0) and (__in1)",
+    "or": "__out0 = (__in0) or  (__in1)",
+    "pow": "__out0 = (__in0)**(__in1)",
+    "ipow": "__out0 = (__in0)**(int(__in1))",
+    "min": "__out0 = min(__in0, __in1)",
+    "max": "__out0 = max(__in0, __in1)",
+    "eq": "__out0 = __in0 == __in1",
+    "ne": "__out0 = __in0 != __in1",
+    "ge": "__out0 = __in0 >= __in1",
+    "gt": "__out0 = __in0 > __in1",
+    "le": "__out0 = __in0 <= __in1",
+    "lt": "__out0 = __in0 < __in1",
+}
+
+translator.add_subtranslators(
+    *[ALUTranslator(prim_name, prim_tmpl) for prim_name, prim_tmpl in _ALU_OPS_TMPL.items()]
+)

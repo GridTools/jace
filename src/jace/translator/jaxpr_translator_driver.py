@@ -43,12 +43,16 @@ class JaxprTranslationDriver:
     Instead the request is forwarded to a `PrimitiveTranslator` object, also known as subtranslator.
     This is a highly specialized object that is able to handle one kind of primitive.
     For more information on the subtranslators see the documentation of `PrimitiveTranslator`.
+    The actual translators are supplied from the outside at construction time.
 
     To start a translation the `translate_jaxpr()` function should be called,
     if this happens it is said that the driver has an ongoing translation.
     If `translate_jaxpr()` is called on driver that has an ongoing translation, a new translation context will be set up.
     Thus the driver will then translate the supplied (nested) Jaxpr and return the result.
     However, this will have no influence on the translation process that is already going.
+
+    Notes:
+        The translator is able to handle multiple consecutive translations.
     """
 
     __slots__ = (
@@ -60,26 +64,24 @@ class JaxprTranslationDriver:
 
     def __init__(
         self,
-        **kwargs: Any,
+        sub_translators: Mapping[str, translator.PrimitiveTranslator],
     ) -> None:
-        """Creates the base translator.
+        """Creates the driver.
 
-        All arguments that does not start with an underscore are used as
-        arguments to construct the subtranslators.
+        Args:
+            sub_translators:    Use these subtranslators to perform the translation.
 
         Notes:
-            This function will not allocate the translation context of `self`
-                but will only allocate the shared members.
-            By setting `_no_shared_alloc` to `True` the function will not allocate
-                the shared part. This flag is provided only for implementing
-                `self.fork()` using it is an error and undefined behaviour.
+            `sub_translators` is not copied, thus the user has to guarantee,
+                that it will not change during translation.
+                It is highly advised but not requiered to use the output of
+                `get_subtranslators()` or pass a copy as argument.
         """
-        # Contains all the subtranslators that we need.
-        #  They are partitioned by the names of the primitive they have registered for.
-        #  This member is allocated by '_init_sub_translators()' and remains allocated
-        #  during the lifetime of the object.
-        self._sub_translators: dict[str, translator.PrimitiveTranslator] = None  # type: ignore[assignment]
-        self._init_sub_translators(kwargs)
+
+        # Shared with the outside, while key and mapped values are immutable,
+        #  the mapping itself is not, but it should be fine.
+        #  Allocated through the lifetime of `self`.
+        self._sub_translators: Mapping[str, translator.PrimitiveTranslator] = sub_translators
 
         # These names can not be used for the automatic naming of Jax variables.
         #  They differ from the forbidden names, that they denote valid SDFG names.
@@ -766,32 +768,6 @@ class JaxprTranslationDriver:
         assert len(self._ctx_stack) != 0, "No context is active."
         return self._ctx_stack[-1]
 
-    def _init_sub_translators(
-        self,
-        subtrans_args: Mapping[str, Any],
-    ) -> JaxprTranslationDriver:
-        """This function initializes the subtranslator.
-
-        The function forwards `kwargs` to the constructor of the subtranslators.
-        However, it will remove all arguments starting with an underscore.
-        """
-
-        subtrans_args = {k: v for k, v in subtrans_args.items() if not k.startswith("_")}
-        prim_translators: dict[str, translator.PrimitiveTranslator] = {}
-        for prim_translator_cls in translator.get_subtranslators_cls():
-            prim_translator: translator.PrimitiveTranslator = prim_translator_cls.build_translator(
-                **subtrans_args
-            )
-            handled_primitives: Iterable[str] = util.as_sequence(prim_translator.primitive)
-
-            for handled_primitive in handled_primitives:
-                if handled_primitive in prim_translators:
-                    raise RuntimeError(f"Multiple translators for '{handled_primitive}' found.")
-                prim_translators[handled_primitive] = prim_translator
-        self._sub_translators = prim_translators
-
-        return self
-
     def _clear_translation_ctx(self) -> JaxprTranslationDriver:
         """This function deallocate the translation context of `self`.
 
@@ -813,17 +789,6 @@ class JaxprTranslationDriver:
             # Restore the previous state
             self._ctx_stack.pop()
         return self
-
-    def _find_sub_translator_for(
-        self,
-        eqn: jax_core.JaxprEqn,
-    ) -> translator.PrimitiveTranslator:
-        """Returns the appropriate subtranslator for equation `eqn`."""
-        prim_name: str = eqn.primitive.name
-        if prim_name not in self._sub_translators:
-            raise NotImplementedError(f"No subtranslators known to handle '{prim_name}'.")
-
-        return self._sub_translators[prim_name]
 
     def _translate_single_eqn(
         self,
@@ -863,17 +828,22 @@ class JaxprTranslationDriver:
         )
 
         # Find the subtranslator
-        subtranslator: translator.PrimitiveTranslator = self._find_sub_translator_for(eqn)
+        prim_name: str = eqn.primitive.name
+        if prim_name not in self._sub_translators:
+            raise NotImplementedError(
+                f"No subtranslators known to handle '{prim_name}' || {type(self._sub_translators)}."
+            )
+        subtranslator = self._sub_translators[prim_name]
 
         # Create the state into which the equation should be translated
         last_term_state: dace.SDFGState = self.terminal_sdfg_state  # noqa: F841 # Will be used later
         eqn_state = self.append_new_state(
-            label=f"{eqn.primitive.name}_{out_var_names[0]}",
+            label=f"{eqn.primitive.name}_{'_'.join(out_var_names)}",
             prev_state=None,  # forces terminal state to use
         )
 
         # Now perform the actual translation of the equation.
-        new_sdfg_term_state = subtranslator.translate_jaxeqn(
+        new_sdfg_term_state = subtranslator(
             driver=self,
             in_var_names=in_var_names,
             out_var_names=out_var_names,  # Might be modified by the subtranslator!
@@ -945,18 +915,6 @@ class JaxprTranslationDriver:
         # Set the output names inside the context.
         self._ctx.out_names = tuple(out_var_names)
 
-        return self._export_context()
-
-    def _export_context(self) -> translator.TranslatedJaxprSDFG:
-        """Encapsulate the translation context of `self` into a `TranslatedJaxprSDFG` object..
-
-        This function will not deallocate the internal context of `self`.
-        Thus `self` and the return value will share the same context in memory.
-        To free the context of `self` use `self._clear_translation_ctx()`.
-        """
-        assert self.is_allocated()
-        assert all((isinstance(x, str) and (len(x) > 0)) for x in self._ctx.inp_names)
-        assert all((isinstance(x, str) and (len(x) > 0)) for x in self._ctx.out_names)
         return self._ctx
 
     def _handle_null_jaxpr(

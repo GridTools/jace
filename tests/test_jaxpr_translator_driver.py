@@ -15,7 +15,7 @@ import dace
 import pytest
 from dace.data import Array, Data, Scalar
 
-from jace import translator as jtrans
+from jace import translator
 from jace.util import JaCeVar
 
 
@@ -23,14 +23,14 @@ from jace.util import JaCeVar
 def translation_driver():
     """Returns an allocated driver instance."""
     name = "fixture_driver"
-    driver = jtrans.JaxprTranslationDriver()
+    driver = translator.JaxprTranslationDriver(sub_translators=translator.get_subtranslators())
     driver._allocate_translation_ctx(name=name)
     return driver
 
 
 def test_driver_alloc() -> None:
     """Tests the state right after allocation."""
-    driver = jtrans.JaxprTranslationDriver()
+    driver = translator.JaxprTranslationDriver(sub_translators=translator.get_subtranslators())
     assert not driver.is_allocated(), "Driver was created allocated."
     assert len(driver._ctx_stack) == 0
 
@@ -55,7 +55,7 @@ def test_driver_nested() -> None:
     """
 
     # This is the parent driver.
-    driver = jtrans.JaxprTranslationDriver()
+    driver = translator.JaxprTranslationDriver(sub_translators=translator.get_subtranslators())
     assert not driver.is_allocated(), "Driver should not be allocated."
 
     # We allocate the driver directly, because we need to set some internals.
@@ -92,7 +92,7 @@ def test_driver_nested() -> None:
     assert driver._reserved_names is None
 
 
-def test_driver_append_state(alloc_driver: jtrans.JaxprTranslationDriver) -> None:
+def test_driver_append_state(translation_driver: translator.JaxprTranslationDriver) -> None:
     """Tests the functionality of appending states."""
     sdfg: dace.SDFG = alloc_driver.sdfg
 
@@ -128,7 +128,7 @@ def test_driver_append_state(alloc_driver: jtrans.JaxprTranslationDriver) -> Non
     assert next(iter(sdfg.in_edges(non_terminal_state))).src is terminal_state_1
 
 
-def test_driver_scalar(alloc_driver: jtrans.JaxprTranslationDriver) -> None:
+def test_driver_scalar(translation_driver: translator.JaxprTranslationDriver) -> None:
     """This function tests the array creation routines, especially the scalar part.
 
     However, it does so without using Jax variables.
@@ -241,7 +241,7 @@ def test_driver_scalar(alloc_driver: jtrans.JaxprTranslationDriver) -> None:
     assert scal6_ == scal6_j.name
 
 
-def test_driver_array(alloc_driver: jtrans.JaxprTranslationDriver) -> None:
+def test_driver_array(translation_driver: translator.JaxprTranslationDriver) -> None:
     """This function tests the array creation routines.
 
     However, it does so without using Jax variables.
@@ -295,7 +295,7 @@ def test_driver_array2() -> None:
         - Literals.
     """
     # This is the parent driver.
-    driver = jtrans.JaxprTranslationDriver()
+    driver = translator.JaxprTranslationDriver(sub_translators=translator.get_subtranslators())
     assert not driver.is_allocated(), "Driver should not be allocated."
 
     # Creating JaCe Variables with empty names, forces the driver to use the
