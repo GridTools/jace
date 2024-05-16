@@ -181,16 +181,12 @@ def _propose_jax_name(
         raise RuntimeError(
             f"Can not propose a second name for '{jax_var}', it already known as '{jax_name_map[jax_var]}'."
         )
-    if isinstance(jax_var, jax_core.Var):
-        pass
-    elif isinstance(jax_var, JaCeVar):
+    if isinstance(jax_var, JaCeVar) and (jax_var.name != ""):
         # If the name of the JaCe variable is empty, then use the name proposing
         #  technique used for Jax variables; Mostly used for debugging.
-        if jax_var.name != "":
-            return jax_var.name
-    else:
-        raise TypeError(f"Can not propose a name for '{jax_var}'")
+        return jax_var.name
 
+    # This code is taken from the Jax source.
     c = len(jax_name_map)
     jax_name = ""
     while len(jax_name) == 0 or c != 0:
