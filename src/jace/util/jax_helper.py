@@ -199,6 +199,7 @@ def propose_jax_name(
         The second mode is activated by passing `jax_name_map` as argument.
         The naming of variables are only consistent with the inner most Jaxpr a variable is defined in.
         Dropped variables will always be named `'_'`.
+        If `jax_var` is already inside `jax_name_map` that name will be returned.
     """
     if util.traits.is_drop_var(jax_var):
         return "_"
@@ -207,10 +208,7 @@ def propose_jax_name(
     if jax_name_map is None:
         return get_jax_var_name(jax_var)
     if jax_var in jax_name_map:
-        # Should be turned into a lookup?
-        raise RuntimeError(
-            f"Can not propose a second name for '{jax_var}', it already known as '{jax_name_map[jax_var]}'."
-        )
+        return jax_name_map[jax_var]
     if isinstance(jax_var, JaCeVar) and (jax_var.name != ""):
         # If the name of the JaCe variable is empty, then use the name proposing
         #  technique used for Jax variables; Mostly used for debugging.

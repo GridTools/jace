@@ -414,13 +414,6 @@ class JaxprTranslationDriver:
         storage: dace.StorageType = dace.StorageType.Default  # Set at later stages (optimization)
         is_scalar: bool = shape == ()
 
-        if (alt_name is None) and (self.map_jax_var_to_sdfg(arg, allow_fail=True) is not None):
-            # Maybe the test could be more robust, but it will check if we try to create
-            #  a variable for a second time. It is, however, okay to use one as template,
-            #  if another name is specified from the beginning.
-            raise ValueError(
-                f"Tried to create variable '{arg}' again, without specifying an alternative name."
-            )
         if force_jax_name:
             if alt_name is not None:
                 raise ValueError(
@@ -453,19 +446,6 @@ class JaxprTranslationDriver:
         if (name_prefix is not None) and (len(name_prefix) == 0):
             raise ValueError("Specified an empty 'name_prefix'.")
 
-        # Checking the strides.
-        if strides is not None:
-            if is_scalar:
-                raise ValueError("Specified a stride for a scalar.")
-            if isinstance(strides, (str, dace.symbol, int)):
-                strides = (strides,)
-            elif not isinstance(strides, tuple):
-                strides = tuple(strides)
-            if len(strides) != len(shape):
-                raise ValueError(
-                    f"'strides' has length {len(strides)}, but array rank is {len(shape)}."
-                )
-
         # Now we determine the proposed name of the variable.
         #  Depending on the situation, we will further manipulate it.
         if alt_name is not None:
@@ -490,6 +470,19 @@ class JaxprTranslationDriver:
         else:
             # Use the supplied name directly.
             arg_name = str(alt_name)
+
+        # Checking the strides.
+        if strides is not None:
+            if is_scalar:
+                raise ValueError("Specified a stride for a scalar.")
+            if isinstance(strides, (str, dace.symbol, int)):
+                strides = (strides,)
+            elif not isinstance(strides, tuple):
+                strides = tuple(strides)
+            if len(strides) != len(shape):
+                raise ValueError(
+                    f"'strides' has length {len(strides)}, but array rank is {len(shape)}."
+                )
 
         # Determine if we should look for a new name or not, if nothing was specified
         if find_new_name is None:
@@ -939,9 +932,7 @@ class JaxprTranslationDriver:
             self._start_state.add_nedge(
                 src=inp_acc,
                 dst=out_acc,
-                data=dace.Memlet.from_array(
-                    sdfg_in_name, self.get_array(self.map_jax_var_to_sdfg(sdfg_in_name))
-                ),
+                data=dace.Memlet.from_array(sdfg_in_name, self.get_array(sdfg_in_name)),
             )
 
             # A Jax variable now has two SDFG equivalent, the input, that was previously created by
