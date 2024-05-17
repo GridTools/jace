@@ -21,13 +21,16 @@ from abc import abstractmethod
 from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Protocol, TypeAlias, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, TypeAlias, runtime_checkable
 
 import dace
 from jax import core as jax_core
 
 from jace import util
-from jace.jax import stages
+
+
+if TYPE_CHECKING:
+    from jace.jax import stages
 
 
 def cached_translation(
@@ -57,6 +60,7 @@ def cached_translation(
         **kwargs: Any,
     ) -> stages.Stage:
         # If not initialized initialize the cache.
+        assert hasattr(self, "_cache")  # Needed to make mypy silent
         if self._cache is None:
             self._cache = _get_cache(self)
 
@@ -66,16 +70,17 @@ def cached_translation(
             return self._cache.get(key)
 
         # We must actually perform the call
-        wants_description: bool = hasattr(self, "_call_description")
         try:
-            if wants_description:
+            if hasattr(self, "_call_description"):
                 assert (
                     self._call_description is None
                 ), f"call description already set for `{self}` (probably another call going on?)."
                 self._call_description = key.fargs
             next_stage: stages.Stage = action(self, *args, **kwargs)
         finally:
-            if wants_description:
+            # If I would cache the result from above and store and then use here,
+            #  mypy would complain, thus we have to do it twice.
+            if hasattr(self, "_call_description"):
                 self._call_description = None
 
         # Store the result.
@@ -264,6 +269,7 @@ class CachedCallDescription:
         **kwargs: Any,
     ) -> CachedCallDescription:
         """Creates an abstract description of the call."""
+        from jace.jax import stages  # Cyclic import
 
         if isinstance(stage, stages.JaceWrapped):
             # JaceWrapped.lower() to JaceLowered
