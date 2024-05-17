@@ -158,7 +158,19 @@ class _AbstarctCallArgument:
 
             return cls(shape=shape, dtype=dtype, strides=strides, storage=storage)
 
-        if isinstance(val, jax_core.ShpedArray):
+        if util.is_scalar(val):
+            shape = ()
+            dtype = util.translate_dtype(type(val))
+            strides = None
+            # Lets pretend that scalars are always on the CPU, which is a fair assumption.
+            storage = dace.StorageType.CPU_Heap
+
+            return cls(shape=shape, dtype=dtype, strides=strides, storage=storage)
+
+        if isinstance(val, jax_core.ConcreteArray):
+            return cls.from_value(val.val)
+
+        if isinstance(val, jax_core.ShapedArray):
             shape = val.aval.shape
             dtype = val.aval.dtype
             strides = None
