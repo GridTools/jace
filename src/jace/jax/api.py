@@ -11,17 +11,21 @@ from __future__ import annotations
 
 import functools as ft
 from collections.abc import Callable, Mapping
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import jax as _jax_jax
 
-from jace import jax as jjax, translator
+from jace import translator
+
+
+if TYPE_CHECKING:
+    from jace import jax as jjax
 
 
 def jit(
     fun: Callable | None = None,
     /,
-    sub_translators: Mapping[str, translator.PrimitiveTranslator] | None = None,
+    sub_translators: Mapping[str, translator.PrimitiveTranslatorCallable] | None = None,
     **kwargs: Any,
 ) -> jjax.JaceWrapped | Callable:
     """Jace's replacement for `jax.jit` (just-in-time) wrapper.
@@ -44,6 +48,8 @@ def jit(
         )
 
     def wrapper(f: Callable) -> jjax.JaceWrapped:
+        from jace import jax as jjax  # Cyclic import
+
         jace_wrapper = jjax.JaceWrapped(
             fun=f,
             sub_translators=(
