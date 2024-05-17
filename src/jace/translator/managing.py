@@ -72,6 +72,7 @@ def register_primitive_translator(
     Notes:
         Can only be used to register instances.
     """
+    from jace import translator
 
     def wrapper(
         prim_translator: translator.PrimitiveTranslator | translator.PrimitiveTranslatorCallable,
