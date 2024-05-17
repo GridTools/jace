@@ -13,13 +13,10 @@ For that reason this file was renamed to ensure that it comes at first.
 
 from __future__ import annotations
 
-from jax._src import stages as jax_stages
 
-
-class Stage(jax_stages.Stage):
+class Stage:
     """A distinct step in the compilation chain, see module description for more.
 
-    This class inherent from its Jax counterpart.
     The concrete steps are implemented in:
     - JaceWrapped
     - JaceLowered
