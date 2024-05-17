@@ -12,15 +12,10 @@ Also see the `test_jax_api.py` test file, that tests composability.
 
 from __future__ import annotations
 
-from collections.abc import MutableSequence, Sequence
-
-import dace
 import jax
 import numpy as np
-from jax import core as jax_core
 
 import jace
-from jace import translator
 
 
 def test_decorator_individually():
@@ -120,14 +115,10 @@ def test_decorator_double_annot():
     """Tests the behaviour for double annotations."""
     jax.config.update("jax_enable_x64", True)
 
-    lower_cnt = [0, 0]
+    lower_cnt = [0]
 
     def testee1(A: np.ndarray, B: np.ndarray) -> np.ndarray:
         lower_cnt[0] += 1
-        return A * B
-
-    def testee2(A: np.ndarray, B: np.ndarray) -> np.ndarray:
-        lower_cnt[1] += 1
         return A * B
 
     A = np.arange(12, dtype=np.float64).reshape((4, 3))
@@ -140,42 +131,13 @@ def test_decorator_double_annot():
     # Lower them right after the other.
     lower1_1 = jaceWrapped1_1.lower(A, B)
     lower1_2 = jaceWrapped1_2.lower(A, B)
-    assert lower1_1 is lower1_2
-    assert (
-        lower_cnt[0] == 1
-    ), f"Annotated right after each other, but lowered {lower_cnt[0]} times instead of once."
-    assert lower_cnt[1] == 0
+    assert lower1_1 is not lower1_2
+    assert lower_cnt[0] == 2
 
-    # Now modify the state in between.
-    jaceWrapped2_1 = jace.jit(testee2)
-    lower2_1 = jaceWrapped2_1.lower(A, B)
-    assert lower_cnt[1] == 1
-
-    @jace.translator.add_fsubtranslator("non_existing_primitive")
-    def non_existing_primitive_translator(
-        driver: translator.JaxprTranslationDriver,
-        in_var_names: Sequence[str | None],
-        out_var_names: MutableSequence[str],
-        eqn: jax_core.JaxprEqn,
-        eqn_state: dace.SDFGState,
-    ) -> dace.SDFGState | None:
-        raise NotImplementedError
-
-    # Now lets lower the version 1 again to see if something has changed.
+    # Lower them right after the other.
     assert lower1_1 is jaceWrapped1_1.lower(A, B)
     assert lower1_2 is jaceWrapped1_2.lower(A, B)
-    assert lower_cnt[0] == 1
-
-    # Now lets nower the second version 2 test.
-    jaceWrapped2_2 = jace.jit(testee2)
-    lower2_2 = jaceWrapped2_2.lower(A, B)
-    assert lower2_1 is not lower2_2
-    assert lower_cnt[1] == 2
-
-    # Now lower 2_1 again, to see if there is really no influence.
-    lower2_1_ = jaceWrapped2_1.lower(A, B)
-    assert lower2_1_ is lower2_1
-    assert lower_cnt[1] == 2
+    assert lower_cnt[0] == 2
 
 
 def test_decorator_sharing():

@@ -16,16 +16,14 @@ from typing import Any
 import jax as _jax_jax
 
 from jace import jax as jjax, translator
-from jace.jax import api_helper
 
 
-@api_helper.jax_wrapper(_jax_jax.jit, rewriting=False)
 def jit(
     fun: Callable | None = None,
     /,
     sub_translators: Mapping[str, translator.PrimitiveTranslator] | None = None,
     **kwargs: Any,
-) -> jjax.JaceWrapped:
+) -> jjax.JaceWrapped | Callable:
     """Jace's replacement for `jax.jit` (just-in-time) wrapper.
 
     It works the same way as `jax.jit` does, but instead of using XLA the computation is lowered to DaCe.
@@ -37,55 +35,29 @@ def jit(
 
     Notes:
         If no subtranslators are specified then the ones that are currently active,
-            i.e. the output of `get_subtranslators()`, are used.
-            After construction the set of subtranslators that are used by the wrapped object can not be changed.
+            i.e. the output of `get_regsitered_primitive_translators()`, are used.
+            After construction changes to the passed `sub_translators` have no effect on the returned object.
     """
-    if any(kwargs.get(arg, None) is not None for arg in ["donate_argnums", "donate_argnames"]):
-        # Donated arguments are not yet fully supported, the prototype supported something similar.
-        #  However, the documentation mentioned that they are only a hint, thus we ignore them.
-        kwargs.pop("donate_argnums", None)
-        kwargs.pop("donate_argnames", None)
-
     if len(kwargs) != 0:
         raise NotImplementedError(
             f"The following arguments of 'jax.jit' are not yet supported by jace: {', '.join(kwargs.keys())}."
         )
 
-    # fmt: off
-    if fun is None:
-        # TODO: Is there an obscure case where it makes sense to copy `sub_translators`?
-        def wrapper(f: Callable) -> jjax.JaceWrapped:
-            return jit(f, sub_translators=sub_translators, **kwargs)
-        return wrapper  # type: ignore[return-value]
-    # fmt: on
+    def wrapper(f: Callable) -> jjax.JaceWrapped:
+        jace_wrapper = jjax.JaceWrapped(
+            fun=f,
+            sub_translators=(
+                translator.managing._PRIMITIVE_TRANSLATORS_DICT
+                if sub_translators is None
+                else sub_translators
+            ),
+            jit_ops=kwargs,
+        )
+        return ft.wraps(f)(jace_wrapper)
 
-    # If no subtranslators were specified then use the ones that are currently installed.
-    if sub_translators is None:
-        sub_translators = translator.get_subtranslators()
-
-    wrapper = jjax.JaceWrapped(
-        fun=fun,
-        sub_translators=sub_translators,
-        jit_ops=kwargs,
-    )
-    return ft.wraps(fun)(wrapper)
+    return wrapper if fun is None else wrapper(fun)
 
 
-@api_helper.jax_wrapper(_jax_jax.pmap)
-def pmap(
-    fun: Callable | None = None,  # noqa: ARG001  # Unused argument
-    /,
-    **kwargs: Any,  # noqa: ARG001 # Unused argument.
-) -> jjax.JaceWrapped:
-    """Jace wrapper around `jax.pmap`.
-
-    Notes:
-        Will be supported in a very late state.
-    """
-    raise NotImplementedError("Currently Jace is not able to run in multi resource mode.")
-
-
-@api_helper.jax_wrapper(_jax_jax.vmap)
 def vmap(
     fun: Callable,
     /,
@@ -108,7 +80,6 @@ def vmap(
     )
 
 
-@api_helper.jax_wrapper(_jax_jax.grad)
 def grad(
     fun: Callable | None = None,
     /,
@@ -124,7 +95,6 @@ def grad(
     return _jax_jax.grad(fun, **kwargs)
 
 
-@api_helper.jax_wrapper(_jax_jax.jacfwd)
 def jacfwd(
     fun: Callable | None = None,
     /,
@@ -134,7 +104,6 @@ def jacfwd(
     return _jax_jax.jacfwd(fun, **kwargs)
 
 
-@api_helper.jax_wrapper(_jax_jax.jacrev)
 def jacrev(
     fun: Callable | None = None,
     /,

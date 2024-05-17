@@ -27,8 +27,7 @@ if TYPE_CHECKING:
     from jace import translator
 
 
-@runtime_checkable
-class PrimitiveTranslator(Protocol):
+class PrimitiveTranslatorCallable(Protocol):
     """Interface for all Jax primitive translators, also known as subtranslator.
 
     A translator for a primitive translates a single equation of a Jaxpr into its SDFG equivalent.
@@ -39,15 +38,12 @@ class PrimitiveTranslator(Protocol):
     In the end this implements the delegation pattern.
 
     You can use `jace.translator.add_subtranslator()` to register your translator to Jace.
+
+    Notes:
+        Primitive translators that are implemented as a class, should be derived from `PrimitiveTranslator`.
     """
 
     __slots__ = ()
-
-    @property
-    @abstractmethod
-    def primitive(self) -> str:
-        """Returns the name of the Jax primitive that `self` is able to handle."""
-        ...
 
     @abstractmethod
     def __call__(
@@ -100,4 +96,31 @@ class PrimitiveTranslator(Protocol):
             eqn_state:      State into which the primitive`s SDFG representation
                                 should be constructed.
         """
+        ...
+
+
+@runtime_checkable
+class PrimitiveTranslator(PrimitiveTranslatorCallable, Protocol):
+    """Interface for all Jax primitive translators, also known as subtranslator, that are implemented as class.
+
+    A translator for a primitive translates a single equation of a Jaxpr into its SDFG equivalent.
+    For satisfying this interface a concrete implementation must be immutable after construction.
+
+    Subtranslators are simple, but highly specialized objects that are only able to perform the translation of a single primitive.
+    The overall translation process itself is managed by a driver object, which also owns and manage the subtranslators.
+    In the end this implements the delegation pattern.
+
+    You can use `jace.translator.add_subtranslator()` to register your translator to Jace.
+
+    Notes:
+        The main difference to to `PrimitiveTranslatorCallable` is that this interface specifies the `primitive` property.
+            Thus, it must not be specified during registration.
+    """
+
+    __slots__ = ()
+
+    @property
+    @abstractmethod
+    def primitive(self) -> str:
+        """Returns the name of the Jax primitive that `self` is able to handle."""
         ...

@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping, MutableSequence, Sequence
-from inspect import isclass, isfunction
 from typing import Any
 
 import dace
@@ -21,11 +20,10 @@ import pytest
 from jax import core as jax_core
 
 import jace
-from jace import translator as jtrans
+from jace import translator
 from jace.translator import (
-    add_fsubtranslator,
-    add_subtranslator,
-    get_subtranslators,
+    get_regsitered_primitive_translators,
+    register_primitive_translator,
 )
 
 
@@ -36,9 +34,10 @@ def _conserve_builtin_translators():
     Todo:
         Come up with something better/nicer.
     """
-    initial_translators = get_subtranslators()
+    initial_translators = get_regsitered_primitive_translators()
     yield
-    jtrans.add_subtranslators(*initial_translators.values(), overwrite=True)
+    translator.managing._PRIMITIVE_TRANSLATORS_DICT.clear()
+    translator.managing._PRIMITIVE_TRANSLATORS_DICT.update(initial_translators)
 
 
 def _dict_struct(dict_: Mapping[str, Any]) -> Sequence[tuple[str, int]]:
@@ -47,17 +46,17 @@ def _dict_struct(dict_: Mapping[str, Any]) -> Sequence[tuple[str, int]]:
 
 def test_are_subtranslators_imported():
     """Tests if something is inside the list of subtranslators."""
-    assert len(get_subtranslators()) > 1
+    assert len(get_regsitered_primitive_translators()) > 1
 
 
 def test_subtranslatior_managing():
     """Ensures the functionality of the subtranslator managing."""
 
     # TODO(phimuell): Make this more friendly; See blow
-    builtin_subtrans = get_subtranslators()
+    builtin_subtrans = get_regsitered_primitive_translators()
     builin_struct = _dict_struct(builtin_subtrans)
 
-    class SubTrans1(jtrans.PrimitiveTranslator):
+    class SubTrans1(translator.PrimitiveTranslator):
         @property
         def primitive(self):
             return "non_existing_primitive1"
@@ -66,12 +65,10 @@ def test_subtranslatior_managing():
             raise NotImplementedError
 
     # Ensures that we really return the object unmodified.
-    SubTrans1_ = add_subtranslator(SubTrans1)
-    assert isclass(SubTrans1_)
-    assert SubTrans1_ is SubTrans1
+    sub_trans1 = register_primitive_translator(SubTrans1())
+    assert sub_trans1 is get_regsitered_primitive_translators()["non_existing_primitive1"]
 
-    @add_subtranslator(overwrite=True)
-    class SubTrans2(jtrans.PrimitiveTranslator):
+    class SubTrans2(translator.PrimitiveTranslator):
         @property
         def primitive(self):
             return "non_existing_primitive2"
@@ -79,11 +76,28 @@ def test_subtranslatior_managing():
         def __call__(self) -> None:  # type: ignore[override]  # Arguments
             raise NotImplementedError
 
-    assert isclass(SubTrans2)
+    # Wrong name
+    sub_trans2_instance = SubTrans2()
+    with pytest.raises(
+        expected_exception=TypeError,
+        match=re.escape(
+            f"Translator's primitive '{sub_trans2_instance.primitive}' doesn't match the supplied 'not_non_existing_primitive2'."
+        ),
+    ):
+        register_primitive_translator(
+            sub_trans2_instance,
+            primitive="not_non_existing_primitive2",
+        )
 
-    @add_fsubtranslator("non_existing_primitive3")
+    # But if the correct name is specified it works.
+    register_primitive_translator(
+        sub_trans2_instance,
+        primitive="non_existing_primitive2",
+    )
+
+    @register_primitive_translator(primitive="non_existing_primitive3")
     def non_existing_primitive_translator_3(
-        driver: jtrans.JaxprTranslationDriver,
+        driver: translator.JaxprTranslationDriver,
         in_var_names: Sequence[str | None],
         out_var_names: MutableSequence[str],
         eqn: jax_core.JaxprEqn,
@@ -91,11 +105,10 @@ def test_subtranslatior_managing():
     ) -> dace.SDFGState | None:
         raise NotImplementedError
 
-    assert isfunction(non_existing_primitive_translator_3)
     assert non_existing_primitive_translator_3.primitive == "non_existing_primitive3"
 
-    curr1_subtrans = get_subtranslators()
-    curr1_subtrans_mod = get_subtranslators(as_mutable=True)
+    curr1_subtrans = get_regsitered_primitive_translators()
+    curr1_subtrans_mod = get_regsitered_primitive_translators()
     assert curr1_subtrans is not builtin_subtrans
     assert curr1_subtrans is not curr1_subtrans_mod
     assert _dict_struct(curr1_subtrans) != builin_struct
@@ -106,50 +119,55 @@ def test_subtranslatior_managing():
         assert pname in curr1_subtrans, f"Expected to find '{pname}'."
         curr1_subtrans_mod.pop(pname)
     assert builin_struct == _dict_struct(curr1_subtrans_mod)
-    assert curr1_subtrans is get_subtranslators()
 
     # Try adding instance and if we can overwrite.
     sub_trans1_instance = SubTrans1()
     with pytest.raises(
         expected_exception=ValueError,
         match=re.escape(
-            "Tried to add a second translator for primitive 'non_existing_primitive1'."
+            "Explicit override=True needed for primitive 'non_existing_primitive1' to overwrite existing one."
         ),
     ):
-        add_subtranslator(sub_trans1_instance, overwrite=False)
+        register_primitive_translator(sub_trans1_instance, overwrite=False)
 
     # Now adding it forcefully, this should also change a lot.
-    add_subtranslator(sub_trans1_instance, overwrite=True)
+    register_primitive_translator(sub_trans1_instance, overwrite=True)
 
-    curr2_subtrans = get_subtranslators()
+    curr2_subtrans = get_regsitered_primitive_translators()
     assert curr2_subtrans is not builtin_subtrans
     assert curr2_subtrans is not curr1_subtrans
     assert _dict_struct(curr2_subtrans) != builin_struct
     assert _dict_struct(curr2_subtrans) != _dict_struct(curr1_subtrans)
     assert curr2_subtrans["non_existing_primitive1"] is sub_trans1_instance
 
-    # Try to answer a function as translator, that already has a primitive property.
+    # Try to register a function as translator, that already has a primitive property.
     with pytest.raises(
-        expected_exception=ValueError,
-        match=re.escape("Passed 'fun' already 'non_existing_primitive3' as 'primitive' property."),
+        expected_exception=TypeError,
+        match=re.escape(
+            f"Translator's primitive '{non_existing_primitive_translator_3.primitive}' doesn't match the supplied 'non_existing_primitive1'."
+        ),
     ):
-        add_fsubtranslator(
-            "non_existing_primitive1", non_existing_primitive_translator_3, overwrite=False
+        register_primitive_translator(
+            non_existing_primitive_translator_3,
+            primitive="non_existing_primitive1",
+            overwrite=False,
         )
 
     # This would work because it has the same primitive name, but it fails because overwrite is False
     with pytest.raises(
         expected_exception=ValueError,
         match=re.escape(
-            "Tried to add a second translator for primitive 'non_existing_primitive3'."
+            "Explicit override=True needed for primitive 'non_existing_primitive3' to overwrite existing one."
         ),
     ):
-        add_fsubtranslator(
-            "non_existing_primitive3", non_existing_primitive_translator_3, overwrite=False
+        register_primitive_translator(
+            non_existing_primitive_translator_3,
+            primitive="non_existing_primitive3",
+            overwrite=False,
         )
 
-    add_fsubtranslator(
-        "non_existing_primitive3", non_existing_primitive_translator_3, overwrite=True
+    register_primitive_translator(
+        non_existing_primitive_translator_3, primitive="non_existing_primitive3", overwrite=True
     )
 
 
@@ -157,14 +175,15 @@ def test_subtranslatior_managing_2():
     """Shows that we are really able to overwrite stuff"""
     jax.config.update("jax_enable_x64", True)
 
-    @add_subtranslator(overwrite=True)
-    class NonAddTranslator(jtrans.PrimitiveTranslator):
+    class NonAddTranslator(translator.PrimitiveTranslator):
         @property
         def primitive(self):
             return "add"
 
         def __call__(self, *args, **kwargs) -> None:
             raise NotImplementedError("The 'NonAddTranslator' can not translate anything.")
+
+    register_primitive_translator(NonAddTranslator(), overwrite=True)
 
     @jace.jit
     def testee(A: np.ndarray, B: np.ndarray) -> np.ndarray:
@@ -184,7 +203,7 @@ def test_subtranslatior_managing_3():
     """Shows proper decoupling."""
     jax.config.update("jax_enable_x64", True)
 
-    class NonAddTranslator(jtrans.PrimitiveTranslator):
+    class NonAddTranslator(translator.PrimitiveTranslator):
         @property
         def primitive(self):
             return "add"
@@ -192,7 +211,7 @@ def test_subtranslatior_managing_3():
         def __call__(self, *args, **kwargs) -> None:
             raise NotImplementedError("The 'NonAddTranslator' can not translate anything at all.")
 
-    used_sub_trans = get_subtranslators(as_mutable=True)
+    used_sub_trans = get_regsitered_primitive_translators()
     used_sub_trans["add"] = NonAddTranslator()
 
     @jace.jit(sub_translators=used_sub_trans)

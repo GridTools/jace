@@ -69,7 +69,7 @@ class JaxprTranslationDriver:
 
     def __init__(
         self,
-        sub_translators: Mapping[str, translator.PrimitiveTranslator],
+        sub_translators: Mapping[str, translator.PrimitiveTranslatorCallable],
     ) -> None:
         """Creates the driver.
 
@@ -80,13 +80,15 @@ class JaxprTranslationDriver:
             `sub_translators` is not copied, thus the user has to guarantee,
                 that it will not change during translation.
                 It is highly advised but not required to use the output of
-                `get_subtranslators()` or pass a copy as argument.
+                `get_regsitered_primitive_translators()` or pass a copy as argument.
         """
 
         # Shared with the outside, while key and mapped values are immutable,
         #  the mapping itself is not, but it should be fine.
         #  Allocated through the lifetime of `self`.
-        self._sub_translators: Mapping[str, translator.PrimitiveTranslator] = sub_translators
+        self._sub_translators: Mapping[str, translator.PrimitiveTranslatorCallable] = (
+            sub_translators
+        )
 
         # These names can not be used for the automatic naming of Jax variables.
         #  They differ from the forbidden names, that they denote valid SDFG names.

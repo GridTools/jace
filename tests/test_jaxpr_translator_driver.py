@@ -23,14 +23,18 @@ from jace.util import JaCeVar
 def translation_driver():
     """Returns an allocated driver instance."""
     name = "fixture_driver"
-    driver = translator.JaxprTranslationDriver(sub_translators=translator.get_subtranslators())
+    driver = translator.JaxprTranslationDriver(
+        sub_translators=translator.get_regsitered_primitive_translators()
+    )
     driver._allocate_translation_ctx(name=name)
     return driver
 
 
 def test_driver_alloc() -> None:
     """Tests the state right after allocation."""
-    driver = translator.JaxprTranslationDriver(sub_translators=translator.get_subtranslators())
+    driver = translator.JaxprTranslationDriver(
+        sub_translators=translator.get_regsitered_primitive_translators()
+    )
     assert not driver.is_allocated(), "Driver was created allocated."
     assert len(driver._ctx_stack) == 0
 
@@ -55,7 +59,9 @@ def test_driver_nested() -> None:
     """
 
     # This is the parent driver.
-    driver = translator.JaxprTranslationDriver(sub_translators=translator.get_subtranslators())
+    driver = translator.JaxprTranslationDriver(
+        sub_translators=translator.get_regsitered_primitive_translators()
+    )
     assert not driver.is_allocated(), "Driver should not be allocated."
 
     # We allocate the driver directly, because we need to set some internals.
@@ -295,7 +301,9 @@ def test_driver_array2() -> None:
         - Literals.
     """
     # This is the parent driver.
-    driver = translator.JaxprTranslationDriver(sub_translators=translator.get_subtranslators())
+    driver = translator.JaxprTranslationDriver(
+        sub_translators=translator.get_regsitered_primitive_translators()
+    )
     assert not driver.is_allocated(), "Driver should not be allocated."
 
     # Creating JaCe Variables with empty names, forces the driver to use the

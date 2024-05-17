@@ -284,6 +284,7 @@ _ALU_OPS_TMPL: Final[dict[str, str]] = {
     "lt": "__out0 = __in0 < __in1",
 }
 
-translator.add_subtranslators(
-    *[ALUTranslator(prim_name, prim_tmpl) for prim_name, prim_tmpl in _ALU_OPS_TMPL.items()]
-)
+_ = [
+    translator.register_primitive_translator(ALUTranslator(prim_name, prim_tmpl))
+    for prim_name, prim_tmpl in _ALU_OPS_TMPL.items()
+]
