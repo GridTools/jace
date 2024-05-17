@@ -9,9 +9,9 @@
 
 from __future__ import annotations
 
+import functools as ft
 from collections.abc import Callable, Mapping
 from typing import Any
-import functools as ft
 
 import jax as _jax_jax
 
@@ -19,7 +19,7 @@ from jace import jax as jjax, translator
 from jace.jax import api_helper
 
 
-@api_helper.jax_wrapper(_jax_jax.jit)
+@api_helper.jax_wrapper(_jax_jax.jit, rewriting=False)
 def jit(
     fun: Callable | None = None,
     /,

@@ -23,11 +23,6 @@ import jace
 from jace import translator
 
 
-def test_decorator_annotation():
-    """Tests the annotation, essential `jace.jax.api_helper.jax_wrapper`."""
-    assert jax.jit.__doc__ == jace.jit.__doc__
-
-
 def test_decorator_individually():
     """Tests the compilation steps individually."""
     jax.config.update("jax_enable_x64", True)
