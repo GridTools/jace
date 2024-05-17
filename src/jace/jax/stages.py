@@ -116,7 +116,7 @@ class JaceWrapped(Stage):
         #
         # Because we know that the global state is immutable, we must not copy in this case.
         #  See also `make_call_description()` in the cache implementation.
-        if sub_translators is managing._CURRENT_SUBTRANSLATORS_VIEW:
+        if sub_translators is managing._PRIMITIVE_TRANSLATORS_VIEW:
             self._sub_translators = sub_translators
         else:
             # Note this is the canonical way to shallow copy a mapping since `Mapping` does not has `.copy()`
