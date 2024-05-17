@@ -259,7 +259,7 @@ class CachedCallDescription:
             if len(kwargs) != 0:
                 raise NotImplementedError("'kwargs' are not implemented in 'JaceWrapped.lower()'.")
 
-            fun = stage.__wrapped__
+            fun = stage.wrapped_fun
             sdfg = None
 
             # We have to guard ourselves from the case of annotating the same function, but using different translators.

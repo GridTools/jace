@@ -9,7 +9,6 @@
 
 from __future__ import annotations
 
-import functools as ft
 from collections.abc import Callable, Mapping
 from typing import Any
 
@@ -29,9 +28,6 @@ class JaceWrapped(stages.Stage):
     It can also be explicitly lowered prior to compilation, and the result compiled prior to execution.
 
     You should not create `JaceWrapped` instances directly, instead you should use `jace.jit`.
-
-    Notes:
-        The wrapped function is accessible through the `__wrapped__` property.
 
     Todo:
         Handles pytrees.
@@ -67,10 +63,7 @@ class JaceWrapped(stages.Stage):
         Notes:
             Both the `sub_translators` and `jit_ops` are shallow copied.
         """
-
-        # Makes that `self` is a true stand-in for `fun`
         self._fun: Callable = fun
-        ft.update_wrapper(self, self._fun)  # TODO(phimuell): modify text; Jax does the same.
 
         # Why do we have to make a copy (shallow copy is enough as the translators themselves are immutable)?
         #  The question is a little bit tricky so let's consider the following situation:
@@ -112,17 +105,20 @@ class JaceWrapped(stages.Stage):
     ) -> Any:
         """Executes the wrapped function, lowering and compiling as needed in one step."""
 
+        # TODO(phimuell): Handle the `disable_jit` context manager of Jax.
+
         # This allows us to be composable with Jax transformations.
         if util.is_tracing_ongoing(*args, **kwargs):
-            return self.__wrapped__(*args, **kwargs)
-        # TODO(phimuell): Handle the case of gradients:
-        #                   It seems that this one uses special tracers, since they can handle comparisons.
-        #                   https://jax.readthedocs.io/en/latest/notebooks/Common_Gotchas_in_JAX.html#python-control-flow-autodiff
-        # TODO(phimuell): Handle the `disable_jit` context manager of Jax.
+            # TODO(phimuell): Handle the case of gradients:
+            #                   It seems that this one uses special tracers, since they can handle comparisons.
+            #                   https://jax.readthedocs.io/en/latest/notebooks/Common_Gotchas_in_JAX.html#python-control-flow-autodiff
+            return self._fun(*args, **kwargs)
 
         # TODO(phimuell): Handle static arguments correctly
         #                   https://jax.readthedocs.io/en/latest/aot.html#lowering-with-static-arguments
-        return self.lower(*args, **kwargs).compile()(*args, **kwargs)
+        lowered = self.lower(*args, **kwargs)
+        compiled = lowered.compile()
+        return compiled(*args, **kwargs)
 
     @tcache.cached_translation
     def lower(
@@ -148,6 +144,11 @@ class JaceWrapped(stages.Stage):
         jaxpr = jax_jax.make_jaxpr(self._fun)(*real_args)
         driver = translator.JaxprTranslationDriver(sub_translators=self._sub_translators)
         trans_sdfg: translator.TranslatedJaxprSDFG = driver.translate_jaxpr(jaxpr)
-        ptrans.postprocess_jaxpr_sdfg(tsdfg=trans_sdfg, fun=self.__wrapped__)
+        ptrans.postprocess_jaxpr_sdfg(tsdfg=trans_sdfg, fun=self.wrapped_fun)
         # The `JaceLowered` assumes complete ownership of `trans_sdfg`!
         return stages.JaceLowered(trans_sdfg)
+
+    @property
+    def wrapped_fun(self) -> Callable:
+        """Returns the wrapped function."""
+        return self._fun

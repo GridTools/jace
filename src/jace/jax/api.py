@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from typing import Any
+import functools as ft
 
 import jax as _jax_jax
 
@@ -62,11 +63,12 @@ def jit(
     if sub_translators is None:
         sub_translators = translator.get_subtranslators()
 
-    return jjax.JaceWrapped(
+    wrapper = jjax.JaceWrapped(
         fun=fun,
         sub_translators=sub_translators,
         jit_ops=kwargs,
     )
+    return ft.wraps(fun)(wrapper)
 
 
 @api_helper.jax_wrapper(_jax_jax.pmap)
