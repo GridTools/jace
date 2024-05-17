@@ -9,14 +9,18 @@ from __future__ import annotations
 
 import itertools
 from collections.abc import Iterable, Mapping, MutableSequence, Sequence
-from typing import Any, Final, Literal, cast, overload
+from typing import TYPE_CHECKING, Any, Final, Literal, cast, overload
 
 import dace
 import jax
 from dace import data as ddata, properties as dprop
 from jax import core as jax_core
 
-from jace import translator, util
+
+if TYPE_CHECKING:
+    from jace import translator
+
+from jace import util
 
 
 class JaxprTranslationDriver:
@@ -711,6 +715,8 @@ class JaxprTranslationDriver:
             name:               The name of the SDFG.
             reserved_names:     Add these name to the set of resered names of `self`.
         """
+        from jace import translator  # Cyclic import
+
         # Create a new translation context and put it on the stack.
         self._ctx_stack.append(
             translator.TranslatedJaxprSDFG(

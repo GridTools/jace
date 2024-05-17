@@ -17,12 +17,14 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from collections.abc import MutableSequence, Sequence
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 import dace
 from jax import core as jax_core
 
-from jace import translator
+
+if TYPE_CHECKING:
+    from jace import translator
 
 
 @runtime_checkable

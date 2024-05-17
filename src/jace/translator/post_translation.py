@@ -13,8 +13,11 @@ Most of them operate on `TranslatedJaxprSDFG` objects.
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 
-from jace import translator
+
+if TYPE_CHECKING:
+    from jace import translator
 
 
 def postprocess_jaxpr_sdfg(
