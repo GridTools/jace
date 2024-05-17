@@ -11,7 +11,7 @@ import re
 from collections.abc import Iterable
 from typing import TypeVar, cast, overload
 
-from jace.util import traits
+import jace.util.traits as traits
 
 
 _T = TypeVar("_T")

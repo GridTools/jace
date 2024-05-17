@@ -12,15 +12,16 @@ Everything in this module is experimental and might vanish anytime.
 
 from __future__ import annotations
 
-import functools as ft
 import time
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import dace
 
-from jace import translator
-from jace.util import dace_helper as jdace
+
+if TYPE_CHECKING:
+    from jace import translator
+    from jace.util import dace_helper as jdace
 
 
 def compile_jax_sdfg(
@@ -72,7 +73,6 @@ def compile_jax_sdfg(
     return csdfg
 
 
-@ft.singledispatch
 def run_jax_sdfg(
     csdfg: jdace.CompiledSDFG,
     inp_names: Sequence[str],
@@ -146,23 +146,3 @@ def run_jax_sdfg(
     if len(out_names) == 1:
         return ret_val[0]
     return ret_val
-
-
-@run_jax_sdfg.register(translator.TranslatedJaxprSDFG)
-def _(
-    tsdfg: translator.TranslatedJaxprSDFG,
-    cargs: Sequence[Any],
-    ckwargs: Mapping[str, Any],
-) -> tuple[Any, ...] | Any:
-    """Execute the `TranslatedJaxprSDFG` object directly.
-
-    This function is a convenience function provided for debugging.
-    """
-    csdfg: jdace.CompiledSDFG = compile_jax_sdfg(tsdfg)
-    return run_jax_sdfg(
-        csdfg=csdfg,
-        inp_names=tsdfg.inp_names,
-        out_names=tsdfg.out_names,
-        cargs=cargs,
-        ckwargs=ckwargs,
-    )

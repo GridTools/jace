@@ -25,7 +25,7 @@ import jax.core as jax_core
 import jax.dtypes as jax_dtypes
 import numpy as np
 
-from jace import util
+import jace.util as util
 
 
 @dataclass(init=True, repr=True, frozen=True, eq=False)
@@ -67,6 +67,7 @@ def get_jax_var_name(jax_var: jax_core.Atom | JaCeVar | str) -> str:
         Due to some modification in Jax itself, this function is unable to return "proper" variable names.
         This function is subject for removal.
     """
+
     match jax_var:
         case jax_core.DropVar():
             return "_"
@@ -201,7 +202,7 @@ def propose_jax_name(
         Dropped variables will always be named `'_'`.
         If `jax_var` is already inside `jax_name_map` that name will be returned.
     """
-    if util.traits.is_drop_var(jax_var):
+    if util.is_drop_var(jax_var):
         return "_"
     if isinstance(jax_var, jax_core.Literal):
         raise TypeError(f"Can not propose a name for literal '{jax_var}'.")

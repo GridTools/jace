@@ -17,7 +17,8 @@ import numpy as np
 from jax import _src as jax_src, core as jax_core
 from jaxlib import xla_extension as jax_xe
 
-from jace import jax as jjax, util
+import jace.jax as jjax
+import jace.util as util
 
 
 class NonStringIterable(Iterable): ...
