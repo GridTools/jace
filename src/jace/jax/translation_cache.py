@@ -227,11 +227,8 @@ class CachedCallDescription:
     This class represents both the `JaceWrapped.lower()` and `JaceLowered.compile()` calls.
 
     The actual key is composed of two parts, first the "origin of the call".
-    For `JaceLowered` the lowered SDFG is used, because we assume immutability across the whole translation chain,
-    we relay on its built-in  `__hash__()` and `__eq__`, which fall back to their address.
-
-    For `JaceWrapped` objects the first part includes the wrapped function.
-    Then it also includes the addresses of the jit options and the set of used subtranslators.
+    For this we just use the address of the stage object we are caching and hope that the
+    address is not reused for another stag anytime soon.
 
     The second part is of the key are a description of the actual arguments, see `CallArgsDescription` type alias.
     There are two ways for describing the arguments:
@@ -244,21 +241,16 @@ class CachedCallDescription:
     In addition an argument can be positional or a named argument,
     in which case it consists of a `tuple[str, _AbstarctCallArgument  | _ConcreteCallArgument]`.
 
+    Notes:
+        The base assumption is that the stages are immutable.
+
     Todo:
         - pytrees.
         - Turn the references into week references, Jax does this and I am sure there is a reason for it.
         - Turn this into a strategy.
     """
 
-    # Origin Part for `JaceWrapped`:
-    fun: Callable | None
-    sub_trans_id: int | None
-    jit_ops_id: int | None
-
-    # Origin Part for `JaceLowered`:
-    sdfg: dace.SDFG | None
-
-    # Argument Part of the key
+    stage_id: int
     fargs: CallArgsDescription
 
     @classmethod
@@ -277,26 +269,6 @@ class CachedCallDescription:
             if len(kwargs) != 0:
                 raise NotImplementedError("'kwargs' are not implemented in 'JaceWrapped.lower()'.")
 
-            fun = stage.wrapped_fun
-            sdfg = None
-
-            # We have to guard ourselves from the case of annotating the same function, but using different translators.
-            #  Thus we have to include the translators somehow in the cache description.
-            #  As outlined in `JaceWrapped.__init__()`, the list of subtranslators is copied by the constructor,
-            #  thus it is unique, and its address serves as a key.
-            #  The special design of the copying in `JaceWrapped.__init__()`, will not make a copy if the set is the current global set.
-            #  This design will cache most aggressively, if the subtranslator are set up at the beginning and then never again.
-            #  Which should also be the main use case.
-            # The best we could probably do is some kind of content hash, i.e. creating a sorted list of `(prim_name, id(prim_trans))` tuples.
-            #  However, this is relatively expensive and probably an overkill.
-            sub_trans_id = id(stage._sub_translators)
-
-            # From the discussion above it becomes clear that we also have to include the Jax options in the hash.
-            #  Currently `JaceWrapper.__init__()` shallow copies it, in the assumption that this is enough.
-            #  We could also do some kind of semantic hash, but currently we just cache on its address,
-            #  with the optimization that "supplying no options" is handled explicitly.
-            jit_ops_id = id(stage._jit_ops) if len(stage._jit_ops) != 0 else None
-
             # Currently we only allow positional arguments and no static arguments.
             #   Thus the function argument part of the key only consists of abstract arguments.
             fargs: tuple[_AbstarctCallArgument, ...] = tuple(
@@ -305,11 +277,6 @@ class CachedCallDescription:
 
         elif isinstance(stage, stages.JaceLowered):
             # JaceLowered.compile() to JaceCompiled
-            #  We do not have to deepcopy the sdfg, since we assume immutability.
-            fun = None
-            sub_trans_id = None
-            jit_ops_id = None
-            sdfg = stage.compiler_ir().sdfg
 
             #   We only accepts compiler options, which the Jax interface mandates
             #   are inside a `dict` thus we will get at most one argument.
@@ -321,16 +288,10 @@ class CachedCallDescription:
                 raise ValueError("Only a 'dict' is allowed as argument to 'JaceLowered.compile()'.")
             if (len(args) == 0) or (args[0] is None):
                 # Currently we consider no argument and `None` as "use the default argument".
-                #  This should be in accordance with Jax. See also `JaceLowered.compile()`.
+                #  Which is what Jax does.
                 comp_ops: stages.CompilerOptions = stages.JaceLowered.DEF_COMPILER_OPTIONS
             else:
-                # Compiler options where given.
                 comp_ops = args[0]
-            assert isinstance(comp_ops, dict)
-            assert all(
-                isinstance(k, str) and isinstance(v, _ConcreteCallArgument)
-                for k, v in comp_ops.items()
-            )
 
             # We will now make `(argname, argvalue)` pairs and sort them according to `argname`.
             #  This guarantees a stable order.
@@ -344,9 +305,7 @@ class CachedCallDescription:
         else:
             raise TypeError(f"Can not make key from '{type(stage).__name__}'.")
 
-        return cls(
-            fun=fun, sdfg=sdfg, sub_trans_id=sub_trans_id, jit_ops_id=jit_ops_id, fargs=fargs
-        )
+        return cls(stage_id=id(stage), fargs=fargs)
 
 
 class TranslationCache:
