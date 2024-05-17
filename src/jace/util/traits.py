@@ -13,6 +13,7 @@ from collections.abc import Iterable
 from typing import Any, TypeGuard
 
 import dace
+import numpy as np
 from jax import _src as jax_src, core as jax_core
 from jaxlib import xla_extension as jax_xe
 
@@ -87,6 +88,38 @@ def is_array(
 ) -> bool:
     """Identifies arrays, this also includes Jax arrays."""
     return is_jax_array(obj) or dace.is_array(obj)
+
+
+def is_scalar(
+    obj: Any,
+) -> bool:
+    """Tests if `obj` is a scalar."""
+    # These are the type known to DaCe; Taken from `dace.dtypes`.
+    known_types = {
+        bool,
+        int,
+        float,
+        complex,
+        np.intc,
+        np.uintc,
+        np.bool_,
+        np.int8,
+        np.int16,
+        np.int32,
+        np.int64,
+        np.uint8,
+        np.uint16,
+        np.uint32,
+        np.uint64,
+        np.float16,
+        np.float32,
+        np.float64,
+        np.complex64,
+        np.complex128,
+        np.longlong,
+        np.ulonglong,
+    }
+    return type(obj) in known_types
 
 
 def is_on_device(

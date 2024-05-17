@@ -31,6 +31,7 @@ from .traits import (
     is_jaxified,
     is_non_string_iterable,
     is_on_device,
+    is_scalar,
 )
 from .util import (
     VALID_JAX_VAR_NAME,
@@ -54,6 +55,7 @@ __all__ = [
     "is_fully_addressable",
     "is_non_string_iterable",
     "is_on_device",
+    "is_scalar",
     "get_jax_var_name",
     "get_jax_var_shape",
     "get_jax_var_dtype",
