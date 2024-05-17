@@ -144,10 +144,12 @@ def test_decorator_double_annot():
     assert (
         lower_cnt[0] == 1
     ), f"Annotated right after each other, but lowered {lower_cnt[0]} times instead of once."
+    assert lower_cnt[1] == 0
 
     # Now modify the state in between.
     jaceWrapped2_1 = jace.jit(testee2)
     lower2_1 = jaceWrapped2_1.lower(A, B)
+    assert lower_cnt[1] == 1
 
     @jace.translator.add_fsubtranslator("non_existing_primitive")
     def non_existing_primitive_translator(
@@ -159,6 +161,12 @@ def test_decorator_double_annot():
     ) -> dace.SDFGState | None:
         raise NotImplementedError
 
+    # Now lets lower the version 1 again to see if something has changed.
+    assert lower1_1 is jaceWrapped1_1.lower(A, B)
+    assert lower1_2 is jaceWrapped1_2.lower(A, B)
+    assert lower_cnt[0] == 1
+
+    # Now lets nower the second version 2 test.
     jaceWrapped2_2 = jace.jit(testee2)
     lower2_2 = jaceWrapped2_2.lower(A, B)
     assert lower2_1 is not lower2_2
