@@ -18,7 +18,7 @@ from __future__ import annotations
 import itertools
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, overload
+from typing import Any
 
 import dace
 import jax.core as jax_core
@@ -28,25 +28,38 @@ import numpy as np
 import jace.util as util
 
 
-@dataclass(init=True, repr=True, frozen=True, eq=False)
+@dataclass(repr=True, frozen=True, eq=False)
 class JaCeVar:
-    """Substitute class for Jax' `Var` instance.
+    """Replacement for the `jax.Var` class.
 
     This class can be seen as some kind of substitute `jax.core.Var`.
     The main intention of this class is as an internal representation of values,
     as they are used in Jax, but without the Jax machinery.
-    The main differences to Jax variable is that this class has a name.
+    The main difference is, that this class also carries a `strides` and a `name` member,
+    this can be used to influence how `JaxprTranslationDriver::add_array()` works.
 
     Notes:
         Main intention is to test functionality.
         If the name of a `JaCeVar` is '_' it is considered a drop variable.
         If the name of a `JaCeVar` is empty, the automatic naming will consider it as a Jax variable.
-        The definition of `__hash__` and `__eq__` is in accordance how Jax variable works.
+        The definitions of `__hash__` and `__eq__` are in accordance how Jax variable works.
     """
 
-    name: str
     shape: tuple[int | dace.symbol | str, ...]
     dtype: dace.typeclass
+    strides: tuple[int | dace.symbol | str, ...] | None = None
+    name: str | None = None
+
+    def __post_init__(self) -> None:
+        """Sanity checks."""
+        if not ((self.name is None) or util.VALID_SDFG_VAR_NAME.fullmatch(self.name)):
+            raise ValueError(f"Supplied the invalid name '{self.name}'.")
+        if (self.strides is not None) and (len(self.strides) != len(self.shape)):
+            raise ValueError(
+                f"Passed strides of rank {len(self.strides)}, but shape had rank {len(self.shape)}."
+            )
+        if not isinstance(self.dtype, dace.typeclass):  # To typechecking yet.
+            raise TypeError(f"'dtype' is not a 'dace.typeclass' but '{type(self.dtype).__name__}'.")
 
     def __hash__(self) -> int:
         return id(self)
@@ -57,51 +70,32 @@ class JaCeVar:
         return id(self) == id(other)
 
 
-def get_jax_var_name(jax_var: jax_core.Atom | JaCeVar | str) -> str:
+def get_jax_var_name(jax_var: jax_core.Atom | JaCeVar) -> str:
     """Returns the name of the Jax variable as a string.
 
     Args:
         jax_var:     The variable to stringify.
 
     Notes:
-        Due to some modification in Jax itself, this function is unable to return "proper" variable names.
-        This function is subject for removal.
+        If `jax_var` is a `JaCeVar` the function will return, if defined, its `.name` property.
+            Otherwise it will compose a name similar to Jax `Var` objects.
+        The returned names are stable, i.e. it will output the same value for the same variable.
+        The returned name passes the `util.VALID_SDFG_VAR_NAME` pattern.
     """
-
     match jax_var:
         case jax_core.DropVar():
             return "_"
         case JaCeVar():
-            # In case of an empty name consider the jace variable as a Jax variable.
-            #  This is mostly for testing.
-            jax_name = f"jax{id(jax_var)}" if jax_var.name == "" else jax_var.name
+            return jax_var.name if jax_var.name else f"jax{id(jax_var)}"
         case jax_core.Var():
-            # This stopped working after version 0.20.4, because of some changes in Jax
-            #  See `https://github.com/google/jax/pull/10573` for more information.
-            #  The following implementation will generate stable names, however, they will be decoupled
-            #  from output of the pretty printed Jaxpr
-            jax_name = f"jax{jax_var.count}{jax_var.suffix}"
+            # This is not how the pretty printer works nor Jax.Var.__repr__, but leads to stable names that can be used.
+            return f"jax{jax_var.count}{jax_var.suffix}"
         case jax_core.Literal():
             raise TypeError("Can not derive a name from a Jax Literal.")
-        case str():
-            jax_name = jax_var
         case _:
             raise TypeError(
                 f"Does not know how to transform '{jax_var}' (type: '{type(jax_var).__name__}') into a string."
             )
-    assert isinstance(jax_name, str)
-
-    if not util.VALID_JAX_VAR_NAME.fullmatch(jax_name):
-        raise ValueError(f"Deduced Jax name '{jax_name}' is invalid.")
-    return jax_name
-
-
-@overload
-def get_jax_var_shape(jax_var: JaCeVar) -> tuple[int | dace.symbol | str, ...]: ...  # type: ignore[overload-overlap]
-
-
-@overload
-def get_jax_var_shape(jax_var: jax_core.Atom) -> tuple[int, ...]: ...
 
 
 def get_jax_var_shape(jax_var: jax_core.Atom | JaCeVar) -> tuple[int | dace.symbol | str, ...]:
@@ -117,6 +111,22 @@ def get_jax_var_shape(jax_var: jax_core.Atom | JaCeVar) -> tuple[int | dace.symb
             return jax_var.shape
         case _:
             raise TypeError(f"'get_jax_var_shape()` is not implemented for '{type(jax_var)}'.")
+
+
+def get_jax_var_strides(
+    jax_var: jax_core.Atom | JaCeVar,
+) -> tuple[int | dace.symbol | str, ...] | None:
+    """Returns the stride of `jax_var`.
+
+    If there is no stride specified return `None`.
+    """
+    match jax_var:
+        case jax_core.Var() | jax_core.Literal():
+            return getattr(jax_var.aval, "strides", None)
+        case JaCeVar():
+            return jax_var.strides
+        case _:
+            raise TypeError(f"'get_jax_var_strides()` is not implemented for '{type(jax_var)}'.")
 
 
 def get_jax_var_dtype(jax_var: jax_core.Atom | JaCeVar) -> dace.typeclass:
@@ -183,42 +193,44 @@ def translate_dtype(dtype: Any) -> dace.typeclass:
 
 def propose_jax_name(
     jax_var: jax_core.Atom | JaCeVar,
-    jax_name_map: Mapping[jax_core.Var | JaCeVar, Any] | None = None,
+    jax_name_map: Mapping[jax_core.Var | JaCeVar, str] | None = None,
 ) -> str:
     """Proposes a variable name for `jax_var`.
 
-    There are two modes for proposing new names.
-    In the first mode, `get_jax_var_name()` is used to derive a name.
-    The second mode, proposes a name based on all names that are already known,
-    this leads to names similar to the ones used by Jax.
+    If `jax_name_map` is `None` then the function will fallback to `get_jax_var_name()`.
+    If `jax_name_map` is supplied the function will:
+    - if `jax_var` is stored inside the mapping that value will be returned.
+    - if `jax_var` is a `JaCeVar` with a set `.name` property it will be returned.
+    - otherwise the function will generate a new name similar to how the pretty printer of Jaxpr works.
 
     Args:
         jax_var:        The variable for which a name to propose.
         jax_name_map:   A mapping of all Jax variables that were already named.
 
     Notes:
-        The second mode is activated by passing `jax_name_map` as argument.
-        The naming of variables are only consistent with the inner most Jaxpr a variable is defined in.
+        The function guarantees that the returned name passes `VALID_SDFG_VAR_NAME` test
+            and that the name is not part of `util.FORBIDDEN_SDFG_VAR_NAMES`.
         Dropped variables will always be named `'_'`.
-        If `jax_var` is already inside `jax_name_map` that name will be returned.
     """
-    if util.is_drop_var(jax_var):
-        return "_"
     if isinstance(jax_var, jax_core.Literal):
         raise TypeError(f"Can not propose a name for literal '{jax_var}'.")
-    if jax_name_map is None:
+    if util.is_drop_var(jax_var) or (jax_name_map is None):
         return get_jax_var_name(jax_var)
     if jax_var in jax_name_map:
         return jax_name_map[jax_var]
-    if isinstance(jax_var, JaCeVar) and (jax_var.name != ""):
-        # If the name of the JaCe variable is empty, then use the name proposing
-        #  technique used for Jax variables; Mostly used for debugging.
+    if isinstance(jax_var, JaCeVar) and (jax_var.name is not None):
         return jax_var.name
 
-    # This code is taken from the Jax source.
+    # We have the set of all previous names, so we generate names
+    #  in the same way as Jax does:
     c = len(jax_name_map)
     jax_name = ""
     while len(jax_name) == 0 or c != 0:
         c, i = c // 26, c % 26
         jax_name = chr(97 + i % 26) + jax_name
-    return jax_name + getattr(jax_var, "suffix", "")
+    jax_name = jax_name + getattr(jax_var, "suffix", "")
+
+    if jax_name is util.FORBIDDEN_SDFG_VAR_NAMES:
+        jax_name = f"__jace_forbidden_{jax_name}"
+        assert jax_name not in util.FORBIDDEN_SDFG_VAR_NAMES
+    return jax_name

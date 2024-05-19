@@ -13,6 +13,7 @@ from collections.abc import Iterable
 from typing import Any, TypeGuard
 
 import dace
+import jax
 import numpy as np
 from jax import _src as jax_src, core as jax_core
 from jaxlib import xla_extension as jax_xe
@@ -74,21 +75,20 @@ def is_jaxified(
 
 def is_jax_array(
     obj: Any,
-) -> bool:
+) -> TypeGuard[jax.Array]:
     """Tests if `obj` is a jax array.
 
-    Todo:
-        Find the Jax type for `TypeGuard`.
+    Notes jax array are special, you can not write to them directly.
+    Furthermore, they always allocate also on GPU, beside the CPU allocation.
     """
-    # Currently this seams to be the besst way to identify Jax arrays.
-    return all(hasattr(obj, x) for x in ["sharding", "is_fully_addressable"])
+    return isinstance(obj, jax.Array)
 
 
 def is_array(
     obj: Any,
 ) -> bool:
     """Identifies arrays, this also includes Jax arrays."""
-    return is_jax_array(obj) or dace.is_array(obj)
+    return dace.is_array(obj) or is_jax_array(obj)
 
 
 def is_scalar(
@@ -126,11 +126,17 @@ def is_scalar(
 def is_on_device(
     obj: Any,
 ) -> bool:
-    """Tests if `obj` is on a device."""
-    # The problem is, that we can not test if `__cuda_array_interface__` exists.
-    #  because Jax array have that even on CPU, thus it is a bit mnore complex.
+    """Tests if `obj` is on a device.
+
+    Jax arrays are always on the CPU and GPU (if there is one).
+    Thus for Jax arrays this function is more of a test, if there is a GPU or not.
+    """
     if is_jax_array(obj):
-        obj = obj.__array__(copy=False)
+        try:
+            _ = obj.__cuda_array_interface__
+            return True
+        except AttributeError:
+            return False
     return dace.is_gpu_array(obj)
 
 
