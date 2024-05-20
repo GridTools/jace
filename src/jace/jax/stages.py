@@ -24,10 +24,10 @@ As in Jax Jace has different stages, the terminology is taken from [Jax' AOT-Tut
 from __future__ import annotations
 
 import copy
-import json
 from collections.abc import Callable, Mapping, Sequence
-from typing import TYPE_CHECKING, Any, Final
+from typing import Any, Final
 
+import dace
 import jax as jax_jax
 from jax.stages import CompilerOptions
 
@@ -35,10 +35,6 @@ from jace import optimization, translator, util
 from jace.jax import translation_cache as tcache
 from jace.translator import post_translation as ptrans
 from jace.util import dace_helper as jdace
-
-
-if TYPE_CHECKING:
-    pass
 
 
 class Stage:
@@ -68,13 +64,7 @@ class JaceWrapped(Stage):
     _fun: Callable
     _sub_translators: Mapping[str, translator.PrimitiveTranslator]
     _jit_ops: Mapping[str, Any]
-
-    # Managed by the caching infrastructure and only defined during `lower()`.
-    #  If defined it contains an abstract description of the function arguments.
-    _call_description: tcache.CallArgsDescription | None = None
-
-    # Cache for the lowering. Managed by the caching infrastructure.
-    _cache: tcache.TranslationCache | None = None
+    _cache: tcache.TranslationCache
 
     def __init__(
         self,
@@ -100,6 +90,7 @@ class JaceWrapped(Stage):
         self._sub_translators = dict(sub_translators)
         self._jit_ops = dict(jit_ops)
         self._fun = fun
+        self._cache = tcache.get_cache(self)
 
     def __call__(
         self,
@@ -152,20 +143,31 @@ class JaceWrapped(Stage):
         """Returns the wrapped function."""
         return self._fun
 
+    def _make_call_decscription(
+        self,
+        *args: Any,
+    ) -> tcache.CachedCallDescription:
+        """This function computes the key for the `JaceWrapped.lower()` call.
+
+        Currently it is only able to handle positional argument and does not support static arguments.
+        The function will fully abstractify its input arguments.
+        This function is used by the cache to generate the key.
+        """
+        fargs = tuple(tcache._AbstarctCallArgument.from_value(x) for x in args)
+        return tcache.CachedCallDescription(stage_id=id(self), fargs=fargs)
+
 
 class JaceLowered(Stage):
     """Represents the original computation that was lowered to SDFG."""
-
-    # `self` assumes complete ownership of the
-    _trans_sdfg: translator.TranslatedJaxprSDFG
-
-    # Cache for the compilation. Managed by the caching infrastructure.
-    _cache: tcache.TranslationCache | None = None
 
     DEF_COMPILER_OPTIONS: Final[dict[str, Any]] = {
         "auto_optimize": True,
         "simplify": True,
     }
+
+    # `self` assumes complete ownership of the
+    _trans_sdfg: translator.TranslatedJaxprSDFG
+    _cache: tcache.TranslationCache
 
     def __init__(
         self,
@@ -179,11 +181,12 @@ class JaceLowered(Stage):
         if trans_sdfg.out_names is None:
             raise ValueError("Output names must be defined.")
         self._trans_sdfg = trans_sdfg
+        self._cache = tcache.get_cache(self)
 
     @tcache.cached_translation
     def compile(
         self,
-        compiler_options: CompilerOptions | None = None,  # Unused arguments
+        compiler_options: CompilerOptions | None = None,
     ) -> JaceCompiled:
         """Compile the SDFG.
 
@@ -234,28 +237,33 @@ class JaceLowered(Stage):
         """
         self.compiler_ir().sdfg.view(filename=filename, verbose=False)
 
-    def as_text(self, dialect: str | None = None) -> str:
-        """Textual representation of the SDFG.
+    def as_sdfg(self) -> dace.SDFG:
+        """Returns the encapsulated SDFG.
 
-        By default, the function will return the Json representation of the SDFG.
-        However, by specifying `'html'` as `dialect` the function will call `view()` on the underlying SDFG.
-
-        Notes:
-            You should prefer `self.as_html()` instead of this function.
+        It is an error to modify the returned object.
         """
-        if (dialect is None) or (dialect.upper() == "JSON"):
-            return json.dumps(self.compiler_ir().sdfg.to_json())
-        if dialect.upper() == "HTML":
-            self.as_html()
-            return ""  # For the interface
-        raise ValueError(f"Unknown dialect '{dialect}'.")
+        return self.compiler_ir().sdfg
 
-    def cost_analysis(self) -> Any | None:
-        """A summary of execution cost estimates.
+    def _make_call_decscription(
+        self,
+        compiler_options: CompilerOptions | None = None,
+    ) -> tcache.CachedCallDescription:
+        """This function computes the key for the `self.compile()` call.
 
-        Not implemented use the DaCe [instrumentation API](https://spcldace.readthedocs.io/en/latest/optimization/profiling.html) directly.
+        The function only get one argument that is either a `dict` or a `None`, where `None` means `use default argument.
+        The function will construct a concrete description of the call using `(name, value)` pairs.
+        This function is used by the cache.
         """
-        raise NotImplementedError()
+        if compiler_options is None:  # Must be the same as in `compile()`!
+            compiler_options = self.DEF_COMPILER_OPTIONS
+        assert isinstance(compiler_options, dict)
+        fargs: tuple[tuple[str, tcache._ConcreteCallArgument], ...] = tuple(
+            sorted(
+                ((argname, argvalue) for argname, argvalue in compiler_options.items()),
+                key=lambda X: X[0],
+            )
+        )
+        return tcache.CachedCallDescription(stage_id=id(self), fargs=fargs)
 
 
 class JaceCompiled(Stage):

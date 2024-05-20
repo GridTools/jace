@@ -21,7 +21,7 @@ from abc import abstractmethod
 from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Protocol, TypeAlias, runtime_checkable
+from typing import TYPE_CHECKING, Any, Final, Protocol, TypeAlias, runtime_checkable
 
 import dace
 from jax import core as jax_core
@@ -31,6 +31,12 @@ from jace import util
 
 if TYPE_CHECKING:
     from jace.jax import stages
+
+# This is the default cache size we are using
+_DEF_CACHE_SIZE: Final[int] = 256
+
+# This are the caches that we are using.
+_TRANSLATION_CACHES: dict[type[stages.Stage], TranslationCache] = {}
 
 
 def cached_translation(
@@ -55,35 +61,17 @@ def cached_translation(
 
     @ft.wraps(action)
     def _action_wrapper(
-        self: stages.Stage,
+        self: stages.JaceWrapped | stages.JaceLowered,
         *args: Any,
         **kwargs: Any,
     ) -> stages.Stage:
-        # If not initialized initialize the cache.
-        assert hasattr(self, "_cache")  # Needed to make mypy silent
-        if self._cache is None:
-            self._cache = _get_cache(self)
-
-        # Get the key (abstract description of the call).
-        key: CachedCallDescription = self._cache.make_key(self, *args, **kwargs)
+        # Get the abstract description of the call, that is used as key.
+        key: CachedCallDescription = self._make_call_decscription(*args, **kwargs)
         if self._cache.has(key):
             return self._cache.get(key)
 
         # We must actually perform the call
-        try:
-            if hasattr(self, "_call_description"):
-                assert (
-                    self._call_description is None
-                ), f"call description already set for `{self}` (probably another call going on?)."
-                self._call_description = key.fargs
-            next_stage: stages.Stage = action(self, *args, **kwargs)
-        finally:
-            # If I would cache the result from above and store and then use here,
-            #  mypy would complain, thus we have to do it twice.
-            if hasattr(self, "_call_description"):
-                self._call_description = None
-
-        # Store the result.
+        next_stage: stages.Stage = action(self, *args, **kwargs)
         self._cache.add(key, next_stage)
         return next_stage
 
@@ -92,32 +80,18 @@ def cached_translation(
 
 def clear_translation_cache() -> None:
     """Clear all caches associated to translation."""
-
-    if not hasattr(_get_cache, "_caches"):
-        return
-    _get_cache._caches.clear()
-    return
+    _TRANSLATION_CACHES.clear()
 
 
-def _get_cache(
-    self: stages.Stage,
-    size: int = 128,
+def get_cache(
+    stage: stages.Stage,
 ) -> TranslationCache:
-    """Returns the cache associated to `name`.
-
-    If called for the first time, the cache sizes will be set to `size`.
-    In all later calls this value is ignored.
-    """
-    # Get the caches and if not present, create them.
-    if not hasattr(_get_cache, "_caches"):
-        _caches: dict[type[stages.Stage], TranslationCache] = {}
-        _get_cache._caches = _caches  # type: ignore[attr-defined]
-    _caches = _get_cache._caches  # type: ignore[attr-defined]
-
-    if type(self) not in _caches:
-        _caches[type(self)] = TranslationCache(size=size)
-
-    return _caches[type(self)]
+    """Returns the cache that is used for `stage`."""
+    # The caches are per stage and not per instance basis
+    tstage = type(stage)
+    if tstage not in _TRANSLATION_CACHES:
+        _TRANSLATION_CACHES[tstage] = TranslationCache(size=_DEF_CACHE_SIZE)
+    return _TRANSLATION_CACHES[tstage]
 
 
 @dataclass(init=True, eq=True, frozen=True)
@@ -172,27 +146,7 @@ class _AbstarctCallArgument:
 
             return cls(shape=shape, dtype=dtype, strides=strides, storage=storage)
 
-        if isinstance(val, jax_core.ConcreteArray):
-            return cls.from_value(val.val)
-
-        if isinstance(val, jax_core.ShapedArray):
-            shape = val.aval.shape
-            dtype = val.aval.dtype
-            strides = None
-            storage = (
-                dace.StorageType.GPU_Global
-                if util.is_on_device(val.val)
-                else dace.StorageType.CPU_Heap
-            )
-
-            return cls(shape=shape, dtype=dtype, strides=strides, storage=storage)
-
-        if isinstance(val, jax_core.AbstractValue):
-            raise TypeError(f"Can not make 'JaCeVar' from '{type(val).__name__}', too abstract.")
-
-        # If we are here, then we where not able, thus we will will now try Jax
-        #  This is inefficient and we should make it better.
-        return cls.from_value(jax_core.get_aval(val))
+        raise TypeError(f"Can not make 'an abstract description from '{type(val).__name__}'.")
 
 
 @runtime_checkable
@@ -247,65 +201,10 @@ class CachedCallDescription:
     Todo:
         - pytrees.
         - Turn the references into week references, Jax does this and I am sure there is a reason for it.
-        - Turn this into a strategy.
     """
 
     stage_id: int
     fargs: CallArgsDescription
-
-    @classmethod
-    def make_call_description(
-        cls,
-        stage: stages.Stage,
-        *args: Any,
-        **kwargs: Any,
-    ) -> CachedCallDescription:
-        """Creates an abstract description of the call."""
-        from jace.jax import stages  # Cyclic import
-
-        if isinstance(stage, stages.JaceWrapped):
-            # JaceWrapped.lower() to JaceLowered
-
-            if len(kwargs) != 0:
-                raise NotImplementedError("'kwargs' are not implemented in 'JaceWrapped.lower()'.")
-
-            # Currently we only allow positional arguments and no static arguments.
-            #   Thus the function argument part of the key only consists of abstract arguments.
-            fargs: tuple[_AbstarctCallArgument, ...] = tuple(
-                _AbstarctCallArgument.from_value(x) for x in args
-            )
-
-        elif isinstance(stage, stages.JaceLowered):
-            # JaceLowered.compile() to JaceCompiled
-
-            #   We only accepts compiler options, which the Jax interface mandates
-            #   are inside a `dict` thus we will get at most one argument.
-            if len(kwargs) != 0:
-                raise ValueError(
-                    "All arguments to 'JaceLowered.compile()' must be inside a 'dict'."
-                )
-            if len(args) >= 2:
-                raise ValueError("Only a 'dict' is allowed as argument to 'JaceLowered.compile()'.")
-            if (len(args) == 0) or (args[0] is None):
-                # Currently we consider no argument and `None` as "use the default argument".
-                #  Which is what Jax does.
-                comp_ops: stages.CompilerOptions = stages.JaceLowered.DEF_COMPILER_OPTIONS
-            else:
-                comp_ops = args[0]
-
-            # We will now make `(argname, argvalue)` pairs and sort them according to `argname`.
-            #  This guarantees a stable order.
-            fargs: tuple[tuple[str, _ConcreteCallArgument], ...] = tuple(  # type: ignore[no-redef]  # Type confusion.
-                sorted(
-                    ((argname, argvalue) for argname, argvalue in comp_ops.items()),
-                    key=lambda X: X[0],
-                )
-            )
-
-        else:
-            raise TypeError(f"Can not make key from '{type(stage).__name__}'.")
-
-        return cls(stage_id=id(stage), fargs=fargs)
 
 
 class TranslationCache:
@@ -326,33 +225,22 @@ class TranslationCache:
 
     def __init__(
         self,
-        size: int = 128,
+        size: int,
     ) -> None:
-        """Creates a cache instance of size `size`."""
+        """Creates a cache instance of size.
+
+        The cache will have size `size` and use `key` as key function.
+        """
         if size <= 0:
             raise ValueError(f"Invalid cache size of '{size}'")
         self._memory: OrderedDict[CachedCallDescription, stages.Stage] = OrderedDict()
         self._size = size
 
-    @staticmethod
-    def make_key(
-        stage: stages.Stage,
-        *args: Any,
-        **kwargs: Any,
-    ) -> CachedCallDescription:
-        """Create a key object for `stage`."""
-        return CachedCallDescription.make_call_description(stage, *args, **kwargs)
-
     def has(
         self,
         key: CachedCallDescription,
     ) -> bool:
-        """Check if `self` have a record of `key`.
-
-        Notes:
-            For generating `key` use the `make_key()` function.
-            This function will not modify the order of the cached entries.
-        """
+        """Check if `self` have a record of `key`."""
         return key in self._memory
 
     def get(
@@ -368,18 +256,14 @@ class TranslationCache:
         if not self.has(key):
             raise KeyError(f"Key '{key}' is unknown.")
         self._memory.move_to_end(key, last=True)
-        return self._memory.get(key)  # type: ignore[return-value]  # type confusion
+        return self._memory[key]
 
     def add(
         self,
         key: CachedCallDescription,
         res: stages.Stage,
     ) -> TranslationCache:
-        """Adds `res` under `key` to `self`.
-
-        Notes:
-            It is not an error if if `key` is already present.
-        """
+        """Adds `res` under `key` to `self`."""
         if self.has(key):
             # `key` is known, so move it to the end and update the mapped value.
             self._memory.move_to_end(key, last=True)
@@ -395,23 +279,18 @@ class TranslationCache:
     def _evict(
         self,
         key: CachedCallDescription | None,
-    ) -> bool:
-        """Evict `key` from `self` and return `True`.
+    ) -> None:
+        """Evict `key` from `self`.
 
-        In case `key` is not known the function returns `False`.
-        If `key` is `None` then evict the oldest one unconditionally.
+        If `key` is `None` the oldest entry is evicted.
         """
+        if len(self._memory) == 0:
+            return
         if key is None:
-            if len(self._memory) == 0:
-                return False
             self._memory.popitem(last=False)
-            return True
-
-        if not self.has(key):
-            return False
-        self._memory.move_to_end(key, last=False)
-        self._memory.popitem(last=False)
-        return True
+        elif self.has(key):
+            self._memory.move_to_end(key, last=False)
+            self._memory.popitem(last=False)
 
     def __repr__(self) -> str:
         """Textual representation for debugging."""
