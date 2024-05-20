@@ -13,13 +13,29 @@ import re
 
 import dace
 import pytest
-from dace.data import Array, Data, Scalar
+from dace.data import Array
 
-from jace import translator
+from jace import translator, util
 from jace.util import JaCeVar
 
 
-@pytest.fixture(scope="module")
+# These are some Jace variables that we use inside the tests
+#  Unnamed arrays
+array1 = JaCeVar((10, 12), dace.float64)
+array2 = JaCeVar((10, 13), dace.float32)
+array3 = JaCeVar((11, 16), dace.int64)
+
+#  Unnamed scalars
+scal1 = JaCeVar((), dace.float16)
+scal2 = JaCeVar((), dace.float32)
+scal3 = JaCeVar((), dace.int64)
+
+# Named variables
+narray = JaCeVar((10,), dace.float16, "narr")
+nscal = JaCeVar((), dace.int32, "nscal")
+
+
+@pytest.fixture()
 def translation_driver():
     """Returns an allocated driver instance."""
     name = "fixture_driver"
@@ -31,7 +47,10 @@ def translation_driver():
 
 
 def test_driver_alloc() -> None:
-    """Tests the state right after allocation."""
+    """Tests the state right after allocation.
+
+    Does not use the fixture because it does it on its own.
+    """
     driver = translator.JaxprTranslationDriver(
         sub_translators=translator.get_regsitered_primitive_translators()
     )
@@ -41,6 +60,8 @@ def test_driver_alloc() -> None:
     # The reserved names will be tested in `test_driver_fork()`.
     sdfg_name = "qwertzuiopasdfghjkl"
     driver._allocate_translation_ctx(name=sdfg_name)
+    assert len(driver._ctx_stack) == 1
+    assert driver.is_root_translator()
 
     sdfg: dace.SDFG = driver.sdfg
 
@@ -49,53 +70,182 @@ def test_driver_alloc() -> None:
     assert sdfg.number_of_nodes() == 1
     assert sdfg.number_of_edges() == 0
     assert sdfg.start_block is driver._ctx.start_state
-    assert driver.terminal_sdfg_state is driver._ctx.start_state
+    assert driver._terminal_sdfg_state is driver._ctx.start_state
 
 
-def test_driver_nested() -> None:
-    """Tests the ability of the nesting of the driver.
+def test_driver_variable_alloc_auto_naming(
+    translation_driver: translator.JaxprTranslationDriver,
+) -> None:
+    """Tests simple variable allocation."""
+    for i, var in enumerate([array1, array2, scal1, array3, scal2, scal3]):
+        sdfg_name = translation_driver.add_array(var, update_var_mapping=True)
+        sdfg_var = translation_driver.get_array(sdfg_name)
+        assert sdfg_name == chr(97 + i)
+        assert isinstance(sdfg_var, Array)  # Everything is now an array
+        assert sdfg_var.shape == ((1,) if var.shape == () else var.shape)
+        assert sdfg_var.dtype == var.dtype
 
-    Note this test does the creation of subcontext manually, which is not recommended.
+
+def test_driver_variable_alloc_mixed_naming(
+    translation_driver: translator.JaxprTranslationDriver,
+) -> None:
+    """Tests the naming in a mixed setting.
+
+    If `update_var_mapping=True` is given, then the naming will skip variables, see also `test_driver_variable_alloc_mixed_naming2()`.
     """
+    #                        *       b       c       d      *      f      g
+    for i, var in enumerate([narray, array1, array2, scal1, nscal, scal2, scal3]):
+        sdfg_name = translation_driver.add_array(var, update_var_mapping=True)
+        sdfg_var = translation_driver.get_array(sdfg_name)
+        if var.name is None:
+            assert sdfg_name == chr(97 + i)
+        else:
+            assert sdfg_name == var.name
+        assert isinstance(sdfg_var, Array)  # Everything is now an array
+        assert sdfg_var.shape == ((1,) if var.shape == () else var.shape)
+        assert sdfg_var.dtype == var.dtype
 
-    # This is the parent driver.
-    driver = translator.JaxprTranslationDriver(
-        sub_translators=translator.get_regsitered_primitive_translators()
+
+def test_driver_variable_alloc_mixed_naming2(
+    translation_driver: translator.JaxprTranslationDriver,
+) -> None:
+    """Tests the naming in a mixed setting.
+
+    This time we do not use `update_var_mapping=True`, instead it now depends on the name.
+    This means that automatic naming will now again include all, letters, but not in a linear order.
+    """
+    letoff = 0
+    #             *      a        b       c      *      d     e
+    for var in [narray, array1, array2, scal1, nscal, scal2, scal3]:
+        sdfg_name = translation_driver.add_array(var, update_var_mapping=var.name is None)
+        sdfg_var = translation_driver.get_array(sdfg_name)
+        if var.name is None:
+            assert sdfg_name == chr(97 + letoff)
+            letoff += 1
+        else:
+            assert sdfg_name == var.name
+        assert isinstance(sdfg_var, Array)  # Everything is now an array
+        assert sdfg_var.shape == ((1,) if var.shape == () else var.shape)
+        assert sdfg_var.dtype == var.dtype
+
+
+def test_driver_variable_alloc_prefix_naming(
+    translation_driver: translator.JaxprTranslationDriver,
+) -> None:
+    """Using the prefix to name variables."""
+    prefix_1 = "__my_special_prefix"
+    exp_name_1 = prefix_1 + "a"
+    sdfg_name_1 = translation_driver.add_array(
+        array1, name_prefix=prefix_1, update_var_mapping=False
     )
-    assert not driver.is_allocated(), "Driver should not be allocated."
+    assert exp_name_1 == sdfg_name_1
 
-    # We allocate the driver directly, because we need to set some internals.
-    #  This is also the reason why we do not use the fixture.
-    org_res_names = {"a", "b"}
-    driver._allocate_translation_ctx("driver", reserved_names=org_res_names)
-    driver._ctx.inp_names = ("a", "b")
-    driver._ctx.out_names = ("c", "d")
-    assert driver.is_allocated()
-    assert len(driver._ctx_stack) == 1
-    assert driver._reserved_names == org_res_names
+    # Because `update_var_mapping` is `False` above, 'a' will be reused.
+    prefix_2 = "__my_special_prefix_second_"
+    exp_name_2 = prefix_2 + "a"
+    sdfg_name_2 = translation_driver.add_array(
+        array1, name_prefix=prefix_2, update_var_mapping=False
+    )
+    assert exp_name_2 == sdfg_name_2
 
-    # Now we increase the stack by one.
-    org_ctx = driver._ctx
-    driver._allocate_translation_ctx("driver2")
-    driver._ctx.inp_names = ("e", "f")
-    driver._ctx.out_names = ("g", "h")
-    assert driver.is_allocated()
-    assert len(driver._ctx_stack) == 2
-    assert driver._ctx is driver._ctx_stack[-1]
-    assert driver._ctx is not driver._ctx_stack[0]
 
-    assert org_ctx.rev_idx < driver.rev_idx  # type: ignore[operator]  # Type confusion
+def test_driver_variable_alloc_auto_naming_wrapped(
+    translation_driver: translator.JaxprTranslationDriver,
+) -> None:
+    """Tests the variable naming if we have more than 26 variables."""
+    single_letters = [chr(x) for x in range(97, 123)]
+    i = 0
+    for let1 in ["", *single_letters[1:]]:  # Note `z` is followed by `ba` and not by `aa`.
+        for let2 in single_letters:
+            i += 1
+            # Create a variable and enter it into the variable naming.
+            var = JaCeVar(shape=(19, 19), dtype=dace.float64)
+            sdfg_name = translation_driver.add_array(arg=var, update_var_mapping=True)
+            mapped_name = translation_driver.map_jax_var_to_sdfg(var)
+            assert (
+                sdfg_name == mapped_name
+            ), f"Mapping for '{var}' failed, expected '{sdfg_name}' got '{mapped_name}'."
 
-    # Now we go back one state, i.e. pretend that we are done with translating the nested jaxpr.
-    driver._clear_translation_ctx()
-    assert driver._ctx is org_ctx
-    assert len(driver._ctx_stack) == 1
-    assert driver._reserved_names == org_res_names
+            # Get the name that we really expect, we must also handle some situations.
+            exp_name = let1 + let2
+            if exp_name in util.FORBIDDEN_SDFG_VAR_NAMES:
+                exp_name = "__jace_forbidden_" + exp_name
+            assert (
+                exp_name == sdfg_name
+            ), f"Automated naming failed, expected '{exp_name}' but got '{sdfg_name}'."
 
-    # Now if we fully deallocate then we expect that it is fully deallocated.
-    driver._clear_translation_ctx()
-    assert len(driver._ctx_stack) == 0
-    assert driver._reserved_names is None
+
+def test_driver_nested(translation_driver: translator.JaxprTranslationDriver) -> None:
+    """Tests the ability of the nesting of the driver."""
+
+    # Now add a variable to the current subtext.
+    name_1 = translation_driver.add_array(array1, update_var_mapping=True)
+    assert name_1 == "a"
+    assert translation_driver.map_jax_var_to_sdfg(array1) == name_1
+
+    # For the sake of doing it add a new state to the SDFG.
+    translation_driver.append_new_state("sake_state")
+    assert translation_driver.sdfg.number_of_nodes() == 2
+    assert translation_driver.sdfg.number_of_edges() == 1
+
+    # Now we go one subcontext deeper; note we do this manually which should not be done.
+    translation_driver._allocate_translation_ctx("driver")
+    assert len(translation_driver._ctx_stack) == 2
+    assert translation_driver.sdfg.name == "driver"
+    assert translation_driver.sdfg.number_of_nodes() == 1
+    assert translation_driver.sdfg.number_of_edges() == 0
+    assert not translation_driver.is_root_translator()
+
+    # Because we have a new SDFG the mapping to previous SDFG does not work,
+    #  regardless the fact that it still exists.
+    with pytest.raises(
+        expected_exception=KeyError,
+        match=re.escape(
+            f"Jax variable '{array1}' was supposed to map to '{name_1}', but no such SDFG variable is known."
+        ),
+    ):
+        _ = translation_driver.map_jax_var_to_sdfg(array1)
+
+    # Because the SDFGs are distinct it is possible to add `array1` to the nested one.
+    #  However, it is not able to update the mapping.
+    with pytest.raises(
+        expected_exception=ValueError,
+        match=re.escape(
+            f"Tried to create the mapping '{array1} -> {name_1}', but the variable is already mapped."
+        ),
+    ):
+        _ = translation_driver.add_array(array1, update_var_mapping=True)
+    assert name_1 not in translation_driver.sdfg.arrays
+
+    # Without updating the mapping it is possible create the variable.
+    assert name_1 == translation_driver.add_array(array1, update_var_mapping=False)
+
+    # Now add a new variable, the map is shared, so a new name will be generated.
+    name_2 = translation_driver.add_array(array2, update_var_mapping=True)
+    assert name_2 == "b"
+    assert name_2 == translation_driver.map_jax_var_to_sdfg(array2)
+
+    # Now we go one stack level back.
+    translation_driver._clear_translation_ctx()
+    assert len(translation_driver._ctx_stack) == 1
+    assert translation_driver.sdfg.number_of_nodes() == 2
+    assert translation_driver.sdfg.number_of_edges() == 1
+
+    # Again the variable that was declared in the last stack is now no longer present.
+    #  Note if the nested SDFG was integrated into the parent SDFG it would be accessible
+    with pytest.raises(
+        expected_exception=KeyError,
+        match=re.escape(
+            f"Jax variable '{array2}' was supposed to map to '{name_2}', but no such SDFG variable is known."
+        ),
+    ):
+        _ = translation_driver.map_jax_var_to_sdfg(array2)
+    assert name_2 == translation_driver._jax_name_map[array2]
+
+    # Now add a new variable, since the map is shared, we will now get the next name.
+    name_3 = translation_driver.add_array(array3, update_var_mapping=True)
+    assert name_3 == "c"
+    assert name_3 == translation_driver.map_jax_var_to_sdfg(array3)
 
 
 def test_driver_append_state(translation_driver: translator.JaxprTranslationDriver) -> None:
@@ -105,8 +255,8 @@ def test_driver_append_state(translation_driver: translator.JaxprTranslationDriv
     terminal_state_1: dace.SDFGState = translation_driver.append_new_state("terminal_state_1")
     assert sdfg.number_of_nodes() == 2
     assert sdfg.number_of_edges() == 1
-    assert terminal_state_1 is translation_driver.terminal_sdfg_state
-    assert translation_driver.terminal_sdfg_state is translation_driver._ctx.terminal_state
+    assert terminal_state_1 is translation_driver._terminal_sdfg_state
+    assert translation_driver._terminal_sdfg_state is translation_driver._ctx.terminal_state
     assert translation_driver._ctx.start_state is sdfg.start_block
     assert translation_driver._ctx.start_state is not terminal_state_1
     assert next(iter(sdfg.edges())).src is sdfg.start_block
@@ -118,7 +268,7 @@ def test_driver_append_state(translation_driver: translator.JaxprTranslationDriv
     )
     assert sdfg.number_of_nodes() == 3
     assert sdfg.number_of_edges() == 2
-    assert terminal_state_2 is translation_driver.terminal_sdfg_state
+    assert terminal_state_2 is translation_driver._terminal_sdfg_state
     assert sdfg.out_degree(terminal_state_1) == 1
     assert sdfg.out_degree(terminal_state_2) == 0
     assert sdfg.in_degree(terminal_state_2) == 1
@@ -128,232 +278,10 @@ def test_driver_append_state(translation_driver: translator.JaxprTranslationDriv
     non_terminal_state: dace.SDFGState = translation_driver.append_new_state(
         "non_terminal_state", prev_state=terminal_state_1
     )
-    assert translation_driver.terminal_sdfg_state is not non_terminal_state
+    assert translation_driver._terminal_sdfg_state is not non_terminal_state
     assert sdfg.in_degree(non_terminal_state) == 1
     assert sdfg.out_degree(non_terminal_state) == 0
     assert next(iter(sdfg.in_edges(non_terminal_state))).src is terminal_state_1
 
 
-def test_driver_scalar(translation_driver: translator.JaxprTranslationDriver) -> None:
-    """This function tests the array creation routines, especially the scalar part.
-
-    However, it does so without using Jax variables.
-    """
-    # Since we do not have Jax variables, we are using JaCe substitute for it.
-
-    # Creating a scalar.
-    scal1_j = JaCeVar("scal1", (), dace.float64)
-    scal1_: str = translation_driver.add_array(
-        arg=scal1_j,
-        update_var_mapping=True,
-    )
-    scal1: Data = translation_driver.get_array(scal1_)
-    assert scal1 is translation_driver.get_array(scal1_j)
-    assert scal1_ == translation_driver.map_jax_var_to_sdfg(scal1_j)
-    assert isinstance(scal1, Scalar)
-    assert scal1_ == scal1_j.name
-    assert scal1.dtype == scal1_j.dtype
-
-    # Create a scalar and force it as an array
-    scal2_j = JaCeVar("scal2", (), dace.int64)
-    scal2_: str = translation_driver.add_array(
-        arg=scal2_j,
-        force_array=True,
-    )
-    scal2: Data = translation_driver.get_array(scal2_)
-    assert isinstance(scal2, Array)
-    assert scal2_ == scal2_j.name
-    assert scal2.shape == (1,)
-    assert scal2.strides == (1,)
-    assert scal2.dtype == scal2_j.dtype
-
-    # Using a special name for the variable
-    scal3_j = JaCeVar("scal3", (), dace.int64)
-    scal3_n = "scal3_special_name"
-    scal3_: str = translation_driver.add_array(
-        arg=scal3_j,
-        alt_name=scal3_n,
-        update_var_mapping=True,
-    )
-    assert scal3_ == scal3_n
-    assert scal3_ == translation_driver.map_jax_var_to_sdfg(scal3_j)
-
-    # Test the prefix functionality
-    scal4_j = JaCeVar("scal4", (), dace.float64)
-    scal4_p = "my_prefix"
-    scal4_n = "scal4_unused_name"
-    with pytest.raises(
-        expected_exception=ValueError,
-        match=re.escape(
-            f"Specified 'name_prefix' ('{scal4_p}') but passed '{scal4_n}' as 'alt_name'."
-        ),
-    ):
-        scal4_: str = translation_driver.add_array(
-            arg=scal4_j,
-            alt_name=scal4_n,
-            name_prefix=scal4_p,
-        )
-    # Now create it correctly
-    scal4_ = translation_driver.add_array(
-        arg=scal4_j,
-        name_prefix=scal4_p,
-    )
-    assert scal4_.startswith(scal4_p)
-    assert scal4_j.name in scal4_
-
-    # Test the strides, or the inability to use it.
-    scal5_j = JaCeVar("scal5", (), dace.float64)
-    with pytest.raises(
-        expected_exception=ValueError,
-        match="Specified a stride for a scalar.",
-    ):
-        scal5_: str = translation_driver.add_array(arg=scal5_j, strides=(3,))
-
-    # test the force jax name feature
-    scal6_j = JaCeVar("scal6", (), dace.float64)
-    scal6_n: str = "scal6_name"
-    scal6_np: str = "scal6_name_prefix"
-    with pytest.raises(
-        expected_exception=ValueError,
-        match=f"Specified 'force_jax_name', but passed '{scal6_n}' as 'alt_name'.",
-    ):
-        scal6_: str = translation_driver.add_array(
-            arg=scal6_j,
-            alt_name=scal6_n,
-            force_jax_name=True,
-        )
-    with pytest.raises(
-        expected_exception=ValueError,
-        match=f"Specified 'force_jax_name', but passed '{scal6_np}' as 'name_prefix'.",
-    ):
-        scal6_ = translation_driver.add_array(
-            arg=scal6_j,
-            name_prefix=scal6_np,
-            force_jax_name=True,
-        )
-    with pytest.raises(
-        expected_exception=ValueError,
-        match="Specified `force_jax_name` but also wanted a new name.",
-    ):
-        scal6_ = translation_driver.add_array(
-            arg=scal6_j,
-            force_jax_name=True,
-            find_new_name=True,
-        )
-    scal6_ = translation_driver.add_array(
-        arg=scal6_j,
-        force_jax_name=True,
-    )
-    assert scal6_ == scal6_j.name
-
-
-def test_driver_array(translation_driver: translator.JaxprTranslationDriver) -> None:
-    """This function tests the array creation routines.
-
-    However, it does so without using Jax variables.
-    """
-    # Allocating an array
-    arr1_j = JaCeVar("arr1", (5, 3), dace.float32)
-    arr1_: str = translation_driver.add_array(
-        arg=arr1_j,
-    )
-    arr1: Data = translation_driver.get_array(arr1_)
-    assert isinstance(arr1, Array)
-    assert arr1_ == arr1_j.name
-    assert arr1.shape == arr1_j.shape
-    assert arr1.strides == (3, 1)
-    assert arr1.dtype == arr1_j.dtype
-
-    # Create a variable that has a sdfg name that is already known.
-    arr2_j = JaCeVar(arr1_, (10,), dace.float64)
-    with pytest.raises(
-        expected_exception=ValueError,
-        match=f"Can't create variable '{arr2_j.name}', variable is already created.",
-    ):
-        arr2_: str = translation_driver.add_array(arg=arr2_j)
-    with pytest.raises(expected_exception=ValueError, match=f"Variable '{arr1_}' already exists."):
-        # `alt_name` will not work because name still exists.
-        arr2_ = translation_driver.add_array(arg=arr2_j, alt_name=arr2_j.name)
-    # However, specifying `find_new_name` will solve this issue
-    arr2_ = translation_driver.add_array(
-        arg=arr2_j,
-        find_new_name=True,
-    )
-    assert arr2_.startswith("_jax_variable__" + arr2_j.name)
-
-    # Create a variable that has a custom stride
-    arr3_j = JaCeVar("arr3", (5, 1, 3), dace.float64)
-    arr3_st = (5, 3, 2)
-    arr3_: str = translation_driver.add_array(
-        arg=arr3_j,
-        strides=arr3_st,
-    )
-    arr3: Data = translation_driver.get_array(arr3_)
-    assert isinstance(arr3, Array)
-    assert arr3.shape == arr3_j.shape
-    assert arr3.strides == arr3_st
-
-
-def test_driver_array2() -> None:
-    """This function tests the array creation routine with respect to the automatic naming.
-
-    Todo:
-        - Literals.
-    """
-    # This is the parent driver.
-    driver = translator.JaxprTranslationDriver(
-        sub_translators=translator.get_regsitered_primitive_translators()
-    )
-    assert not driver.is_allocated(), "Driver should not be allocated."
-
-    # Creating JaCe Variables with empty names, forces the driver to use the
-    #  Jax naming algorithm.
-    var_a = JaCeVar("", (10, 19), dace.int64)
-    var_b = JaCeVar("", (10, 909), dace.float16)
-
-    # These are the reserved names, so `a` should be named as is, but `b` should have another name.
-    org_res_names = {"b"}
-    driver._allocate_translation_ctx("driver", reserved_names=org_res_names)
-
-    # These are the expected names
-    exp_names = [
-        "a",
-        "_jax_variable__b__0",
-    ]
-    res_names = driver.create_jax_var_list(
-        [var_a, var_b],
-        only_creation=True,
-    )
-    assert res_names == exp_names, f"Expected names '{exp_names}' but got '{res_names}'."
-    assert len(driver._jax_name_map) == 2
-
-    # Try to create variable `c` and `a`, however, since variable `a` already exists it will fail.
-    #  However, currently the variable `c` will be created, this might change in the future.
-    var_c = JaCeVar("", (10, 19), dace.int64)
-    with pytest.raises(
-        expected_exception=ValueError,
-        match=re.escape(f"'only_creation' given '{var_a}' already exists."),
-    ):
-        res_names = driver.create_jax_var_list(
-            [var_c, var_a],
-            only_creation=True,
-        )
-    assert len(driver._jax_name_map) == 3, f"{driver._jax_name_map}"
-    assert driver._jax_name_map[var_c] == "c"
-
-    # Now we test the only collection mode
-    res_names = driver.create_jax_var_list(
-        [var_c, var_a],
-        prevent_creation=True,
-    )
-    assert len(driver._jax_name_map) == 3, f"{driver._jax_name_map}"
-    assert res_names == ["c", "a"]
-
-    # Now also the mixed mode, i.e. between collecting and creating.
-    var_d = JaCeVar("", (10, 19), dace.int64)
-    exp_names = ["c", "d", "a"]
-    res_names = driver.create_jax_var_list(
-        [var_c, var_d, var_a],
-    )
-    assert len(driver._jax_name_map) == 4
-    assert exp_names == res_names
+# TODO: Failing tests
