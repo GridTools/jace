@@ -13,8 +13,8 @@ If not specified the content of this list is used to perform the translation.
 
 from __future__ import annotations
 
-from collections.abc import Callable, MutableMapping, Mapping
-from typing import TYPE_CHECKING, Literal, cast, overload
+from collections.abc import Callable, Mapping, MutableMapping
+from typing import TYPE_CHECKING, cast
 
 
 if TYPE_CHECKING:
@@ -22,27 +22,6 @@ if TYPE_CHECKING:
 
 # These are the currently active primitive translators of JaCe.
 _PRIMITIVE_TRANSLATORS_DICT: dict[str, translator.PrimitiveTranslatorCallable] = {}
-
-
-@overload
-def register_primitive_translator(
-    prim_translator: Literal[None] = None,
-    /,
-    primitive: str | None = None,
-    overwrite: bool = False,
-) -> Callable[
-    [translator.PrimitiveTranslator | translator.PrimitiveTranslatorCallable],
-    translator.PrimitiveTranslator,
-]: ...
-
-
-@overload
-def register_primitive_translator(
-    prim_translator: translator.PrimitiveTranslator | translator.PrimitiveTranslatorCallable,
-    *,
-    primitive: str | None = None,
-    overwrite: bool = False,
-) -> translator.PrimitiveTranslator: ...
 
 
 def register_primitive_translator(
@@ -107,3 +86,16 @@ def get_regsitered_primitive_translators() -> (
     This means that calls to `register_primitive_translator()` does not modify the returned object.
     """
     return _PRIMITIVE_TRANSLATORS_DICT.copy()
+
+
+def set_active_primitive_translators_to(
+    new_translators: Mapping[str, translator.PrimitiveTranslatorCallable],
+) -> None:
+    """Exchange the currently active subtranslators in Jace with the one inside `new_translators`.
+
+    This function allows you to restore a specific state that was obtained by a previous call to `get_regsitered_primitive_translators()`.
+    The function is mainly intended for debugging.
+    """
+    assert all(getattr(trans, "primitive", prim) for prim, trans in new_translators.items())
+    global _PRIMITIVE_TRANSLATORS_DICT
+    _PRIMITIVE_TRANSLATORS_DICT = dict(new_translators)

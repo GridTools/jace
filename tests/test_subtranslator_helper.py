@@ -29,15 +29,10 @@ from jace.translator import (
 
 @pytest.fixture(autouse=True)
 def _conserve_builtin_translators():
-    """Decorator that preserves the initial list of built in translators.
-
-    Todo:
-        Come up with something better/nicer.
-    """
-    initial_translators = get_regsitered_primitive_translators()
+    """Decorator that restores the previous state of the build ins."""
+    initial_translators = translator.get_regsitered_primitive_translators()
     yield
-    translator.managing._PRIMITIVE_TRANSLATORS_DICT.clear()
-    translator.managing._PRIMITIVE_TRANSLATORS_DICT.update(initial_translators)
+    translator.set_active_primitive_translators_to(initial_translators)
 
 
 def _dict_struct(dict_: Mapping[str, Any]) -> Sequence[tuple[str, int]]:
