@@ -362,7 +362,12 @@ class JaxprTranslationDriver:
         )
 
         if update_var_mapping:
-            self.add_jax_name_mapping(jax_var=arg, sdfg_name=arg_name)
+            try:
+                # If the mapping fails, remove the variable from the SDFG.
+                self.add_jax_name_mapping(jax_var=arg, sdfg_name=arg_name)
+            except:
+                del self._ctx.sdfg.arrays[arg_name]
+                raise
 
         return arg_name
 
