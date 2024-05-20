@@ -29,7 +29,6 @@ from .traits import (
     is_jaceified,
     is_jax_array,
     is_jaxified,
-    is_non_string_iterable,
     is_on_device,
     is_scalar,
 )
@@ -56,7 +55,6 @@ __all__ = [
     "is_jaxified",
     "is_jax_array",
     "is_fully_addressable",
-    "is_non_string_iterable",
     "is_on_device",
     "is_scalar",
     "get_jax_var_dtype",

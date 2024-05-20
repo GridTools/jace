@@ -9,7 +9,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
 from typing import Any, TypeGuard
 
 import dace
@@ -20,13 +19,6 @@ from jaxlib import xla_extension as jax_xe
 
 import jace.jax as jjax
 import jace.util as util
-
-
-class NonStringIterable(Iterable): ...
-
-
-def is_non_string_iterable(val: Any) -> TypeGuard[NonStringIterable]:
-    return isinstance(val, Iterable) and not isinstance(val, str)
 
 
 def is_jaceified(obj: Any) -> TypeGuard[jjax.JaceWrapped]:
