@@ -211,10 +211,10 @@ def propose_jax_name(
     jax_name = ""
     while len(jax_name) == 0 or c != 0:
         c, i = c // 26, c % 26
-        jax_name = chr(97 + i % 26) + jax_name
+        jax_name = chr(97 + i) + jax_name
     jax_name = jax_name + getattr(jax_var, "suffix", "")
 
-    if jax_name is util.FORBIDDEN_SDFG_VAR_NAMES:
+    if jax_name in util.FORBIDDEN_SDFG_VAR_NAMES:
         jax_name = f"__jace_forbidden_{jax_name}"
         assert jax_name not in util.FORBIDDEN_SDFG_VAR_NAMES
     return jax_name
