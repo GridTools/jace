@@ -28,13 +28,13 @@ def postprocess_jaxpr_sdfg(
 
     Afterwards `tsdfg` will be finalized.
 
-    TBA, summary:
-    - Setting correct inputs (names + strides)
-    - Setting outputs (in case of donation).
-
     Args:
         tsdfg:  The translated SDFG object.
         fun:    The original function that we translated.
+
+    Todo:
+        - Setting correct input names (layer that does not depend on JAX).
+        - Setting the correct strides & Storage properties.
     """
     # Currently we do nothing except finalizing.
     finalize_jaxpr_sdfg(tsdfg)
@@ -73,8 +73,6 @@ def finalize_jaxpr_sdfg(
     tsdfg.sdfg.arg_names = sdfg_arg_names
 
     # Now we will deallocate the fields and mark `self` as finalized.
-    tsdfg.jax_name_map = None
     tsdfg.start_state = None
     tsdfg.terminal_state = None
-    tsdfg.rev_idx = None
     tsdfg.is_finalized = True
