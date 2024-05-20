@@ -31,6 +31,7 @@ class JaxprTranslationDriver:
     - all variable names are derived from Jax names,
     - there are only transient variables inside the SDFG,
     - It lacks the special `__return` variable,
+    - all variables that Jax considers a scalar are in fact arrays with shape `(1,)`.
     - the `arg_names` parameter is not set.
 
     For these reasons the SDFG is not directly usable, and further manipulations have to be performed.
@@ -315,13 +316,15 @@ class JaxprTranslationDriver:
     ) -> str:
         """Creates an SDFG variable for the Jax variable `arg` and returns its SDFG name.
 
-        By default this function will _not_ update the internal variable list mapping.
-        If you wish to do that, which is recommended you should set `update_var_mapping` to `True`.
+        Regardless, if `arg` refers to an array or a scalar, the function will generate an array.
+        Furthermore, the created variables are always transients.
 
-        The function will create either scalar or Array transients.
-        By default the function will extract all necessary information using the `jace.util.get_jax_var_*` functions.
-        For the naming the function will use the `jace.util.propose_jax_name()` function and pass the internal variable mapping.
-        If you need to create a rather special variable, it is advised to pass a `JaCeVar` instance.
+        By default this function will _not_ update the internal variable mapping.
+        However, by setting `update_var_mapping` to `True` the mapping will be created.
+
+        By default the function will use `jace.util.propose_jax_name()` to derive the name that should be used.
+        However, by passing a `JaCeVar` with a name it is possible to suggest a specific name.
+        In addition it is possible to specify `name_prefix` to prefix name that would be used.
 
         Args:
             arg:                The Jax object for which a SDFG equivalent should be created.
@@ -331,13 +334,15 @@ class JaxprTranslationDriver:
         shape: tuple[int | dace.symbol | str, ...] = util.get_jax_var_shape(arg)
         dtype: dace.typeclass = util.get_jax_var_dtype(arg)
         storage: dace.StorageType = dace.StorageType.Default  # Set at later stages (optimization)
-        offset = None  # i.e. no offset
-        is_scalar: bool = shape == ()
-        as_transient: bool = True
+        offset = None
+        as_transient = True
+        strides = None
+
+        if shape == ():  # Shape of a DaCe scalar.
+            shape = (1,)
 
         # Propose a name and if needed extend it.
         arg_name = util.propose_jax_name(arg, self._jax_name_map)
-        assert not arg_name.startswith("__")
         if name_prefix is not None:
             arg_name = name_prefix + arg_name
 
@@ -349,23 +354,15 @@ class JaxprTranslationDriver:
         if arg_name in self._ctx.sdfg.arrays:
             raise ValueError(f"add_array({arg}): The proposed name '{arg_name}', is used.")
 
-        if is_scalar:
-            self._ctx.sdfg.add_scalar(
-                name=arg_name,
-                storage=storage,
-                dtype=dtype,
-                transient=as_transient,
-            )
-        else:
-            self._ctx.sdfg.add_array(
-                name=arg_name,
-                shape=shape,
-                strides=strides,
-                offset=offset,
-                storage=storage,
-                dtype=dtype,
-                transient=as_transient,
-            )
+        self._ctx.sdfg.add_array(
+            name=arg_name,
+            shape=shape,
+            strides=strides,
+            offset=offset,
+            storage=storage,
+            dtype=dtype,
+            transient=as_transient,
+        )
 
         if update_var_mapping:
             self.add_jax_name_mapping(jax_var=arg, sdfg_name=arg_name)
