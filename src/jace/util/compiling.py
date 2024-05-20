@@ -94,8 +94,11 @@ def run_jax_sdfg(
     Notes:
         There is no pytree mechanism jet, thus the return values are returned inside a `tuple`
             or in case of one value, directly, in the order determined by Jax.
+        Currently, this function does not consider strides in the input.
     """
     from dace.data import Array, Data, Scalar, make_array_from_descriptor
+
+    from jace import util
 
     if len(ckwargs) != 0:
         raise NotImplementedError("No kwargs are supported yet.")
@@ -111,12 +114,18 @@ def run_jax_sdfg(
     # Build the argument list that we will pass to the compiled object.
     call_args: dict[str, Any] = {}
     for in_name, in_val in zip(inp_names, cargs, strict=True):
+        assert (  # noqa: PT018  # Assertion must be one line
+            util.is_array(in_val) and in_val.flags["C_CONTIGUOUS"]
+        )  # Currently the only stride we support.
         call_args[in_name] = in_val
     for out_name in out_names:
         assert not ((out_name == "__return") or (out_name.startswith("__return_")))  # noqa: PT018 # Assert split
 
         if out_name in call_args:  # Donated arguments
             assert out_name in inp_names
+            assert not util.is_jax_array(
+                call_args[out_name]
+            )  # This violates one of Jax internal assumptions.
             continue
 
         sarray: Data = sdfg.arrays[out_name]
