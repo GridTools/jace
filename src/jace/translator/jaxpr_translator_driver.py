@@ -281,9 +281,9 @@ class JaxprTranslationDriver:
         jax_var: jax_core.Var | util.JaCeVar,
         sdfg_name: str,
     ) -> JaxprTranslationDriver:
-        """Creates a mapping between `jax_var` to `sdfg_name`.
+        """Creates a new mapping between `jax_var` to `sdfg_name`.
 
-        This function updates the internal map of `self` and after the call `self.map_jax_var_to_sdfg()` will identify `jax_var` with `sdfg_name`.
+        If the mapping already exists an error will be generated.
         This function is not able to delete a variable mapping that was established before, for this use TBA.
 
         Args:
@@ -293,11 +293,8 @@ class JaxprTranslationDriver:
         assert len(sdfg_name) > 0
 
         if jax_var in self._jax_name_map:
-            if self._jax_name_map[jax_var] == sdfg_name:  # noops.
-                return self
             raise ValueError(
-                f"Tried to create the mapping '{jax_var} -> {sdfg_name}', but '{jax_var}'"
-                f" already points to '{self.map_jax_var_to_sdfg(jax_var)}'."
+                f"Tried to create the mapping '{jax_var} -> {sdfg_name}', but the variable is already mapped."
             )
         if sdfg_name not in self._ctx.sdfg.arrays:
             raise KeyError(f"Mapping '{jax_var} -> {sdfg_name}': SDFG target unknown.")
