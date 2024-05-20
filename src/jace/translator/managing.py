@@ -13,7 +13,7 @@ If not specified the content of this list is used to perform the translation.
 
 from __future__ import annotations
 
-from collections.abc import Callable, MutableMapping
+from collections.abc import Callable, MutableMapping, Mapping
 from typing import TYPE_CHECKING, Literal, cast, overload
 
 
@@ -81,7 +81,7 @@ def register_primitive_translator(
             if not primitive:
                 raise ValueError(f"Missing primitive name for '{prim_translator}'")
             prim_translator.primitive = primitive  # type: ignore[attr-defined]
-        elif prim_translator.primitive != (primitive or prim_translator.primitive):
+        elif (primitive is not None) and (prim_translator.primitive != primitive):
             raise TypeError(
                 f"Translator's primitive '{prim_translator.primitive}' doesn't match the supplied '{primitive}'."
             )
