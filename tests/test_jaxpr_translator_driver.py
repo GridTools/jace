@@ -148,6 +148,14 @@ def test_driver_variable_alloc_prefix_naming(
     )
     assert exp_name_2 == sdfg_name_2
 
+    # Now we use a named variables, which are also affected.
+    prefix_3 = "__my_special_prefix_third_named_"
+    exp_name_3 = prefix_3 + nscal.name  # type: ignore[operator]  # `.name` is not `None`.
+    sdfg_name_3 = translation_driver.add_array(
+        nscal, name_prefix=prefix_3, update_var_mapping=False
+    )
+    assert exp_name_3 == sdfg_name_3
+
 
 def test_driver_variable_alloc_auto_naming_wrapped(
     translation_driver: translator.JaxprTranslationDriver,
@@ -284,4 +292,51 @@ def test_driver_append_state(translation_driver: translator.JaxprTranslationDriv
     assert next(iter(sdfg.in_edges(non_terminal_state))).src is terminal_state_1
 
 
-# TODO: Failing tests
+def test_driver_variable_multiple_variables(
+    translation_driver: translator.JaxprTranslationDriver,
+) -> None:
+    """A simple test in which we try to add a variable that are known, but with a different name."""
+    # Now we will add `array1` and then different ways of updating it.
+    narray1: str = translation_driver.add_array(array1, update_var_mapping=True)
+
+    # It will fail if we use the prefix, because we also want to update.
+    prefix = "__jace_prefix"
+    prefix_expected_name = prefix + narray1
+    with pytest.raises(
+        expected_exception=ValueError,
+        match=re.escape(
+            f"Tried to create the mapping '{array1} -> {prefix_expected_name}', but the variable is already mapped."
+        ),
+    ):
+        _ = translation_driver.add_array(array1, update_var_mapping=True, name_prefix=prefix)
+    assert prefix_expected_name not in translation_driver.sdfg.arrays
+
+    # But if we do not want to update it then it works.
+    prefix_sdfg_name = translation_driver.add_array(
+        array1, update_var_mapping=False, name_prefix=prefix
+    )
+    assert prefix_expected_name in translation_driver.sdfg.arrays
+    assert narray1 == translation_driver.map_jax_var_to_sdfg(array1)
+
+
+def test_driver_variable_invalid_prefix(
+    translation_driver: translator.JaxprTranslationDriver,
+) -> None:
+    """Use invalid prefix."""
+    # It will fail if we use the prefix, because we also want to update.
+    for iprefix in ["0_", "_ja ", "_!"]:
+        with pytest.raises(
+            expected_exception=ValueError,
+            match=re.escape(f"add_array({array1}): Supplied invalid prefix '{iprefix}'."),
+        ):
+            _ = translation_driver.add_array(array1, update_var_mapping=False, name_prefix=iprefix)
+        assert len(translation_driver.sdfg.arrays) == 0
+
+
+def test_driver_jace_var() -> None:
+    """Simple tests about the `JaCeVar` objects."""
+    for iname in ["do", "", "_ _", "9al", "_!"]:
+        with pytest.raises(
+            expected_exception=ValueError, match=re.escape(f"Supplied the invalid name '{iname}'.")
+        ):
+            _ = JaCeVar((), dace.int8, name=iname)
