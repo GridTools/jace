@@ -46,78 +46,129 @@ def test_jit():
 
 
 @pytest.mark.skip(reason="Scalar return values are not handled.")
-def test_composition1():
+def test_composition_itself():
+    """Tests if Jace is composable with itself."""
     jax.config.update("jax_enable_x64", True)
 
-    def f_(x):
+    # Pure Python functions
+    def f_ref(x):
         return jnp.sin(x)
 
-    def df_(x):
+    def df_ref(x):
         return jnp.cos(x)
 
-    def ddf_(x):
+    def ddf_ref(x):
         return -jnp.sin(x)
 
+    # Annotated functions.
+
+    @jace.jit
+    def f(x):
+        return f_ref(x)
+
+    @jace.jit
+    def df(x):
+        return jace.grad(f)(x)
+
+    @jace.jit
+    @jace.grad
+    def ddf(x):
+        return df(x)
+
+    assert all(jutil.is_jaceified(x) for x in [f, df, ddf])
+
     x = 1.0
-
-    # Jacify it.
-    f = jace.jit(f_)
-    assert jutil.is_jaceified(f)
-    assert not jutil.is_jaxified(f)
-
-    ref = f_(x)
-    res = f(x)
-    assert np.allclose(ref, res), f"f: Expected '{ref}', got '{res}'."
-
-    # Now apply a Jax transformation to the jaceified function.
-    df = jax.grad(f)
-
-    ref = df_(x)
-    res = df(x)
-    assert np.allclose(ref, res), f"df: Expected '{ref}', got '{res}'."
-
-    # Now apply a jace transformation around a jaxified transformation.
-    ddf = jace.grad(df)
-
-    ref = ddf_(x)
-    res = ddf(x)
-    assert np.allclose(ref, res), f"ddf: Expected '{ref}', got '{res}'."
+    for fun, fref in zip([f, df, ddf], [f_ref, df_ref, ddf_ref]):
+        ref = fref(x)
+        res = fun(x)
+        assert np.allclose(ref, res), f"f: Expected '{ref}', got '{res}'."
 
 
-def test_composition2():
+@pytest.mark.skip(reason="Nested Jaxpr are not handled.")
+def test_composition_with_jax():
+    """Tests if Jace can interact with Jax and vice versa."""
     jax.config.update("jax_enable_x64", True)
 
-    def f1_(A, B):
+    def base_fun(A, B, C):
+        return A + B * jnp.sin(C) - A * B
+
+    @jace.jit
+    def jace_fun(A, B, C):
+        return jax.jit(base_fun)(A, B, C)
+
+    def jax_fun(A, B, C):
+        return jace.jit(base_fun)(A, B, C)
+
+    A, B, C = (np.random.random((10, 3, 50)) for _ in range(3))  # noqa: NPY002  # random generator
+
+    assert np.allclose(jace_fun(A, B, C), jax_fun(A, B, C))
+
+
+@pytest.mark.skip(reason="Nested Jaxpr are not handled.")
+def test_composition_with_jax_2():
+    """Second test if Jace can interact with Jax and vice versa."""
+
+    @jax.jit
+    def f1_jax(A, B):
         return A + B
 
-    f1 = jax.jit(f1_)
+    assert jutil.is_jaxified(f1_jax)
 
-    def f2_(A, B, C):
-        return f1(A, B) - C
+    @jace.jit
+    def f2_jace(A, B, C):
+        return f1_jax(A, B) - C
 
-    f2 = jace.jit(f2_)
+    assert jutil.is_jaceified(f2_jace)
 
-    def f3_(A, B, C, D):
-        return f2(A, B, C) * D
+    @jax.jit
+    def f3_jax(A, B, C, D):
+        return f2_jace(A, B, C) * D
 
-    f3_jax = jax.jit(f3_)
-    f3_jace = jace.jit(f3_)
+    assert jutil.is_jaxified(f3_jax)
+
+    @jace.jit
+    def f3_jace(A, B, C, D):
+        return f3_jax(A, B, C, D)
+
+    assert jutil.is_jaceified(f3_jace)
 
     A, B, C, D = (np.random.random((10, 3, 50)) for _ in range(4))  # noqa: NPY002  # random generator
 
     ref = ((A + B) - C) * D
 
-    # We have to disable it, because currently there is no `pjit` instruction
-    #  that can handle the nesting.
-    with jax.disable_jit():
-        res_jax = f3_jax(A, B, C, D)
-        res_jace = f3_jace(A, B, C, D)
+    res_jax = f3_jax(A, B, C, D)
+    res_jace = f3_jace(A, B, C, D)
 
     assert np.allclose(ref, res_jax), "Jax failed."
     assert np.allclose(ref, res_jace), "JaCe Failed."
 
 
 @pytest.mark.skip(reason="Scalar return values are not handled.")
+def test_grad_annotation_direct():
+    """Test if `jace.grad` works directly."""
+    jax.config.update("jax_enable_x64", True)
+
+    def f(x):
+        return jnp.sin(jnp.exp(jnp.cos(x**2)))
+
+    @jax.grad
+    def jax_df(x):
+        return f(x)
+
+    @jax.jit
+    def jace_df(x):
+        return jace.grad(f)(x)
+
+    # These are the random numbers where we test
+    Xs = (np.random.random(10) - 0.5) * 10  # noqa: NPY002  # Random number generator
+
+    for i in range(Xs.shape[0]):
+        x = Xs[i]
+        res = jace_df(x)
+        ref = jax_df(x)
+        assert np.allclose(res, ref)
+
+
 def test_grad_control_flow():
     """Tests if `grad` and controlflow works.
 
@@ -125,12 +176,11 @@ def test_grad_control_flow():
     """
     jax.config.update("jax_enable_x64", True)
 
-    def f(x):
+    @jace.grad
+    def df(x):
         if x < 3:
             return 3.0 * x**2
         return -4 * x
-
-    df = jace.grad(f)
 
     x1 = 2.0
     df_x1 = 6 * x1
