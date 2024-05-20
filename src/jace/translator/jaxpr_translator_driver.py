@@ -341,13 +341,11 @@ class JaxprTranslationDriver:
         # Propose a name and if needed extend it.
         arg_name = util.propose_jax_name(arg, self._jax_name_map)
         if name_prefix is not None:
-            arg_name = name_prefix + arg_name
+            if not util.VALID_SDFG_VAR_NAME.fullmatch(name_prefix):
+                raise ValueError(f"add_array({arg}): Supplied invalid prefix '{name_prefix}'.")
+            arg_name = f"{name_prefix}{arg_name}"
 
         # final checks
-        if arg_name in util.FORBIDDEN_SDFG_VAR_NAMES:
-            raise ValueError(f"add_array({arg}): The proposed name '{arg_name}' is forbidden.")
-        if not util.VALID_SDFG_VAR_NAME.fullmatch(arg_name):
-            raise ValueError(f"add_array({arg}): The proposed name '{arg_name} is invalid.")
         if arg_name in self._ctx.sdfg.arrays:
             raise ValueError(f"add_array({arg}): The proposed name '{arg_name}', is used.")
 

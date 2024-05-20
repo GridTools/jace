@@ -216,5 +216,4 @@ def propose_jax_name(
 
     if jax_name in util.FORBIDDEN_SDFG_VAR_NAMES:
         jax_name = f"__jace_forbidden_{jax_name}"
-        assert jax_name not in util.FORBIDDEN_SDFG_VAR_NAMES
     return jax_name
