@@ -18,7 +18,6 @@ from .jax_helper import (
     get_jax_var_dtype,
     get_jax_var_name,
     get_jax_var_shape,
-    get_jax_var_strides,
     is_tracing_ongoing,
     propose_jax_name,
     translate_dtype,
@@ -43,6 +42,9 @@ from .util import (
 
 
 __all__ = [
+    "VALID_SDFG_OBJ_NAME",
+    "VALID_SDFG_VAR_NAME",
+    "FORBIDDEN_SDFG_VAR_NAMES",
     "JaCeVar",
     "as_sequence",
     "compile_jax_sdfg",
@@ -60,11 +62,7 @@ __all__ = [
     "get_jax_var_dtype",
     "get_jax_var_name",
     "get_jax_var_shape",
-    "get_jax_var_strides",
     "translate_dtype",
     "run_jax_sdfg",
     "propose_jax_name",
-    "VALID_SDFG_OBJ_NAME",
-    "VALID_SDFG_VAR_NAME",
-    "FORBIDDEN_SDFG_VAR_NAMES",
 ]

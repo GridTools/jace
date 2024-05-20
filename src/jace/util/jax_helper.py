@@ -35,30 +35,30 @@ class JaCeVar:
     This class can be seen as some kind of substitute `jax.core.Var`.
     The main intention of this class is as an internal representation of values,
     as they are used in Jax, but without the Jax machinery.
-    The main difference is, that this class also carries a `strides` and a `name` member,
-    this can be used to influence how `JaxprTranslationDriver::add_array()` works.
+    As abstract values in Jax this class has a datatype, which is a `dace.typeclass` instance and a shape.
+    In addition it has an optional name, which allows to create variables with a certain name using `JaxprTranslationDriver::add_array()`.
 
     Notes:
         Main intention is to test functionality.
         If the name of a `JaCeVar` is '_' it is considered a drop variable.
-        If the name of a `JaCeVar` is empty, the automatic naming will consider it as a Jax variable.
         The definitions of `__hash__` and `__eq__` are in accordance how Jax variable works.
+
+    Todo:
+        Add support for strides.
     """
 
     shape: tuple[int | dace.symbol | str, ...]
     dtype: dace.typeclass
-    strides: tuple[int | dace.symbol | str, ...] | None = None
     name: str | None = None
 
     def __post_init__(self) -> None:
         """Sanity checks."""
-        if not ((self.name is None) or util.VALID_SDFG_VAR_NAME.fullmatch(self.name)):
+        if self.name is not None and (
+            (not util.VALID_SDFG_VAR_NAME.fullmatch(self.name))
+            or self.name in util.FORBIDDEN_SDFG_VAR_NAMES
+        ):
             raise ValueError(f"Supplied the invalid name '{self.name}'.")
-        if (self.strides is not None) and (len(self.strides) != len(self.shape)):
-            raise ValueError(
-                f"Passed strides of rank {len(self.strides)}, but shape had rank {len(self.shape)}."
-            )
-        if not isinstance(self.dtype, dace.typeclass):  # To typechecking yet.
+        if not isinstance(self.dtype, dace.typeclass):  # No typechecking yet.
             raise TypeError(f"'dtype' is not a 'dace.typeclass' but '{type(self.dtype).__name__}'.")
 
     def __hash__(self) -> int:
@@ -111,22 +111,6 @@ def get_jax_var_shape(jax_var: jax_core.Atom | JaCeVar) -> tuple[int | dace.symb
             return jax_var.shape
         case _:
             raise TypeError(f"'get_jax_var_shape()` is not implemented for '{type(jax_var)}'.")
-
-
-def get_jax_var_strides(
-    jax_var: jax_core.Atom | JaCeVar,
-) -> tuple[int | dace.symbol | str, ...] | None:
-    """Returns the stride of `jax_var`.
-
-    If there is no stride specified return `None`.
-    """
-    match jax_var:
-        case jax_core.Var() | jax_core.Literal():
-            return getattr(jax_var.aval, "strides", None)
-        case JaCeVar():
-            return jax_var.strides
-        case _:
-            raise TypeError(f"'get_jax_var_strides()` is not implemented for '{type(jax_var)}'.")
 
 
 def get_jax_var_dtype(jax_var: jax_core.Atom | JaCeVar) -> dace.typeclass:
@@ -199,7 +183,7 @@ def propose_jax_name(
 
     If `jax_name_map` is `None` then the function will fallback to `get_jax_var_name()`.
     If `jax_name_map` is supplied the function will:
-    - if `jax_var` is stored inside the mapping that value will be returned.
+    - if `jax_var` is stored inside `jax_name_map` this value will be returned.
     - if `jax_var` is a `JaCeVar` with a set `.name` property it will be returned.
     - otherwise the function will generate a new name similar to how the pretty printer of Jaxpr works.
 

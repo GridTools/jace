@@ -330,7 +330,6 @@ class JaxprTranslationDriver:
         """
         shape: tuple[int | dace.symbol | str, ...] = util.get_jax_var_shape(arg)
         dtype: dace.typeclass = util.get_jax_var_dtype(arg)
-        strides: tuple[int | dace.symbol | str, ...] | None = util.get_jax_var_strides(arg)
         storage: dace.StorageType = dace.StorageType.Default  # Set at later stages (optimization)
         offset = None  # i.e. no offset
         is_scalar: bool = shape == ()
