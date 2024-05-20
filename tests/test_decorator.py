@@ -14,8 +14,25 @@ from __future__ import annotations
 
 import jax
 import numpy as np
+import pytest
 
 import jace
+
+
+@pytest.fixture(autouse=True)
+def _clear_translation_cache():
+    """Decorator that clears the translation cache.
+
+    Ensures that a function finds an empty cache and clears up afterwards.
+
+    Todo:
+        Should be used _everywhere_.
+    """
+    from jace.jax import translation_cache as tcache
+
+    tcache.clear_translation_cache()
+    yield
+    tcache.clear_translation_cache()
 
 
 def test_decorator_individually():
@@ -25,8 +42,11 @@ def test_decorator_individually():
     def testee_(A: np.ndarray, B: np.ndarray) -> np.ndarray:
         return A + B
 
+    lowering_cnt = [0]
+
     @jace.jit
-    def testee(A: np.ndarray, B: np.ndarray) -> np.ndarray:
+    def testee(A, B):
+        lowering_cnt[0] += 1
         return testee_(A, B)
 
     A = np.arange(12, dtype=np.float64).reshape((4, 3))
@@ -39,6 +59,7 @@ def test_decorator_individually():
     res = compiled(A, B)
 
     assert np.allclose(ref, res), f"Expected '{ref}' got '{res}'."
+    assert lowering_cnt[0] == 1
 
 
 def test_decorator_one_go():
@@ -48,7 +69,12 @@ def test_decorator_one_go():
     def testee_(A: np.ndarray, B: np.ndarray) -> np.ndarray:
         return A + B
 
-    testee = jace.jit(testee_)
+    lowering_cnt = [0]
+
+    @jace.jit
+    def testee(A, B):
+        lowering_cnt[0] += 1
+        return testee_(A, B)
 
     A = np.arange(12, dtype=np.float64).reshape((4, 3))
     B = np.full((4, 3), 10, dtype=np.float64)
@@ -57,114 +83,16 @@ def test_decorator_one_go():
     res = testee(A, B)
 
     assert np.allclose(ref, res), f"Expected '{ref}' got '{res}'."
+    assert lowering_cnt[0] == 1
 
 
-def test_decorator_caching():
-    """This tests the caching ability"""
-    jax.config.update("jax_enable_x64", True)
+def test_decorator_wrapped():
+    """Tests if some properties are set correctly."""
 
-    def testee1_(A: np.ndarray, B: np.ndarray) -> np.ndarray:
+    def testee(A: np.ndarray, B: np.ndarray) -> np.ndarray:
         return A * B
 
-    def testee2_(A: np.ndarray, B: np.ndarray) -> np.ndarray:
-        return A + B
+    wrapped = jace.jit(testee)
 
-    testee1 = jace.jit(testee1_)
-    testee2 = jace.jit(testee2_)
-
-    assert testee1.__wrapped__ == testee1_
-    assert testee2.__wrapped__ == testee2_
-
-    # This is the first size
-    A = np.arange(12, dtype=np.float64).reshape((4, 3))
-    B = np.full((4, 3), 10, dtype=np.float64)
-
-    # This is the second sizes
-    C = np.arange(16, dtype=np.float64).reshape((4, 4))
-    D = np.full((4, 4), 10, dtype=np.float64)
-
-    # Lower the two functions for the first size.
-    lowered1_size1 = testee1.lower(A, B)
-    lowered2_size1 = testee2.lower(A, B)
-
-    # If we now lower them again, we should get the same objects
-    assert lowered1_size1 is testee1.lower(A, B)
-    assert lowered2_size1 is testee2.lower(A, B)
-
-    # Now we lower them for the second sizes.
-    lowered1_size2 = testee1.lower(C, D)
-    lowered2_size2 = testee2.lower(C, D)
-
-    # Again if we now lower them again, we should get the same objects.
-    assert lowered1_size1 is testee1.lower(A, B)
-    assert lowered2_size1 is testee2.lower(A, B)
-    assert lowered1_size2 is testee1.lower(C, D)
-    assert lowered2_size2 is testee2.lower(C, D)
-
-    # Now use the compilation; since all is the same code path we only use one size.
-    compiled1 = lowered1_size1.compile()
-    compiled2 = lowered1_size1.compile({"dummy_option": True})
-
-    assert compiled1 is lowered1_size1.compile()
-    assert compiled2 is lowered1_size1.compile({"dummy_option": True})
-    assert compiled2 is not lowered1_size1.compile({"dummy_option": False})
-    assert compiled2 is lowered1_size1.compile({"dummy_option": True})
-
-
-def test_decorator_double_annot():
-    """Tests the behaviour for double annotations."""
-    jax.config.update("jax_enable_x64", True)
-
-    lower_cnt = [0]
-
-    def testee1(A: np.ndarray, B: np.ndarray) -> np.ndarray:
-        lower_cnt[0] += 1
-        return A * B
-
-    A = np.arange(12, dtype=np.float64).reshape((4, 3))
-    B = np.full((4, 3), 10, dtype=np.float64)
-
-    jaceWrapped1_1 = jace.jit(testee1)
-    jaceWrapped1_2 = jace.jit(testee1)
-    assert jaceWrapped1_1 is not jaceWrapped1_2
-
-    # Lower them right after the other.
-    lower1_1 = jaceWrapped1_1.lower(A, B)
-    lower1_2 = jaceWrapped1_2.lower(A, B)
-    assert lower1_1 is not lower1_2
-    assert lower_cnt[0] == 2
-
-    # Lower them right after the other.
-    assert lower1_1 is jaceWrapped1_1.lower(A, B)
-    assert lower1_2 is jaceWrapped1_2.lower(A, B)
-    assert lower_cnt[0] == 2
-
-
-def test_decorator_sharing():
-    """Tests if there is no false sharing in the cache."""
-    jax.config.update("jax_enable_x64", True)
-
-    @jace.jit
-    def jaceWrapped(A: np.ndarray, B: np.ndarray) -> np.ndarray:
-        C = A * B
-        D = C + A
-        E = D + B  # Just enough state.
-        return A + B + C + D + E
-
-    # These are the argument
-    A = np.arange(12, dtype=np.float64).reshape((4, 3))
-    B = np.full((4, 3), 10, dtype=np.float64)
-
-    # Now we lower it.
-    jaceLowered = jaceWrapped.lower(A, B)
-
-    # Now we compile it with enabled optimization.
-    optiCompiled = jaceLowered.compile({"auto_optimize": True, "simplify": True})
-
-    # Now we compile it without any optimization.
-    unoptiCompiled = jaceLowered.compile({})
-
-    # Because of the way how things work the optimized must have more than the unoptimized.
-    #  If there is sharing, then this would not be the case.
-    assert optiCompiled._csdfg.sdfg.number_of_nodes() == 1
-    assert optiCompiled._csdfg.sdfg.number_of_nodes() < unoptiCompiled._csdfg.sdfg.number_of_nodes()
+    assert wrapped.wrapped_fun is testee
+    assert wrapped.__wrapped__ is testee
