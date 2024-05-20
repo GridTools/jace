@@ -47,14 +47,14 @@ VALID_SDFG_OBJ_NAME: re.Pattern = re.compile("[a-zA-Z_][a-zA-Z0-9_]*")
 FORBIDDEN_SDFG_VAR_NAMES: Final[set[str]] = {
     # These should be most of the C++ keywords, it is more important to have the short ones.
     #  Taken from 'https://learn.microsoft.com/en-us/cpp/cpp/keywords-cpp?view=msvc-170'
-    'alignas', 'alignof', 'and', 'asm', 'auto', 'bitand', 'bitor', 'bool', 'break', 'case',
-    'catch', 'char', 'class', 'compl', 'concept', 'const', 'consteval', 'constexpr',
-    'constinit', 'continue', 'decltype', 'default', 'delete', 'directive', 'do', 'double',
-    'else', 'enum', 'explicit', 'export', 'extern', 'false', 'float', 'for', 'friend',
-    'goto', 'if', 'inline', 'int', 'long', 'mutable', 'namespace', 'new', 'noexcept', 'not',
-    'nullptr', 'operator', 'or', 'private', 'protected', 'public', 'register', 'requires',
-    'return', 'short', 'signed', 'sizeof', 'static', 'struct', 'switch', 'template', 'this',
-    'throw', 'true', 'try', 'typedef', 'typeid', 'typename', 'union', 'unsigned', 'using',
-    'virtual', 'void', 'volatile', 'while', 'xor', 'std',
+    "alignas", "alignof", "and", "asm", "auto", "bitand", "bitor", "bool", "break", "case",
+    "catch", "char", "class", "compl", "concept", "const", "consteval", "constexpr",
+    "constinit", "continue", "decltype", "default", "delete", "directive", "do", "double",
+    "else", "enum", "explicit", "export", "extern", "false", "float", "for", "friend",
+    "goto", "if", "inline", "int", "long", "mutable", "namespace", "new", "noexcept", "not",
+    "nullptr", "operator", "or", "private", "protected", "public", "register", "requires",
+    "return", "short", "signed", "sizeof", "static", "struct", "switch", "template", "this",
+    "throw", "true", "try", "typedef", "typeid", "typename", "union", "unsigned", "using",
+    "virtual", "void", "volatile", "while", "xor", "std",  "",
 }
 # fmt: on
