@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import functools as ft
 from collections.abc import Callable, Mapping
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal, overload
 
 import jax as _jax_jax
 
@@ -19,7 +19,25 @@ from jace import translator
 
 
 if TYPE_CHECKING:
-    from jace import jax as jjax
+    from jace.jax import stages
+
+
+@overload
+def jit(
+    fun: Literal[None] = None,
+    /,
+    sub_translators: Mapping[str, translator.PrimitiveTranslatorCallable] | None = None,
+    **kwargs: Any,
+) -> Callable[..., stages.JaceWrapped]: ...
+
+
+@overload
+def jit(
+    fun: Callable,
+    /,
+    sub_translators: Mapping[str, translator.PrimitiveTranslatorCallable] | None = None,
+    **kwargs: Any,
+) -> stages.JaceWrapped: ...
 
 
 def jit(
@@ -27,7 +45,7 @@ def jit(
     /,
     sub_translators: Mapping[str, translator.PrimitiveTranslatorCallable] | None = None,
     **kwargs: Any,
-) -> jjax.JaceWrapped | Callable:
+) -> stages.JaceWrapped | Callable[..., stages.JaceWrapped]:
     """Jace's replacement for `jax.jit` (just-in-time) wrapper.
 
     It works the same way as `jax.jit` does, but instead of using XLA the computation is lowered to DaCe.
@@ -47,10 +65,10 @@ def jit(
             f"The following arguments of 'jax.jit' are not yet supported by jace: {', '.join(kwargs.keys())}."
         )
 
-    def wrapper(f: Callable) -> jjax.JaceWrapped:
-        from jace import jax as jjax  # Cyclic import
+    def wrapper(f: Callable) -> stages.JaceWrapped:
+        from jace import jax as stages  # Cyclic import
 
-        jace_wrapper = jjax.JaceWrapped(
+        jace_wrapper = stages.JaceWrapped(
             fun=f,
             sub_translators=(
                 translator.managing._PRIMITIVE_TRANSLATORS_DICT
@@ -68,7 +86,7 @@ def vmap(
     fun: Callable,
     /,
     **kwargs: Any,
-) -> jjax.JaceWrapped:
+) -> stages.JaceWrapped:
     """Jace wrapper around `jax.vmap`.
 
     Notes:

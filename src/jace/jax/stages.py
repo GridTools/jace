@@ -25,11 +25,10 @@ from __future__ import annotations
 
 import copy
 from collections.abc import Callable, Mapping, Sequence
-from typing import Any, Final
+from typing import Any, Final, TypeAlias
 
 import dace
 import jax as jax_jax
-from jax.stages import CompilerOptions
 
 from jace import optimization, translator, util
 from jace.jax import translation_cache as tcache
@@ -47,6 +46,11 @@ class Stage:
     """
 
 
+"""Map type to pass compiler options to `JaceLowered.compile()`.
+"""
+CompilerOptions: TypeAlias = dict[str, tuple[bool, str]]
+
+
 class JaceWrapped(Stage):
     """A function ready to be specialized, lowered, and compiled.
 
@@ -62,14 +66,14 @@ class JaceWrapped(Stage):
     """
 
     _fun: Callable
-    _sub_translators: Mapping[str, translator.PrimitiveTranslator]
+    _sub_translators: Mapping[str, translator.PrimitiveTranslatorCallable]
     _jit_ops: Mapping[str, Any]
     _cache: tcache.TranslationCache
 
     def __init__(
         self,
         fun: Callable,
-        sub_translators: Mapping[str, translator.PrimitiveTranslator],
+        sub_translators: Mapping[str, translator.PrimitiveTranslatorCallable],
         jit_ops: Mapping[str, Any],
     ) -> None:
         """Creates a wrapped jace jitable object of `jax_prim`.
@@ -125,11 +129,17 @@ class JaceWrapped(Stage):
         Performs the first two steps of the AOT steps described above,
         i.e. transformation into Jaxpr and then to SDFG.
         The result is encapsulated into a `Lowered` object.
-        """
-        # TODO(phimuell): Handle pytrees
 
+        Todo:
+            - Handle pytrees.
+        """
         if len(kwargs) != 0:
             raise NotImplementedError("Currently only positional arguments are supported.")
+
+        # Currently we do not allow memory order beside `C_CONTIGUOUS`.
+        #  This is the best place to check for it.
+        if not all((not util.is_array(arg)) or arg.flags["C_CONTIGUOUS"] for arg in args):
+            raise NotImplementedError("Currently can not handle strides beside 'C_CONTIGUOUS'.")
 
         jaxpr = jax_jax.make_jaxpr(self._fun)(*args)
         driver = translator.JaxprTranslationDriver(sub_translators=self._sub_translators)
