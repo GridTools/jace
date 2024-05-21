@@ -13,7 +13,7 @@ If not specified the content of this list is used to perform the translation.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, MutableMapping
+from collections.abc import Callable, Mapping
 from typing import TYPE_CHECKING, cast
 
 
@@ -77,25 +77,25 @@ def register_primitive_translator(
     return wrapper if prim_translator is None else wrapper(prim_translator)
 
 
-def get_regsitered_primitive_translators() -> (
-    MutableMapping[str, translator.PrimitiveTranslatorCallable]
-):
-    """Returns the currently active view of all _currently_ installed primitive translators in Jace.
+def get_regsitered_primitive_translators() -> dict[str, translator.PrimitiveTranslatorCallable]:
+    """Returns a view of the _currently_ active set of installed primitive translators in Jace.
 
     The returned mapping represents the active primitive translators at the time of calling.
-    This means that calls to `register_primitive_translator()` does not modify the returned object.
+    This means that calls to `register_primitive_translator()` or any other mutating call will not affect the returned object.
     """
     return _PRIMITIVE_TRANSLATORS_DICT.copy()
 
 
 def set_active_primitive_translators_to(
     new_translators: Mapping[str, translator.PrimitiveTranslatorCallable],
-) -> None:
-    """Exchange the currently active subtranslators in Jace with the one inside `new_translators`.
+) -> Mapping[str, translator.PrimitiveTranslatorCallable]:
+    """Exchange the currently active subtranslators in Jace with `new_translators` and returns the previous ones.
 
     This function allows you to restore a specific state that was obtained by a previous call to `get_regsitered_primitive_translators()`.
     The function is mainly intended for debugging.
     """
-    assert all(getattr(trans, "primitive", prim) for prim, trans in new_translators.items())
     global _PRIMITIVE_TRANSLATORS_DICT
+    assert all(getattr(trans, "primitive", prim) for prim, trans in new_translators.items())
+    previous_translators = _PRIMITIVE_TRANSLATORS_DICT
     _PRIMITIVE_TRANSLATORS_DICT = dict(new_translators)
+    return previous_translators

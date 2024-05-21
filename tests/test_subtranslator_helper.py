@@ -35,8 +35,7 @@ def _conserve_builtin_translators():
 @pytest.fixture()
 def no_builtin_translators() -> str:
     """This fixture can be used if the test does not want any builtin translators."""
-    initial_translators = translator.get_regsitered_primitive_translators()
-    translator.set_active_primitive_translators_to({})
+    initial_translators = translator.set_active_primitive_translators_to({})
     yield "DUMMY_VALUE"
     translator.set_active_primitive_translators_to(initial_translators)
 
