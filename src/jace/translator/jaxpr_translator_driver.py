@@ -316,12 +316,12 @@ class JaxprTranslationDriver:
         Regardless, if `arg` refers to an array or a scalar, the function will generate an array.
         Furthermore, the created variables are always transients.
 
-        By default this function will _not_ update the internal variable mapping.
-        However, by setting `update_var_mapping` to `True` the mapping will be created.
-
         By default the function will use `jace.util.propose_jax_name()` to derive the name that should be used.
         However, by passing a `JaCeVar` with a name it is possible to suggest a specific name.
         In addition it is possible to specify `name_prefix` to prefix name that would be used.
+
+        The function will not update the internal variable mapping.
+        If this is desired one can set `update_var_mapping`, for forcing this.
 
         Args:
             arg:                The Jax object for which a SDFG equivalent should be created.
@@ -400,10 +400,12 @@ class JaxprTranslationDriver:
         """Creates SDFG variables for the listed Jax variables and returns their SDFG names.
 
         If a Jax variable already has a SDFG equivalent then the function will use this variable.
-        If no corresponding SDFG variable is known the function will create one using `add_array()`, with `update_var_mapping` set to `True`.
+        If no corresponding SDFG variable is known the function will create one using `add_array()`.
 
-        By setting `prevent_creation` the function will not create any new SDFG variables, if no already existing variable is found an error is generated.
-        By setting `only_creation` the function will only create new SDFG variables, if a variable was already processed an error will be created.
+        By setting `prevent_creation` the function will not create any new SDFG variables,
+        if no corresponding SDFG variable exists an error is generated.
+        By setting `only_creation` the function will only create new SDFG variables,
+        if a variable already have a corresponding SDFG variable an error will be created.
 
         By default literals cause an error.
         However, by setting `handle_literals` to `True` literals will will be included in the output with the value `None`.
@@ -413,16 +415,13 @@ class JaxprTranslationDriver:
             prevent_creation:   Never create a variable, all must already be known.
             only_creation:      Always create a variable, it is an error if one already exist.
             handle_literals:    Allow the processing of literals.
-            kwargs:             Will be forwarded to `self.add_array()` if a variable as to be created,
+            kwargs:             Will be forwarded to `self.add_array()` in case a variable is created.
 
         Todo:
             Rollback if the creation fails.
         """
         if only_creation and prevent_creation:
             raise ValueError("Specified both 'only_creation' and 'prevent_creation'.")
-        assert (
-            "update_var_mapping" not in kwargs
-        ), "You can not pass 'update_var_mapping' as argument to 'create_jax_var_list()'."
 
         ret_list: list[None | str] = []
         for jax_var in jax_var_list:
@@ -435,7 +434,7 @@ class JaxprTranslationDriver:
                 if prevent_creation and (mapped_sdfg_name is None):
                     raise ValueError(f"'prevent_creation' given but have to create '{jax_var}'.")
                 if mapped_sdfg_name is None:
-                    sdfg_name = self.add_array(arg=jax_var, update_var_mapping=True, **kwargs)
+                    sdfg_name = self.add_array(arg=jax_var, **kwargs)
                 elif only_creation:
                     raise ValueError(f"'only_creation' given '{jax_var}' already exists.")
                 else:
@@ -468,6 +467,7 @@ class JaxprTranslationDriver:
             jax_var_list=jaxpr.jaxpr.invars,
             only_creation=True,  # Nothing exists yet.
             handle_literals=False,  # Initial arguments are never literals
+            update_var_mapping=True,
         )
         # This forces the code to only accept kwargs; it is also part of "what a canonical sdfg" is.
         self.sdfg.arg_names = []
@@ -501,6 +501,7 @@ class JaxprTranslationDriver:
             only_creation=True,  # Nothing exists yet.
             handle_literals=False,  # It seems that constants are never literals.
             name_prefix="__const_",
+            update_var_mapping=True,
         )
         for sdfg_name, const_value in zip(sdfg_const_names, jaxpr.consts, strict=True):
             self._ctx.sdfg.add_constant(
@@ -597,6 +598,7 @@ class JaxprTranslationDriver:
         out_var_names: MutableSequence[str] = self.create_jax_var_list(
             eqn.outvars,
             only_creation=True,  # Output must not exist yet.
+            update_var_mapping=True,
         )
 
         # Find the subtranslator
