@@ -36,21 +36,6 @@ def postprocess_jaxpr_sdfg(
         - Setting correct input names (layer that does not depend on JAX).
         - Setting the correct strides & Storage properties.
     """
-    # Currently we do nothing except finalizing.
-    finalize_jaxpr_sdfg(tsdfg)
-
-
-def finalize_jaxpr_sdfg(
-    tsdfg: translator.TranslatedJaxprSDFG,
-) -> None:
-    """Finalizes the supplied `tsdfg` object in place.
-
-    This function will turn a non finalized, i.e. canonical, SDFG into a finalized one,
-    i.e. after this function `tsdfg.is_finalized` is `True`.
-    Thus the function will:
-    - Mark all input and output variables, i.e. listed in `tsdfg.{inp, out}_names`, as globals.
-    - Deallocate all members of `tsdfg` that are no longer needed.
-    """
     if tsdfg.is_finalized:
         raise ValueError("The supplied SDFG is already finalized.")
     if not tsdfg.inp_names:
