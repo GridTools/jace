@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import itertools as it
+import re
 
 import jax
 import numpy as np
@@ -187,3 +188,40 @@ def test_caching_compilation():
     #  If there is sharing, then this would not be the case.
     assert optiCompiled._csdfg.sdfg.number_of_nodes() == 1
     assert optiCompiled._csdfg.sdfg.number_of_nodes() < unoptiCompiled._csdfg.sdfg.number_of_nodes()
+
+
+def test_caching_strides() -> None:
+    """Test if the cache detects a change in strides."""
+    jax.config.update("jax_enable_x64", True)
+
+    @jace.jit
+    def wrapped(A: np.ndarray) -> np.ndarray:
+        return A + 10.0
+
+    shape = (10, 100, 1000)
+    C = np.array(
+        (np.random.random(shape) - 0.5) * 10,  # noqa: NPY002
+        order="C",
+        dtype=np.float64,
+    )
+    F = np.array(C, copy=True, order="F")
+
+    # First we compile run it with C strides.
+    C_lower = wrapped.lower(C)
+    C_res = wrapped(C)
+
+    # Now we run it with FORTRAN strides.
+    #  However, this does not work because we do not support strides at all.
+    #  But the cache is aware of this, which helps catch some nasty bugs.
+    F_lower = None  # Remove later
+    F_res = C_res.copy()  # Remove later
+    with pytest.raises(  # noqa: PT012 # Multiple calls
+        expected_exception=NotImplementedError,
+        match=re.escape("Currently can not handle strides beside 'C_CONTIGUOUS'."),
+    ):
+        F_lower = wrapped.lower(F)
+        F_res = wrapped(F)
+    assert F_lower is None  # Remove later.
+    assert C_res is not F_res  # Remove later
+    assert np.allclose(F_res, C_res)
+    assert F_lower is not C_lower

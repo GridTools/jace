@@ -531,3 +531,26 @@ def test_driver_jace_var() -> None:
             match=re.escape(f"Supplied the invalid name '{iname}'."),
         ):
             _ = JaCeVar((), dace.int8, name=iname)
+
+
+def test_driver_F_strides(
+    translation_driver: translator.JaxprTranslationDriver,
+) -> None:
+    """Tests if we can lower without a standard stride.
+
+    Notes:
+        This tests if the restriction is currently in place.
+        See also `tests/test_caching.py::test_caching_strides`.
+    """
+
+    @jace.jit
+    def testee(A: np.ndarray) -> np.ndarray:
+        return A + 10.0
+
+    F = np.full((4, 3), 10, dtype=np.float64, order="F")
+
+    with pytest.raises(
+        expected_exception=NotImplementedError,
+        match=re.escape("Currently can not handle strides beside 'C_CONTIGUOUS'."),
+    ):
+        _ = testee(F)

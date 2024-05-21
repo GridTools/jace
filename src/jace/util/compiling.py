@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any
 
 import dace
 import numpy as np
+from dace import data as ddata
 
 
 if TYPE_CHECKING:
@@ -30,22 +31,15 @@ def compile_jax_sdfg(
 ) -> jdace.CompiledSDFG:
     """This function compiles the SDFG embedded in the embedded `tsdfg` (`TranslatedJaxprSDFG`).
 
-    Notes:
-        Currently the SDFG must not have any undefined symbols, i.e. no undefined sizes.
+    For executing the SDFG, the `run_jax_sdfg()` function, together with the `tsdfg.{inp, out}_names` can be used.
     """
     if not tsdfg.is_finalized:
         raise ValueError("Can only compile a finalized SDFG.")
-    if not tsdfg.inp_names:
-        raise ValueError("The passed SDFG did not had any input arguments.")
-    if not tsdfg.out_names:
-        raise ValueError("The passed SDFG did not had any output arguments.")
-
-    # This is a simplification that makes our life simply.
-    #  However, we should consider lifting it at some point.
-    if len(tsdfg.sdfg.free_symbols) != 0:
-        raise NotImplementedError(
-            f"No externally defined symbols are allowed, found: {tsdfg.sdfg.free_symbols}"
-        )
+    if any(  # We do not support the DaCe return mechanism
+        arrname.startswith("__return")
+        for arrname in tsdfg.sdfg.arrays.keys()  # noqa: SIM118  # we can not use `in` because we are also interested in `__return_`!
+    ):
+        raise ValueError("Only support SDFGs without '__return' members.")
 
     # To ensure that the SDFG is compiled and to get rid of a warning we must modify
     #  some settings of the SDFG. To fake an immutable SDFG, we will restore them later.
@@ -95,11 +89,13 @@ def run_jax_sdfg(
     Notes:
         There is no pytree mechanism jet, thus the return values are returned inside a `tuple`
             or in case of one value, directly, in the order determined by Jax.
-        Currently, this function does not consider strides in the input.
+        Currently, this function does not consider strides in the input,
+            all input must be `C_CONTIGUOUS`.
+        Currently the SDFG must not have any undefined symbols, i.e. no undefined sizes.
     """
-    from dace.data import Array, Data, Scalar, make_array_from_descriptor
-
     from jace import util
+
+    sdfg: dace.SDFG = csdfg.sdfg
 
     if len(ckwargs) != 0:
         raise NotImplementedError("No kwargs are supported yet.")
@@ -107,41 +103,29 @@ def run_jax_sdfg(
         raise RuntimeError("Wrong number of arguments.")
     if len(set(inp_names).intersection(out_names)) != 0:
         raise NotImplementedError("Using an input also for output is not yet supported.")
-
-    # We need the SDFG to construct/allocate the memory for the return values.
-    sdfg: dace.SDFG = csdfg.sdfg
+    if len(sdfg.free_symbols) != 0:  # This is a simplification that makes our life simple.
+        raise NotImplementedError(
+            f"No externally defined symbols are allowed, found: {sdfg.free_symbols}"
+        )
 
     # Build the argument list that we will pass to the compiled object.
     call_args: dict[str, Any] = {}
     for in_name, in_val in zip(inp_names, cargs, strict=True):
-        assert (not util.is_array(in_val)) or in_val.flags["C_CONTIGUOUS"]
         if util.is_scalar(in_val):
             # Currently the translator makes scalar into arrays, this has to be reflected here
             in_val = np.array([in_val])
         call_args[in_name] = in_val
 
-    for out_name in out_names:
-        assert not ((out_name == "__return") or (out_name.startswith("__return_")))  # noqa: PT018 # Assert split
+    for out_name, sarray in ((name, sdfg.arrays[name]) for name in out_names):
+        assert not (out_name in call_args and util.is_jax_array(call_args[out_name]))
+        assert isinstance(sarray, ddata.Array)
+        call_args[out_name] = ddata.make_array_from_descriptor(sarray)
 
-        if out_name in call_args:
-            # This is just a reminder, to not mess with Jax internals!
-            assert not util.is_jax_array(call_args[out_name])
-            raise NotImplementedError
-
-        sarray: Data = sdfg.arrays[out_name]
-        if isinstance(sarray, Scalar):
-            raise NotImplementedError("Scalars as return values are not supported.")
-        if isinstance(sarray, Array):
-            call_args[out_name] = make_array_from_descriptor(sarray)
-        else:
-            raise NotImplementedError(f"Can not handle '{type(sarray).__name__}' as output.")
-
-    if len(call_args) != len(csdfg.argnames):
-        raise ValueError(
-            "Failed to construct the call arguments,"
-            f" expected {len(csdfg.argnames)} but got {len(call_args)}."
-            f"\nExpected: {csdfg.argnames}\nGot: {list(call_args.keys())}"
-        )
+    assert len(call_args) == len(csdfg.argnames), (
+        "Failed to construct the call arguments,"
+        f" expected {len(csdfg.argnames)} but got {len(call_args)}."
+        f"\nExpected: {csdfg.argnames}\nGot: {list(call_args.keys())}"
+    )
 
     # Calling the SDFG
     with dace.config.temporary_config():

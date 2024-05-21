@@ -43,22 +43,20 @@ def postprocess_jaxpr_sdfg(
 def finalize_jaxpr_sdfg(
     tsdfg: translator.TranslatedJaxprSDFG,
 ) -> None:
-    """Finalizes the supplied `tsdfg` object in place."""
+    """Finalizes the supplied `tsdfg` object in place.
+
+    This function will turn a non finalized, i.e. canonical, SDFG into a finalized one,
+    i.e. after this function `tsdfg.is_finalized` is `True`.
+    Thus the function will:
+    - Mark all input and output variables, i.e. listed in `tsdfg.{inp, out}_names`, as globals.
+    - Deallocate all members of `tsdfg` that are no longer needed.
+    """
     if tsdfg.is_finalized:
         raise ValueError("The supplied SDFG is already finalized.")
     if not tsdfg.inp_names:
         raise ValueError("Input names are not specified.")
     if not tsdfg.out_names:
         raise ValueError("Output names are not specified.")
-
-    # We do not support the return value mechanism that dace provides us.
-    #  The reasons for that are that the return values are always shared and the working with pytrees is not yet understood.
-    #  Thus we make the safe choice by passing all as arguments.
-    if any(
-        arrname.startswith("__return")
-        for arrname in tsdfg.sdfg.arrays.keys()  # noqa: SIM118  # we can not use `in` because we are also interested in `__return_`!
-    ):
-        raise ValueError("Only support SDFGs without '__return' members.")
 
     # Canonical SDFGs do not have global memory, so we must transform it
     sdfg_arg_names: list[str] = []
