@@ -31,7 +31,6 @@ class JaxprTranslationDriver:
     - all variable names are derived from Jax names,
     - there are only transient variables inside the SDFG,
     - It lacks the special `__return` variable,
-    - all variables that Jax considers a scalar are in fact arrays with shape `(1,)`.
     - the `arg_names` parameter is not set.
 
     For these reasons the SDFG is not directly usable, and further manipulations have to be performed.
@@ -55,6 +54,8 @@ class JaxprTranslationDriver:
 
     Notes:
         After the main translation has been performed the translator object can be used again.
+        Currently the driver will generate only Array as SDFG variables, however, this is a temporary solution.
+            For more on that see `add_array()`.
     """
 
     __slots__ = (
@@ -313,8 +314,7 @@ class JaxprTranslationDriver:
     ) -> str:
         """Creates an SDFG variable for the Jax variable `arg` and returns its SDFG name.
 
-        Regardless, if `arg` refers to an array or a scalar, the function will generate an array.
-        Furthermore, the created variables are always transients.
+        The SDFG object is always created as a transient.
 
         By default the function will use `jace.util.propose_jax_name()` to derive the name that should be used.
         However, by passing a `JaCeVar` with a name it is possible to suggest a specific name.
@@ -327,6 +327,14 @@ class JaxprTranslationDriver:
             arg:                The Jax object for which a SDFG equivalent should be created.
             name_prefix:        If given it will be used as prefix for the name.
             update_var_mapping: Update the internal variable mapping; by default `False`.
+
+        Notes:
+            Currently the function will always create an Array, even if the Jax variable refers to a scalar.
+                This is done to work around some difficulties with scalar return values and so on.
+                This issue should actually handled in the post processing stage, but currently it is not.
+                However, from a point of building an SDFG manually, there is no difference between a Scalar and an Array.
+                According to the dace developer, the majority of the backend, i.e. optimization pipeline, should be handle to handle it.
+                But there are some special parts that might explicitly want a scalar, it also might block certain compiler optimization.
         """
         shape: tuple[int | dace.symbol | str, ...] = util.get_jax_var_shape(arg)
         dtype: dace.typeclass = util.get_jax_var_dtype(arg)
