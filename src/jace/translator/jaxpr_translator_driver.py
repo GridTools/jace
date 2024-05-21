@@ -34,7 +34,7 @@ class JaxprTranslationDriver:
 
     For these reasons the SDFG is not directly usable, and further manipulations have to be performed.
     Especially, DaCe's validation function will fail and it is unable to be processed by the optimization pipeline.
-    For more information also see `jace.translator.post_translation` module.
+    For more information also see `jace.translator.pre_post_translation` module.
 
     The idea of the translator is extremely simple.
     Since Jaxpr is a list consisting of more or less simple instructions/equations, they get processed one after the other.

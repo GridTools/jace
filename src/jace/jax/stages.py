@@ -32,7 +32,7 @@ import jax as jax_jax
 
 from jace import optimization, translator, util
 from jace.jax import translation_cache as tcache
-from jace.translator import post_translation as ptrans
+from jace.translator import pre_post_translation as pptrans
 from jace.util import dace_helper as jdace
 
 
@@ -144,7 +144,7 @@ class JaceWrapped(Stage):
         jaxpr = jax_jax.make_jaxpr(self._fun)(*args)
         driver = translator.JaxprTranslationDriver(sub_translators=self._sub_translators)
         trans_sdfg: translator.TranslatedJaxprSDFG = driver.translate_jaxpr(jaxpr)
-        ptrans.postprocess_jaxpr_sdfg(tsdfg=trans_sdfg, fun=self.wrapped_fun)
+        pptrans.postprocess_jaxpr_sdfg(tsdfg=trans_sdfg, fun=self.wrapped_fun)
         # The `JaceLowered` assumes complete ownership of `trans_sdfg`!
         return JaceLowered(trans_sdfg)
 
