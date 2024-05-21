@@ -45,7 +45,6 @@ def test_jit():
     assert np.allclose(ref, res), f"Expected '{ref}' got '{res}'."
 
 
-@pytest.mark.skip(reason="Scalar return values are not handled.")
 def test_composition_itself():
     """Tests if Jace is composable with itself."""
     jax.config.update("jax_enable_x64", True)
@@ -143,7 +142,6 @@ def test_composition_with_jax_2():
     assert np.allclose(ref, res_jace), "JaCe Failed."
 
 
-@pytest.mark.skip(reason="Scalar return values are not handled.")
 def test_grad_annotation_direct():
     """Test if `jace.grad` works directly."""
     jax.config.update("jax_enable_x64", True)
@@ -152,20 +150,20 @@ def test_grad_annotation_direct():
         return jnp.sin(jnp.exp(jnp.cos(x**2)))
 
     @jax.grad
-    def jax_df(x):
-        return f(x)
+    def jax_ddf(x):
+        return jax.grad(f)(x)
 
     @jax.jit
-    def jace_df(x):
-        return jace.grad(f)(x)
+    def jace_ddf(x):
+        return jace.grad(jace.grad(f))(x)
 
     # These are the random numbers where we test
     Xs = (np.random.random(10) - 0.5) * 10  # noqa: NPY002  # Random number generator
 
     for i in range(Xs.shape[0]):
         x = Xs[i]
-        res = jace_df(x)
-        ref = jax_df(x)
+        res = jace_ddf(x)
+        ref = jax_ddf(x)
         assert np.allclose(res, ref)
 
 

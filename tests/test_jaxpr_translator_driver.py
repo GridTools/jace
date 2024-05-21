@@ -12,10 +12,12 @@ from __future__ import annotations
 import re
 
 import dace
+import jax
 import numpy as np
 import pytest
 from dace.data import Array
 
+import jace
 from jace import translator, util
 from jace.util import JaCeVar
 
@@ -495,6 +497,30 @@ def test_driver_constants(
     assert next(iter(translation_driver._jax_name_map.values())) == "__const_a"
     assert len(translation_driver.sdfg.constants) == 1
     assert np.all(translation_driver.sdfg.constants["__const_a"] == constant)
+
+
+def test_driver_scalar_return_value(
+    translation_driver: translator.JaxprTranslationDriver,
+) -> None:
+    """Tests if scalars can be returned directly"""
+    jax.config.update("jax_enable_x64", True)
+
+    def scalar_ops(A: float) -> float:
+        return A + A - A * A
+
+    lower_cnt = [0]
+
+    @jace.jit
+    def wrapped(A: float) -> float:
+        lower_cnt[0] += 1
+        return scalar_ops(A)
+
+    vals = np.random.random(100)  # noqa: NPY002
+    for i in range(vals.size):
+        res = wrapped(vals[i])
+        ref = scalar_ops(vals[i])
+        assert np.allclose(res, ref)
+    assert lower_cnt[0] == 1
 
 
 def test_driver_jace_var() -> None:

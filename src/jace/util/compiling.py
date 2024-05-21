@@ -17,6 +17,7 @@ from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, Any
 
 import dace
+import numpy as np
 
 
 if TYPE_CHECKING:
@@ -104,29 +105,28 @@ def run_jax_sdfg(
         raise NotImplementedError("No kwargs are supported yet.")
     if len(inp_names) != len(cargs):
         raise RuntimeError("Wrong number of arguments.")
+    if len(set(inp_names).intersection(out_names)) != 0:
+        raise NotImplementedError("Using an input also for output is not yet supported.")
 
     # We need the SDFG to construct/allocate the memory for the return values.
-    #  Actually, we would only need the descriptors, but this is currently the only way to get them.
-    #  As far as I know the dace performs a deepcopy before compilation, thus it should be safe.
-    #  However, regardless of this this also works if we are inside the stages, which have exclusive ownership.
     sdfg: dace.SDFG = csdfg.sdfg
 
     # Build the argument list that we will pass to the compiled object.
     call_args: dict[str, Any] = {}
     for in_name, in_val in zip(inp_names, cargs, strict=True):
-        assert (  # noqa: PT018  # Assertion must be one line
-            util.is_array(in_val) and in_val.flags["C_CONTIGUOUS"]
-        )  # Currently the only stride we support.
+        assert (not util.is_array(in_val)) or in_val.flags["C_CONTIGUOUS"]
+        if util.is_scalar(in_val):
+            # Currently the translator makes scalar into arrays, this has to be reflected here
+            in_val = np.array([in_val])
         call_args[in_name] = in_val
+
     for out_name in out_names:
         assert not ((out_name == "__return") or (out_name.startswith("__return_")))  # noqa: PT018 # Assert split
 
-        if out_name in call_args:  # Donated arguments
-            assert out_name in inp_names
-            assert not util.is_jax_array(
-                call_args[out_name]
-            )  # This violates one of Jax internal assumptions.
-            continue
+        if out_name in call_args:
+            # This is just a reminder, to not mess with Jax internals!
+            assert not util.is_jax_array(call_args[out_name])
+            raise NotImplementedError
 
         sarray: Data = sdfg.arrays[out_name]
         if isinstance(sarray, Scalar):

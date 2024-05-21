@@ -29,7 +29,6 @@ def test_empty_array():
     assert np.all(testee(A) == A)
 
 
-@pytest.mark.skip(reason="Scalar return values are not handled.")
 def test_empty_scalar():
     jax.config.update("jax_enable_x64", True)
 
