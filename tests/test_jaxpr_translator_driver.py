@@ -12,6 +12,7 @@ from __future__ import annotations
 import re
 
 import dace
+import numpy as np
 import pytest
 from dace.data import Array
 
@@ -333,10 +334,174 @@ def test_driver_variable_invalid_prefix(
         assert len(translation_driver.sdfg.arrays) == 0
 
 
+def test_driver_variable_alloc_list(
+    translation_driver: translator.JaxprTranslationDriver,
+) -> None:
+    """Tests part of the `JaxprTranslationDriver::create_jax_var_list()` api."""
+    var_list_1 = [array1, nscal, scal2]
+    exp_names_1 = ["a", nscal.name, "c"]
+
+    res_names_1 = translation_driver.create_jax_var_list(
+        var_list_1,
+        update_var_mapping=True,
+    )
+    assert len(translation_driver.arrays) == 3
+    assert res_names_1 == exp_names_1
+
+    # Now a mixture of the collection and creation.
+    var_list_2 = [array2, nscal, scal1]
+    exp_names_2 = ["d", nscal.name, "e"]
+
+    res_names_2 = translation_driver.create_jax_var_list(
+        var_list_2,
+        update_var_mapping=True,
+    )
+    assert res_names_2 == exp_names_2
+    assert len(translation_driver.arrays) == 5
+
+
+@pytest.mark.skip(reason="'create_jax_var_list()' does not clean up in case of an error.")
+def test_driver_variable_alloc_list_cleaning(
+    translation_driver: translator.JaxprTranslationDriver,
+) -> None:
+    """Tests part of the `JaxprTranslationDriver::create_jax_var_list()` api.
+
+    It will fail because `update_var_mapping=False` thus the third variable will
+    cause an error because it is proposed to `a`, which is already used.
+    """
+    var_list = [array1, nscal, scal2]
+    exp_names = ["a", nscal.name, "c"]
+
+    with pytest.raises(
+        expected_exception=ValueError,
+        match=re.escape(f"add_array({scal2}): The proposed name 'a', is used."),
+    ):
+        res_names = translation_driver.create_jax_var_list(var_list)
+
+    # This currently fails, because the `create_jax_var_list()` function does not clean up.
+    assert len(translation_driver.arrays) == 0
+
+
+def test_driver_variable_alloc_list_prevent_creation(
+    translation_driver: translator.JaxprTranslationDriver,
+) -> None:
+    """Tests part of the `JaxprTranslationDriver::create_jax_var_list()` api.
+
+    It will test the `prevent_creation` flag.
+    """
+    # First create a variable.
+    translation_driver.add_array(array1, update_var_mapping=True)
+    assert len(translation_driver.arrays) == 1
+
+    # Now create the variables
+    var_list = [array1, array2]
+
+    with pytest.raises(
+        expected_exception=ValueError,
+        match=re.escape(f"'prevent_creation' given but have to create '{array2}'."),
+    ):
+        translation_driver.create_jax_var_list(
+            var_list,
+            prevent_creation=True,
+        )
+    assert len(translation_driver.arrays) == 1
+    assert translation_driver.map_jax_var_to_sdfg(array1) == "a"
+
+
+@pytest.mark.skip(reason="'create_jax_var_list()' does not clean up in case of an error.")
+def test_driver_variable_alloc_list_only_creation(
+    translation_driver: translator.JaxprTranslationDriver,
+) -> None:
+    """Tests part of the `JaxprTranslationDriver::create_jax_var_list()` api.
+
+    It will test the `only_creation` flag.
+    """
+    # First create a variable.
+    translation_driver.add_array(array1, update_var_mapping=True)
+    assert len(translation_driver.arrays) == 1
+
+    # Now create the variables
+    var_list = [array2, array1]
+
+    with pytest.raises(
+        expected_exception=ValueError,
+        match=re.escape(f"'only_creation' given '{array1}' already exists."),
+    ):
+        translation_driver.create_jax_var_list(
+            var_list,
+            only_creation=True,
+        )
+    assert len(translation_driver.arrays) == 1
+    assert translation_driver.map_jax_var_to_sdfg(array1) == "a"
+
+
+def test_driver_variable_alloc_list_handle_literal(
+    translation_driver: translator.JaxprTranslationDriver,
+) -> None:
+    """Tests part of the `JaxprTranslationDriver::create_jax_var_list()` api.
+
+    It will test the `handle_literals` flag.
+    """
+    # First we have to build a jax literal.
+    import numpy as np
+    from jax import core as jcore
+
+    val = np.array(1)
+    aval = jcore.get_aval(val)
+    lit = jcore.Literal(val, aval)
+    var_list = [lit]
+
+    with pytest.raises(
+        expected_exception=ValueError,
+        match=re.escape("Encountered a literal but `handle_literals` was `False`."),
+    ):
+        translation_driver.create_jax_var_list(
+            var_list,
+            handle_literals=False,
+        )
+    assert len(translation_driver.arrays) == 0
+
+    name_list = translation_driver.create_jax_var_list(
+        var_list,
+        handle_literals=True,
+    )
+    assert len(translation_driver.arrays) == 0
+    assert name_list == [None]
+
+
+def test_driver_constants(
+    translation_driver: translator.JaxprTranslationDriver,
+) -> None:
+    """Tests part of the `JaxprTranslationDriver::_create_constants()` api.
+
+    See also the `test_subtranslators_alu.py::test_add3` test.
+    """
+    import jax
+
+    # Create the Jaxpr that we need.
+    constant = [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]
+    jaxpr = jax.make_jaxpr(lambda A: A + jax.numpy.array(constant))(1.0)
+
+    # We have to manually allocate the driver context.
+    #  You should not do that.
+    translation_driver._allocate_translation_ctx(name="Manual_test")
+
+    # No create the constants.
+    translation_driver._create_constants(jaxpr)
+
+    # Test if it was created with the correct value.
+    assert len(translation_driver.arrays) == 1
+    assert len(translation_driver._jax_name_map) == 1
+    assert next(iter(translation_driver._jax_name_map.values())) == "__const_a"
+    assert len(translation_driver.sdfg.constants) == 1
+    assert np.all(translation_driver.sdfg.constants["__const_a"] == constant)
+
+
 def test_driver_jace_var() -> None:
     """Simple tests about the `JaCeVar` objects."""
     for iname in ["do", "", "_ _", "9al", "_!"]:
         with pytest.raises(
-            expected_exception=ValueError, match=re.escape(f"Supplied the invalid name '{iname}'.")
+            expected_exception=ValueError,
+            match=re.escape(f"Supplied the invalid name '{iname}'."),
         ):
             _ = JaCeVar((), dace.int8, name=iname)
