@@ -8,9 +8,11 @@
 
 from __future__ import annotations
 
-from .alu_translator import ALUTranslator
+from .alu_translators import ALUBaseTranslator, BinaryALUTranslator, UnaryALUTranslator
 
 
 __all__ = [
-    "ALUTranslator",
+    "ALUBaseTranslator",
+    "BinaryALUTranslator",
+    "UnaryALUTranslator",
 ]
