@@ -23,7 +23,6 @@ np.random.seed(42)  # noqa: NPY002  # random generator
 
 def test_jit():
     """Simple add function."""
-    jax.config.update("jax_enable_x64", True)
 
     def testee(A: np.ndarray, B: np.ndarray) -> np.ndarray:
         return A + B
@@ -47,7 +46,6 @@ def test_jit():
 
 def test_composition_itself():
     """Tests if Jace is composable with itself."""
-    jax.config.update("jax_enable_x64", True)
 
     # Pure Python functions
     def f_ref(x):
@@ -86,7 +84,6 @@ def test_composition_itself():
 @pytest.mark.skip(reason="Nested Jaxpr are not handled.")
 def test_composition_with_jax():
     """Tests if Jace can interact with Jax and vice versa."""
-    jax.config.update("jax_enable_x64", True)
 
     def base_fun(A, B, C):
         return A + B * jnp.sin(C) - A * B
@@ -144,7 +141,6 @@ def test_composition_with_jax_2():
 
 def test_grad_annotation_direct():
     """Test if `jace.grad` works directly."""
-    jax.config.update("jax_enable_x64", True)
 
     def f(x):
         return jnp.sin(jnp.exp(jnp.cos(x**2)))
@@ -172,7 +168,6 @@ def test_grad_control_flow():
 
     This requirement is mentioned in `https://jax.readthedocs.io/en/latest/notebooks/Common_Gotchas_in_JAX.html#python-control-flow-autodiff`.
     """
-    jax.config.update("jax_enable_x64", True)
 
     @jace.grad
     def df(x):
@@ -190,3 +185,32 @@ def test_grad_control_flow():
 
     assert df(x1) == df_x1, f"Failed lower branch, expected '{df_x1}', got '{res_1}'."
     assert df(x2) == df_x2, f"Failed upper branch, expected '{df_x2}', got '{res_2}'."
+
+
+@pytest.mark.skip(reason="Running Jace with disabled 'x64' support does not work.")
+def test_disabled_x64():
+    """Tests the behaviour of the tool chain if we explicitly disable x64 support in Jax.
+
+    If you want to test, if this restriction still applies, you can enable the test.
+    """
+    from jax.experimental import disable_x64
+
+    def testee(A: np.ndarray, B: np.float64) -> np.ndarray:
+        return A + B
+
+    A = np.arange(12, dtype=np.float64).reshape((4, 3))
+    B = np.float64(10.0)
+
+    # Run them with disabled x64 support
+    with disable_x64():
+        # Jace
+        jace_testee = jace.jit(testee)
+        jace_lowered = jace_testee.lower(A, B)
+        jace_comp = jace_lowered.compile()
+        res = jace_comp(A, B)
+
+        # Jax
+        jax_testee = jax.jit(testee)
+        ref = jax_testee(A, B)
+
+    assert np.allclose(ref, res), "Expected that: {ref.tolist()}, but got {res.tolist()}."

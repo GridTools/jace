@@ -17,7 +17,6 @@ import jace
 
 def test_add():
     """Simple add function."""
-    jax.config.update("jax_enable_x64", True)
 
     def testee(A: np.ndarray, B: np.ndarray) -> np.ndarray:
         return A + B
@@ -33,7 +32,6 @@ def test_add():
 
 def test_add2():
     """Simple add function, with literal."""
-    jax.config.update("jax_enable_x64", True)
 
     def testee(A: np.ndarray, B: np.ndarray) -> np.ndarray:
         c = A + 0.01
@@ -53,7 +51,6 @@ def test_add2():
 
 def test_add3():
     """Simple add function, with constant."""
-    jax.config.update("jax_enable_x64", True)
 
     def testee(A: np.ndarray) -> np.ndarray:
         return A + jax.numpy.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]])

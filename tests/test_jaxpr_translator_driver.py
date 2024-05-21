@@ -12,7 +12,6 @@ from __future__ import annotations
 import re
 
 import dace
-import jax
 import numpy as np
 import pytest
 from dace.data import Array
@@ -503,7 +502,6 @@ def test_driver_scalar_return_value(
     translation_driver: translator.JaxprTranslationDriver,
 ) -> None:
     """Tests if scalars can be returned directly"""
-    jax.config.update("jax_enable_x64", True)
 
     def scalar_ops(A: float) -> float:
         return A + A - A * A

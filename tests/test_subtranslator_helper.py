@@ -12,7 +12,6 @@ from __future__ import annotations
 import re
 from typing import Any
 
-import jax
 import numpy as np
 import pytest
 
@@ -156,7 +155,6 @@ def test_subtranslatior_managing_overwriting():
 
 def test_subtranslatior_managing_overwriting_2(no_builtin_translators):
     """Again an overwriting test, but this time a bit more complicated."""
-    jax.config.update("jax_enable_x64", True)
 
     trans_cnt = [0]
 
@@ -181,7 +179,6 @@ def test_subtranslatior_managing_decoupling():
 
     I.e. changes to the global state, does not affect already annotated functions.
     """
-    jax.config.update("jax_enable_x64", True)
 
     @jace.jit
     def foo(A):

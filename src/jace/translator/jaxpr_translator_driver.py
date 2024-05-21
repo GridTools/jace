@@ -11,7 +11,6 @@ from collections.abc import Mapping, MutableSequence, Sequence
 from typing import TYPE_CHECKING, Any, Literal, cast, overload
 
 import dace
-import jax
 from dace import data as ddata, properties as dprop
 from jax import core as jax_core
 
@@ -115,10 +114,15 @@ class JaxprTranslationDriver:
         Args:
             name:                   Use this name for the SDFG instead some generated one.
         """
+        import jax as _jax
+
         if len(jaxpr.effects) != 0:
             raise NotImplementedError("'Jaxpr' with side effects are not supported.")
-        if not jax.config.read("jax_enable_x64"):
-            raise NotImplementedError("The translation only works if 'jax_enable_x64' is enabled.")
+        if not _jax.config.read("jax_enable_x64"):
+            raise NotImplementedError(
+                "You have disabled 'x64' support in Jax, which interferes with the calling of the SDFG. "
+                "SDFG generated in this way will fail to call."
+            )
 
         # NOTE: If `self` is already allocated, i.e. has an ongoing translation process,
         #       the `_allocate_translation_ctx()` function will start a new context.

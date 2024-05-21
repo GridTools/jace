@@ -13,7 +13,6 @@ from __future__ import annotations
 import itertools as it
 import re
 
-import jax
 import numpy as np
 import pytest
 
@@ -39,7 +38,6 @@ def _clear_translation_cache():
 
 def test_caching_same_sizes():
     """The behaviour of the cache if same sizes are used."""
-    jax.config.update("jax_enable_x64", True)
 
     # Counter for how many time it was lowered.
     lowering_cnt = [0]
@@ -83,7 +81,6 @@ def test_caching_same_sizes():
 
 def test_caching_different_sizes():
     """The behaviour of the cache if different sizes where used."""
-    jax.config.update("jax_enable_x64", True)
 
     # Counter for how many time it was lowered.
     lowering_cnt = [0]
@@ -122,7 +119,6 @@ def test_caching_different_structure():
     Todo:
         - Extend with strides once they are part of the cache.
     """
-    jax.config.update("jax_enable_x64", True)
 
     # This is the wrapped function.
     lowering_cnt = [0]
@@ -159,7 +155,6 @@ def test_caching_different_structure():
 
 def test_caching_compilation():
     """Tests the compilation cache, this is just very simple, since it uses the same code paths as lowering."""
-    jax.config.update("jax_enable_x64", True)
 
     @jace.jit
     def jaceWrapped(A: np.ndarray, B: np.ndarray) -> np.ndarray:
@@ -192,7 +187,6 @@ def test_caching_compilation():
 
 def test_caching_strides() -> None:
     """Test if the cache detects a change in strides."""
-    jax.config.update("jax_enable_x64", True)
 
     @jace.jit
     def wrapped(A: np.ndarray) -> np.ndarray:

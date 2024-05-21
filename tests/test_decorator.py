@@ -12,7 +12,6 @@ Also see the `test_jax_api.py` test file, that tests composability.
 
 from __future__ import annotations
 
-import jax
 import numpy as np
 import pytest
 
@@ -37,7 +36,6 @@ def _clear_translation_cache():
 
 def test_decorator_individually():
     """Tests the compilation steps individually."""
-    jax.config.update("jax_enable_x64", True)
 
     def testee_(A: np.ndarray, B: np.ndarray) -> np.ndarray:
         return A + B
@@ -64,7 +62,6 @@ def test_decorator_individually():
 
 def test_decorator_one_go():
     """Tests the compilation steps in one go."""
-    jax.config.update("jax_enable_x64", True)
 
     def testee_(A: np.ndarray, B: np.ndarray) -> np.ndarray:
         return A + B
