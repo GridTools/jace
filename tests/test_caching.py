@@ -203,6 +203,30 @@ def test_caching_compilation():
     assert optiCompiled._csdfg.sdfg.number_of_nodes() < unoptiCompiled._csdfg.sdfg.number_of_nodes()
 
 
+def test_caching_dtype():
+    """Tests if the data type is properly included in the test."""
+
+    lowering_cnt = [0]
+
+    @jace.jit
+    def testee(A: np.ndarray) -> np.ndarray:
+        lowering_cnt[0] += 1
+        return A + A
+
+    dtypes = [np.float64, np.float32, np.int32, np.int64]
+    shape = (10, 10)
+
+    for i, dtype in enumerate(dtypes):
+        A = np.array((np.random.random(shape) - 0.5) * 10, dtype=dtype)  # noqa: NPY002
+
+        assert lowering_cnt[0] == i
+        _ = testee(A)
+        assert lowering_cnt[0] == i + 1
+
+        assert np.allclose(testee(A), 2 * A)
+        assert lowering_cnt[0] == i + 1
+
+
 def test_caching_strides() -> None:
     """Test if the cache detects a change in strides."""
 
