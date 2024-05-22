@@ -9,8 +9,7 @@
 
 from __future__ import annotations
 
-from abc import abstractmethod
-from collections.abc import MutableSequence, Sequence
+from collections.abc import Sequence
 from typing import Final, cast
 
 import dace
@@ -19,30 +18,24 @@ from jax import core as jax_core
 from typing_extensions import override
 
 from jace import translator
+from jace.translator.primitive_translators.mapped_operation_base_translator import (
+    MappedOperationBaseTranslator,
+)
 
 
-class ALUBaseTranslator(translator.PrimitiveTranslator):
+class ALUBaseTranslator(MappedOperationBaseTranslator):
     """Base for all ALU (arithmetic logical operations) translators.
 
-    The ALU translators make use of the template pattern and this is the main Skeleton.
-    You can think of it as a glorified wrapper around `sdfg::add_mapped_tasklet()`.
+    This class implements the `MappedOperationBaseTranslator::write_tasklet_code()` function.
+    The tasklet is written based on a template string.
+    In addition to that the function will also do literal substitution.
 
-    It assumes that Tasklets can be written in the following form:
-    ```
-        __out0 = f(__in0, __in1, ...)
-    ```
-    where `f` is some function like plus, i.e. `__out0 = __in0 + __in1`, where `__in{}` is an input connector name of the Tasklet.
-
-    An instance of this class is constructed with the name of the primitive that it should handle and a template.
-    The template is basically the code that should be inside the Tasklet, i.e. the function `f`.
-
-    A subclass has to implement the `make_input_memlets()` function which computes the Memlets used as inputs that are used.
     There are two subclasses:
     - `UnaryALUTranslator` for all unary operations.
     - `BinaryALUTranslator` for all binary operations.
     """
 
-    __slots__ = ("_prim_name", "_tskl_tmpl")
+    __slots__ = "_tskl_tmpl"
 
     def __init__(
         self,
@@ -55,72 +48,10 @@ class ALUBaseTranslator(translator.PrimitiveTranslator):
             prim_name:      The name of the primitive that should be handled.
             tskl_tmpl:      Template used for generating the Tasklet code.
         """
-        self._prim_name = prim_name
+        super().__init__(primitive_name=prim_name)
         self._tskl_tmpl = tskl_tmpl
 
-    @property
-    def primitive(self) -> str:
-        """Returns the primitive that should be translated."""
-        return self._prim_name
-
     @override
-    def __call__(
-        self,
-        driver: translator.JaxprTranslationDriver,
-        in_var_names: Sequence[str | None],
-        out_var_names: MutableSequence[str],
-        eqn: jax_core.JaxprEqn,
-        eqn_state: dace.SDFGState,
-    ) -> None:
-        """Perform the translation.
-
-        Deepening on the shapes of the input the function will either create a Tasklet or a mapped Tasklet.
-        The translator is able to handle broadcasting with NumPy rules.
-        The function will always perform the translation inside the provided state.
-
-        Args:
-            driver:         The driver object of the translation.
-            in_var_names:   List of the names of the arrays created inside the SDFG for the inputs or 'None' in case of a literal.
-            out_var_names:  List of the names of the arrays created inside the SDFG for the outputs.
-            eqn:            The Jax equation that is translated.
-            eqn_state:      State into which the primitive's SDFG representation is constructed.
-        """
-        if len(out_var_names) != 1:
-            raise NotImplementedError("'{type(self).__name__}' only one output is allowed.")
-
-        if eqn.outvars[0].aval.shape != ():
-            tskl_ranges: list[tuple[str, str]] = [
-                (f"__i{dim}", f"0:{N}") for dim, N in enumerate(eqn.outvars[0].aval.shape)
-            ]
-            tskl_output: dict[str, dace.Memlet] = {
-                "__out0": dace.Memlet.simple(
-                    out_var_names[0],
-                    ", ".join(name for name, _ in tskl_ranges),
-                ),
-            }
-        else:
-            # If we have a scalar we will generate a Map, but it will be trivial.
-            tskl_ranges = [("__jace_iterator_SCALAR", "0:1")]
-            tskl_output = {"__out0": dace.Memlet.simple(out_var_names[0], "0")}
-
-        # Non size dependent properties
-        tskl_name: str = f"{self.primitive}_{out_var_names[0]}"
-        tskl_code: str = self.write_tasklet_code(in_var_names, eqn)
-        tskl_inputs: dict[str, dace.Memlet] = self.make_input_memlets(
-            tskl_ranges, in_var_names, eqn
-        )
-
-        eqn_state.add_mapped_tasklet(
-            name=tskl_name,
-            map_ranges=tskl_ranges,
-            inputs=tskl_inputs,
-            code=tskl_code,
-            outputs=tskl_output,
-            external_edges=True,
-        )
-
-        return eqn_state
-
     def write_tasklet_code(
         self,
         in_var_names: Sequence[str | None],
@@ -132,7 +63,6 @@ class ALUBaseTranslator(translator.PrimitiveTranslator):
             in_var_names:   The list of SDFG variables used as input.
             eqn:            The equation.
         """
-
         tskl_code = self._tskl_tmpl
         for i, in_var_name in enumerate(in_var_names):
             if in_var_name is not None:
@@ -151,72 +81,36 @@ class ALUBaseTranslator(translator.PrimitiveTranslator):
 
         return tskl_code
 
-    @abstractmethod
-    def make_input_memlets(
-        self,
-        tskl_ranges: Sequence[tuple[str, str]],
-        in_var_names: Sequence[str | None],
-        eqn: jax_core.JaxprEqn,
-    ) -> dict[str, dace.Memlet]:
-        """Generate the input Memlets for the non literal operators of the primitive.
-
-        The returned `dict` maps the input connector of the Tasklet to the Memlet that is used to connect it to the Map entry node.
-
-        Args:
-            tskl_ranges:    List of the different map parameter, first element is the name of the dimension,
-                                    second is the range, i.e. `0:SIZE`.
-            in_var_names:       The list of SDFG variables used as input.
-            eqn:                The equation object.
-        """
-        ...
-
 
 class UnaryALUTranslator(ALUBaseTranslator):
     """Class for all unary operations.
-
-    Thus all Tasklets this class generates have the form:
-    ```python
-        __out0 = f(__in0)
-    ```
 
     Todo:
         - Specialize for `integer_pow` to do code unrolling in certain situations.
     """
 
-    def make_input_memlets(
+    @override
+    def write_tasklet_code(
         self,
-        tskl_ranges: Sequence[tuple[str, str]],
         in_var_names: Sequence[str | None],
         eqn: jax_core.JaxprEqn,
-    ) -> dict[str, dace.Memlet]:
-        """Generate the input Memlets for non literal data.
-
-        Args:
-            tskl_ranges:    List of the different map parameter, first element is the name of the dimension,
-                                second is the range, i.e. `0:SIZE`.
-            in_var_names:   The list of SDFG variables used as input.
-            eqn:            The equation object.
-        """
-        in_var_name = in_var_names[0]
-        if in_var_name is None:  # Unary operation with literal input -> there is nothing to do.
-            return {}
-        if eqn.outvars[0].aval.shape == ():
-            imemlet = dace.Memlet.simple(in_var_name, "0")
-        else:
-            imemlet = dace.Memlet.simple(in_var_name, ", ".join(name for name, _ in tskl_ranges))
-        return {"__in0": imemlet}
+    ) -> str:
+        if len(in_var_names) != 1:
+            raise RuntimeWarning(
+                f"'UnaryALUTranslator' can only handle unary operations.\nEqn: {eqn}"
+            )
+        return super().write_tasklet_code(
+            in_var_names=in_var_names,
+            eqn=eqn,
+        )
 
 
 class BinaryALUTranslator(ALUBaseTranslator):
     """Class for all binary ALU operations.
 
-    Thus all Tasklets will have the following form:
-    ```python
-        __out0 = f(__in0, __in1)
-    ```
-
-    The main difference towards the `UnaryALUTranslator` is that this class supports broadcasting.
-    However, this is only possible if both operators have the same rank.
+    While `MappedOperationBaseTranslator` requires that the inputs must have the same shape,
+    this class lift this restriction and allows to broadcast the operants.
+    However, broadcasting is only possible if both inputs have the same rank.
 
     Notes:
         The input `__in0` is identified with the left hand side of an operator and `__in1` is identified as the right hand side.
@@ -228,6 +122,11 @@ class BinaryALUTranslator(ALUBaseTranslator):
         in_var_names: Sequence[str | None],
         eqn: jax_core.JaxprEqn,
     ) -> dict[str, dace.Memlet]:
+        if len(in_var_names) != 2:
+            raise RuntimeWarning(
+                f"'BinaryALUTranslator' can only handle binary operations.\nEqn: {eqn}"
+            )
+
         out_shps = tuple(eqn.outvars[0].aval.shape)  # Shape of the output
         inp_shpl = tuple(eqn.invars[0].aval.shape)  # Shape of the left/first input
         inp_shpr = tuple(eqn.invars[1].aval.shape)  # Shape of the right/second input
