@@ -22,8 +22,6 @@ from typing import Any
 
 import dace
 import jax.core as jax_core
-import jax.dtypes as jax_dtypes
-import numpy as np
 
 import jace.util as util
 
@@ -141,35 +139,15 @@ def is_tracing_ongoing(
 
 def translate_dtype(dtype: Any) -> dace.typeclass:
     """Turns a Jax datatype into a DaCe datatype."""
+    if dtype is None:
+        raise NotImplementedError  # Handling a special case in DaCe.
     if isinstance(dtype, dace.typeclass):
         return dtype
-    if dtype is None:
-        # Special behaviour of `dtype_to_typeclass()`
-        raise NotImplementedError()
-
-    # For reasons unknown to me we have to do the dtype conversion this way.
-    #  It is not possible to simply call `dace.typeclass(dtype)` or pass it to
-    #  `dace.dtype_to_typeclass()`, it will generate an error.
-    #  We keep the `dtype_to_typeclass()` function call, in order to handle
-    #  NumPy types as DaCe intended them to be handled.
     try:
-        return dace.dtype_to_typeclass(dtype)
-    except KeyError:
+        return dace.typeclass(dtype)
+    except (NameError, KeyError):
         pass
-
-    try:
-        dtype_ = jax_dtypes.canonicalize_dtype(dtype)
-        return dace.dtype_to_typeclass(dtype_)
-    except Exception:
-        pass
-
-    dtype_name = str(dtype)
-    if hasattr(dace.dtypes, dtype_name):
-        return getattr(dace.dtypes, dtype_name)
-    if hasattr(np, dtype_name):
-        dtype = getattr(np, dtype_name)
-        return dace.dtype_to_typeclass(dtype)
-    raise ValueError(f"Unable to translate '{dtype}' ino a DaCe dtype.")
+    return dace.dtype_to_typeclass(getattr(dtype, "type", dtype))
 
 
 def propose_jax_name(
