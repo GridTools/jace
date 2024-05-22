@@ -167,7 +167,7 @@ def translate_dtype(dtype: Any) -> dace.typeclass:
     if hasattr(dace.dtypes, dtype_name):
         return getattr(dace.dtypes, dtype_name)
     if hasattr(np, dtype_name):
-        dtype = getattr(np, dtype)
+        dtype = getattr(np, dtype_name)
         return dace.dtype_to_typeclass(dtype)
     raise ValueError(f"Unable to translate '{dtype}' ino a DaCe dtype.")
 

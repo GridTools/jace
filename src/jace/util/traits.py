@@ -142,5 +142,5 @@ def is_fully_addressable(
             Jax array is on this host.
     """
     if is_jax_array(obj):
-        return obj.is_fully_addressable()
+        return obj.is_fully_addressable
     return True
