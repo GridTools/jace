@@ -126,7 +126,7 @@ class _AbstarctCallArgument:
 
         if util.is_array(val):
             if util.is_jax_array(val):
-                val = val.__array__(copy=False)
+                val = val.__array__()  # Passing `copy=False` leads to error in NumPy.
             shape = val.shape
             dtype = util.translate_dtype(val.dtype)
             strides = getattr(val, "strides", None)
