@@ -114,6 +114,11 @@ class JaxprTranslationDriver:
         if len(jaxpr.effects) != 0:
             raise NotImplementedError("'Jaxpr' with side effects are not supported.")
         if not _jax.config.read("jax_enable_x64"):
+            # NOTE: What is interesting here is, that the SDFG can be called, but the result is garbage.
+            #  Beside that I think it should not work, I think it should not even call,
+            #  because of a mismatch in data types.
+            #  However, If we work with Jax arrays themselves, it should technically work.
+            #  But currently the best we can do, is forbid it!
             raise NotImplementedError(
                 "You have disabled 'x64' support in Jax, which interferes with the calling of the SDFG. "
                 "SDFG generated in this way will fail to call."
