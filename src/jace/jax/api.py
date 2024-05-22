@@ -9,33 +9,30 @@
 
 from __future__ import annotations
 
-import functools as ft
+import functools
 from collections.abc import Callable, Mapping
-from typing import TYPE_CHECKING, Any, Literal, overload
+from typing import Any, Literal, overload
 
-import jax as _jax_jax
+from jax import grad, jacfwd, jacrev
 
 from jace import translator
-
-
-if TYPE_CHECKING:
-    from jace.jax import stages
+from jace.jax import stages
 
 
 @overload
 def jit(
     fun: Literal[None] = None,
     /,
-    sub_translators: Mapping[str, translator.PrimitiveTranslatorCallable] | None = None,
+    sub_translators: Mapping[str, translator.PrimitiveTranslator] | None = None,
     **kwargs: Any,
-) -> Callable[..., stages.JaceWrapped]: ...
+) -> Callable[[Callable], stages.JaceWrapped]: ...
 
 
 @overload
 def jit(
     fun: Callable,
     /,
-    sub_translators: Mapping[str, translator.PrimitiveTranslatorCallable] | None = None,
+    sub_translators: Mapping[str, translator.PrimitiveTranslator] | None = None,
     **kwargs: Any,
 ) -> stages.JaceWrapped: ...
 
@@ -43,9 +40,9 @@ def jit(
 def jit(
     fun: Callable | None = None,
     /,
-    sub_translators: Mapping[str, translator.PrimitiveTranslatorCallable] | None = None,
+    sub_translators: Mapping[str, translator.PrimitiveTranslator] | None = None,
     **kwargs: Any,
-) -> stages.JaceWrapped | Callable[..., stages.JaceWrapped]:
+) -> stages.JaceWrapped | Callable[[Callable], stages.JaceWrapped]:
     """Jace's replacement for `jax.jit` (just-in-time) wrapper.
 
     It works the same way as `jax.jit` does, but instead of using XLA the computation is lowered to DaCe.
@@ -57,17 +54,15 @@ def jit(
 
     Notes:
         If no subtranslators are specified then the ones that are currently active,
-            i.e. the output of `get_regsitered_primitive_translators()`, are used.
-            After construction changes to the passed `sub_translators` have no effect on the returned object.
+        i.e. the output of `get_regsitered_primitive_translators()`, are used.
+        After construction changes to the passed `sub_translators` have no effect on the returned object.
     """
-    if len(kwargs) != 0:
+    if kwargs:
         raise NotImplementedError(
             f"The following arguments of 'jax.jit' are not yet supported by jace: {', '.join(kwargs.keys())}."
         )
 
     def wrapper(f: Callable) -> stages.JaceWrapped:
-        from jace import jax as stages  # Cyclic import
-
         jace_wrapper = stages.JaceWrapped(
             fun=f,
             sub_translators=(
@@ -77,61 +72,14 @@ def jit(
             ),
             jit_ops=kwargs,
         )
-        return ft.wraps(f)(jace_wrapper)
+        return functools.update_wrapper(jace_wrapper, f)
 
     return wrapper if fun is None else wrapper(fun)
 
 
-def vmap(
-    fun: Callable,
-    /,
-    **kwargs: Any,
-) -> stages.JaceWrapped:
-    """Jace wrapper around `jax.vmap`.
-
-    Notes:
-        Currently that is an untested extension.
-    """
-    import warnings
-
-    warnings.warn(
-        "You are using the highly untested 'vamp' interface.",
-        stacklevel=2,
-    )
-    return _jax_jax.vmap(
-        fun,
-        **kwargs,
-    )
-
-
-def grad(
-    fun: Callable | None = None,
-    /,
-    **kwargs: Any,
-) -> Callable:
-    """Jace wrapper for `jax.grad`.
-
-    Notes:
-        Note we can not put it into a `JaceWrapped` object because in autodiff mode
-            control primitives, such as `if` are allowed, but not in `jit`.
-            Thus there need to be this extra layer.
-    """
-    return _jax_jax.grad(fun, **kwargs)
-
-
-def jacfwd(
-    fun: Callable | None = None,
-    /,
-    **kwargs: Any,
-) -> Callable:
-    """Jace wrapper around `jax.jacfwd`."""
-    return _jax_jax.jacfwd(fun, **kwargs)
-
-
-def jacrev(
-    fun: Callable | None = None,
-    /,
-    **kwargs: Any,
-) -> Callable:
-    """Jace wrapper around `jax.jacrev`."""
-    return _jax_jax.jacrev(fun, **kwargs)
+__all__ = [
+    "grad",
+    "jit",
+    "jacfwd",
+    "jacrev",
+]

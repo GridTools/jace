@@ -51,12 +51,10 @@ class TranslatedJaxprSDFG:
         """Initializes the context.
 
         The function allocates the SDFG and initializes the members properly.
+        However, a user should never call this function directly.
 
         Args:
             name:       Name of the SDFG object.
-
-        Notes:
-            A user should never need to call this function.
         """
         if isinstance(name, str) and not util.VALID_SDFG_OBJ_NAME.fullmatch(name):
             raise ValueError(f"'{name}' is not a valid SDFG name.")

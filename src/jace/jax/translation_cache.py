@@ -16,12 +16,12 @@ Both are implemented as a singleton.
 
 from __future__ import annotations
 
-import functools as ft
-from abc import abstractmethod
-from collections import OrderedDict
-from collections.abc import Callable
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Final, Protocol, TypeAlias, runtime_checkable
+import abc
+import collections
+import dataclasses
+import functools
+from collections.abc import Callable, Hashable
+from typing import TYPE_CHECKING, Any, Final, TypeAlias
 
 import dace
 from jax import core as jax_core
@@ -36,43 +36,58 @@ if TYPE_CHECKING:
 _DEF_CACHE_SIZE: Final[int] = 256
 
 # This are the caches that we are using.
-_TRANSLATION_CACHES: dict[type[stages.Stage], TranslationCache] = {}
+_TRANSLATION_CACHES: dict[type[CachingStage], TranslationCache] = {}
+
+
+class CachingStage:
+    """Annotates a stage whose transition to the next one is cacheable.
+
+    This transitions are mainly `JaceWrapped.lower()` and `JaceLowered.compile()` calls.
+    To make a stage cacheable annotate the transition function with the `@cached_translation` decorator.
+
+    Todo:
+        - Make a generic to indicate what the result stage is.
+    """
+
+    _cache: TranslationCache
+
+    def __init__(self) -> None:
+        self._cache = get_cache(self)
+
+    @abc.abstractmethod
+    def _make_call_description(
+        self: CachingStage,
+        *args: Any,
+        **kwargs: Any,
+    ) -> CachedCallDescription:
+        """Generates the key that is used to store/locate the call in the cache."""
+        ...
 
 
 def cached_translation(
-    action: Callable,
+    action: Callable[..., stages.Stage],
 ) -> Callable:
-    """Decorator for making the transfer method, i.e. `JaceWrapped.lower()` and `JaceLowered.compile()` cacheable.
+    """Decorator for making the transition function of the stage cacheable.
 
-    The main issue is that we can not simply cache on the actual arguments we pass to them, but on an abstract
-    (or concrete; static arguments + compiling) description on them, and this is what this decorator is for.
-    Based on its argument it will generate a key of the call, see `TranslationCache.make_key()` for more.
-    Then it will check if the result is known and if needed it will perform the actual call.
-
-    Beside this the function will two two things.
-    The first is, that it will set the `_cache` member of `self` to the associated cache.
-    Thus an annotated object need to define such a member.
-
-    The second thing it will do is optional, if the call is not cached inside the cache the wrapped function has to be run.
-    In that case the wrapper will first check if the object defines the `_call_description` member.
-    If this is the case the wrapper will set this object to an abstract description of the call, which is also used as key in the cache.
-    After the function return this member is set to `None`.
+    The decorator will call the annotated function only if the call is not stored inside the cache.
+    The key to look up the call in the cache is computed by `self._make_call_description()`.
+    For this the stage must be derived from `CachingStage`.
     """
 
-    @ft.wraps(action)
+    @functools.wraps(action)
     def _action_wrapper(
-        self: stages.JaceWrapped | stages.JaceLowered,
+        self: CachingStage,
         *args: Any,
         **kwargs: Any,
     ) -> stages.Stage:
         # Get the abstract description of the call, that is used as key.
-        key: CachedCallDescription = self._make_call_decscription(*args, **kwargs)
-        if self._cache.has(key):
-            return self._cache.get(key)
+        key: CachedCallDescription = self._make_call_description(*args, **kwargs)
+        if key in self._cache:
+            return self._cache[key]
 
         # We must actually perform the call
         next_stage: stages.Stage = action(self, *args, **kwargs)
-        self._cache.add(key, next_stage)
+        self._cache[key] = next_stage
         return next_stage
 
     return _action_wrapper
@@ -84,7 +99,7 @@ def clear_translation_cache() -> None:
 
 
 def get_cache(
-    stage: stages.Stage,
+    stage: CachingStage,
 ) -> TranslationCache:
     """Returns the cache that is used for `stage`."""
     # The caches are per stage and not per instance basis
@@ -94,8 +109,8 @@ def get_cache(
     return _TRANSLATION_CACHES[tstage]
 
 
-@dataclass(init=True, eq=True, frozen=True)
-class _AbstarctCallArgument:
+@dataclasses.dataclass(frozen=True)
+class _AbstractCallArgument:
     """Class to represent one argument to the call in an abstract way.
 
     It is used as part of the key in the cache.
@@ -112,12 +127,11 @@ class _AbstarctCallArgument:
     def from_value(
         cls,
         val: Any,
-    ) -> _AbstarctCallArgument:
-        """Construct an `_AbstarctCallArgument` from a value.
+    ) -> _AbstractCallArgument:
+        """Construct an `_AbstractCallArgument` from a value.
 
         Todo:
-            Improve, such that NumPy arrays are on CPU, CuPy on GPU and so on.
-            This function also probably fails for scalars.
+            Handle storage location of arrays correctly.
         """
         if not util.is_fully_addressable(val):
             raise NotImplementedError("Distributed arrays are not addressed yet.")
@@ -130,7 +144,7 @@ class _AbstarctCallArgument:
             shape = val.shape
             dtype = util.translate_dtype(val.dtype)
             strides = getattr(val, "strides", None)
-            # TODO(phimuell): is `CPU_Heap` always okay? There would also be `CPU_Pinned`.
+            # Is `CPU_Heap` always okay? There would also be `CPU_Pinned`.
             storage = (
                 dace.StorageType.GPU_Global if util.is_on_device(val) else dace.StorageType.CPU_Heap
             )
@@ -141,7 +155,7 @@ class _AbstarctCallArgument:
             shape = ()
             dtype = util.translate_dtype(type(val))
             strides = None
-            # Lets pretend that scalars are always on the CPU, which is a fair assumption.
+            # Scalar arguments are always on the CPU and never on the GPU.
             storage = dace.StorageType.CPU_Heap
 
             return cls(shape=shape, dtype=dtype, strides=strides, storage=storage)
@@ -149,51 +163,34 @@ class _AbstarctCallArgument:
         raise TypeError(f"Can not make 'an abstract description from '{type(val).__name__}'.")
 
 
-@runtime_checkable
-class _ConcreteCallArgument(Protocol):
-    """Type for encoding a concrete arguments in the cache."""
-
-    @abstractmethod
-    def __hash__(self) -> int:
-        pass
-
-    @abstractmethod
-    def __eq__(self, other: Any) -> bool:
-        pass
-
-
-"""This type is the abstract description of a function call.
-It is part of the key used in the cache.
-"""
+#: This type is the abstract description of a function call.
+#:  It is part of the key used in the cache.
 CallArgsDescription: TypeAlias = tuple[
-    _AbstarctCallArgument
-    | _ConcreteCallArgument
-    | tuple[str, _AbstarctCallArgument]
-    | tuple[str, _ConcreteCallArgument],
+    _AbstractCallArgument | Hashable | tuple[str, _AbstractCallArgument | Hashable],
     ...,
 ]
 
 
-@dataclass(init=True, eq=True, frozen=True)
+@dataclasses.dataclass(frozen=True)
 class CachedCallDescription:
-    """Represents the structure of the entire call in the cache and used as key in the cache.
+    """Represents the full structure of a call in the cache as a key.
 
-    This class represents both the `JaceWrapped.lower()` and `JaceLowered.compile()` calls.
+    This class is the return type of the `CachingStage._make_call_description()` function,
+    which is used by the `@cached_translation` decorator to compute a key of transition.
+    This allows to either retrieve or then store the result of the actual call in the cache.
 
     The actual key is composed of two parts, first the "origin of the call".
     For this we just use the address of the stage object we are caching and hope that the
     address is not reused for another stag anytime soon.
 
     The second part is of the key are a description of the actual arguments, see `CallArgsDescription` type alias.
-    There are two ways for describing the arguments:
-    - `_AbstarctCallArgument`: Which encode only the structure of the arguments.
-        These are essentially the tracer used by Jax.
-    - `_ConcreteCallArgument`: Which represents actual values of the call.
-        These are either the static arguments or compile options.
-
-    While `JaceWrapped.lower()` uses both, `JaceLowered.compile()` will only use concrete arguments.
-    In addition an argument can be positional or a named argument,
-    in which case it consists of a `tuple[str, _AbstarctCallArgument  | _ConcreteCallArgument]`.
+    For this the `_make_call_description()` method of the stage is used.
+    The arguments can be described in two different ways:
+    - Abstract description: In this way, the actual value of the argument is irrelevant,
+        only the structure of them are important, this is similar to the tracers used in Jax.
+    - Concrete description: Here one caches on the actual value of the argument,
+        which is similar to static arguments in Jax.
+        The only restriction is that they are hash able.
 
     Notes:
         The base assumption is that the stages are immutable.
@@ -208,19 +205,15 @@ class CachedCallDescription:
 
 
 class TranslationCache:
-    """The _internal_ cache object.
-
-    It implements a simple LRU cache, for storing the results of the `JaceWrapped.lower()` and `JaceLowered.compile()` calls.
-    You should not use this cache directly but instead use the `cached_translation` decorator.
+    """The cache object used to cache the stage transitions.
 
     Notes:
-        The most recently used entry is at the end of the `OrderedDict`.
-            The reason for this is, because there the new entries are added.
+        The most recently used entry is at the end of the `OrderedDict`, because it puts new entries there.
     """
 
-    __slots__ = ["_memory", "_size"]
+    __slots__ = ("_memory", "_size")
 
-    _memory: OrderedDict[CachedCallDescription, stages.Stage]
+    _memory: collections.OrderedDict[CachedCallDescription, stages.Stage]
     _size: int
 
     def __init__(
@@ -233,17 +226,17 @@ class TranslationCache:
         """
         if size <= 0:
             raise ValueError(f"Invalid cache size of '{size}'")
-        self._memory: OrderedDict[CachedCallDescription, stages.Stage] = OrderedDict()
+        self._memory = collections.OrderedDict()
         self._size = size
 
-    def has(
+    def __contains__(
         self,
         key: CachedCallDescription,
     ) -> bool:
         """Check if `self` have a record of `key`."""
         return key in self._memory
 
-    def get(
+    def __getitem__(
         self,
         key: CachedCallDescription,
     ) -> stages.Stage:
@@ -253,18 +246,18 @@ class TranslationCache:
             It is an error if `key` does not exist.
             This function will mark `key` as most recently used.
         """
-        if not self.has(key):
+        if key not in self:
             raise KeyError(f"Key '{key}' is unknown.")
         self._memory.move_to_end(key, last=True)
         return self._memory[key]
 
-    def add(
+    def __setitem__(
         self,
         key: CachedCallDescription,
         res: stages.Stage,
     ) -> TranslationCache:
-        """Adds `res` under `key` to `self`."""
-        if self.has(key):
+        """Adds or update `key` to map to `res`."""
+        if key in self:
             # `key` is known, so move it to the end and update the mapped value.
             self._memory.move_to_end(key, last=True)
             self._memory[key] = res
@@ -272,11 +265,11 @@ class TranslationCache:
         else:
             # `key` is not known so we have to add it
             while len(self._memory) >= self._size:
-                self._evict(None)
+                self.popitem(None)
             self._memory[key] = res
         return self
 
-    def _evict(
+    def popitem(
         self,
         key: CachedCallDescription | None,
     ) -> None:
@@ -288,7 +281,7 @@ class TranslationCache:
             return
         if key is None:
             self._memory.popitem(last=False)
-        elif self.has(key):
+        elif key in self:
             self._memory.move_to_end(key, last=False)
             self._memory.popitem(last=False)
 

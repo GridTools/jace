@@ -24,11 +24,11 @@ As in Jax Jace has different stages, the terminology is taken from [Jax' AOT-Tut
 from __future__ import annotations
 
 import copy
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Hashable, Mapping, Sequence
 from typing import Any, Final, TypeAlias
 
 import dace
-import jax as jax_jax
+import jax as _jax
 
 from jace import optimization, translator, util
 from jace.jax import translation_cache as tcache
@@ -36,22 +36,12 @@ from jace.translator import post_translation as ptrans
 from jace.util import dace_helper as jdace
 
 
-class Stage:
-    """A distinct step in the compilation chain, see module description for more.
-
-    The concrete steps are implemented in:
-    - JaceWrapped
-    - JaceLowered
-    - JaceCompiled
-    """
+# TODO(phimuell): Turn this into `TypedDict` thing.
+#: Map type to pass compiler options to `JaceLowered.compile()`.
+CompilerOptions: TypeAlias = dict[str, bool | str]
 
 
-"""Map type to pass compiler options to `JaceLowered.compile()`.
-"""
-CompilerOptions: TypeAlias = dict[str, tuple[bool, str]]
-
-
-class JaceWrapped(Stage):
+class JaceWrapped(tcache.CachingStage):
     """A function ready to be specialized, lowered, and compiled.
 
     This class represents the output of functions such as `jace.jit()`.
@@ -61,22 +51,20 @@ class JaceWrapped(Stage):
     You should not create `JaceWrapped` instances directly, instead you should use `jace.jit`.
 
     Todo:
-        Handles pytrees.
-        Copy the `jax._src.pjit.make_jit()` functionality to remove `jax.make_jaxpr()`.
+        - Handle pytrees.
     """
 
     _fun: Callable
-    _sub_translators: Mapping[str, translator.PrimitiveTranslatorCallable]
-    _jit_ops: Mapping[str, Any]
-    _cache: tcache.TranslationCache
+    _sub_translators: dict[str, translator.PrimitiveTranslator]
+    _jit_ops: dict[str, Any]
 
     def __init__(
         self,
         fun: Callable,
-        sub_translators: Mapping[str, translator.PrimitiveTranslatorCallable],
+        sub_translators: Mapping[str, translator.PrimitiveTranslator],
         jit_ops: Mapping[str, Any],
     ) -> None:
-        """Creates a wrapped jace jitable object of `jax_prim`.
+        """Creates a wrapped jitable object of `fun`.
 
         You should not create `JaceWrapped` instances directly, instead you should use `jace.jit`.
 
@@ -84,17 +72,14 @@ class JaceWrapped(Stage):
             fun:                The function that is wrapped.
             sub_translators:    The list of subtranslators that that should be used.
             jit_ops:            All options that we forward to `jax.jit`.
-
-        Notes:
-            Both the `sub_translators` and `jit_ops` are shallow copied.
         """
+        super().__init__()
         # We have to shallow copy both the translator and the jit options.
         #  This prevents that any modifications affect `self`.
         #  Shallow is enough since the translators themselves are immutable.
         self._sub_translators = dict(sub_translators)
         self._jit_ops = dict(jit_ops)
         self._fun = fun
-        self._cache = tcache.get_cache(self)
 
     def __call__(
         self,
@@ -141,7 +126,7 @@ class JaceWrapped(Stage):
         if not all((not util.is_array(arg)) or arg.flags["C_CONTIGUOUS"] for arg in args):
             raise NotImplementedError("Currently can not handle strides beside 'C_CONTIGUOUS'.")
 
-        jaxpr = jax_jax.make_jaxpr(self._fun)(*args)
+        jaxpr = _jax.make_jaxpr(self._fun)(*args)
         driver = translator.JaxprTranslationDriver(sub_translators=self._sub_translators)
         trans_sdfg: translator.TranslatedJaxprSDFG = driver.translate_jaxpr(jaxpr)
         ptrans.postprocess_jaxpr_sdfg(tsdfg=trans_sdfg, fun=self.wrapped_fun)
@@ -153,7 +138,7 @@ class JaceWrapped(Stage):
         """Returns the wrapped function."""
         return self._fun
 
-    def _make_call_decscription(
+    def _make_call_description(
         self,
         *args: Any,
     ) -> tcache.CachedCallDescription:
@@ -163,21 +148,24 @@ class JaceWrapped(Stage):
         The function will fully abstractify its input arguments.
         This function is used by the cache to generate the key.
         """
-        fargs = tuple(tcache._AbstarctCallArgument.from_value(x) for x in args)
+        fargs = tuple(tcache._AbstractCallArgument.from_value(x) for x in args)
         return tcache.CachedCallDescription(stage_id=id(self), fargs=fargs)
 
 
-class JaceLowered(Stage):
-    """Represents the original computation that was lowered to SDFG."""
+class JaceLowered(tcache.CachingStage):
+    """Represents the original computation that was lowered to SDFG.
 
-    DEF_COMPILER_OPTIONS: Final[dict[str, Any]] = {
+    Todo:
+        - Handle pytrees.
+    """
+
+    DEF_COMPILER_OPTIONS: Final[CompilerOptions] = {
         "auto_optimize": True,
         "simplify": True,
     }
 
     # `self` assumes complete ownership of the
     _trans_sdfg: translator.TranslatedJaxprSDFG
-    _cache: tcache.TranslationCache
 
     def __init__(
         self,
@@ -190,8 +178,8 @@ class JaceLowered(Stage):
             raise ValueError("Input names must be defined.")
         if trans_sdfg.out_names is None:
             raise ValueError("Output names must be defined.")
+        super().__init__()
         self._trans_sdfg = trans_sdfg
-        self._cache = tcache.get_cache(self)
 
     @tcache.cached_translation
     def compile(
@@ -207,7 +195,7 @@ class JaceLowered(Stage):
 
         Notes:
             I am pretty sure that `None` in Jax means "use the default option".
-                See also `CachedCallDescription.make_call_description()`.
+            See also `CachedCallDescription.make_call_description()`.
         """
         # We **must** deepcopy before we do any optimization.
         #  There are many reasons for this but here are the most important ones:
@@ -218,16 +206,17 @@ class JaceLowered(Stage):
         #  However, if we would now call `jaceWrappedObject.lower()` (with the same arguments as before), we should get `jaceLoweredObject`,
         #  since it was cached, but it would actually contain an already optimized SDFG, which is not what we want.
         #  If you think you can remove this line then do it and run `tests/test_decorator.py::test_decorator_sharing`.
-        fsdfg: translator.TranslatedJaxprSDFG = copy.deepcopy(self._trans_sdfg)
+        tsdfg: translator.TranslatedJaxprSDFG = copy.deepcopy(self._trans_sdfg)
         optimization.jace_optimize(
-            fsdfg, **(self.DEF_COMPILER_OPTIONS if compiler_options is None else compiler_options)
+            tsdfg=tsdfg,
+            **(self.DEF_COMPILER_OPTIONS if compiler_options is None else compiler_options),  # type: ignore[arg-type]  # type confusion.
         )
-        csdfg: jdace.CompiledSDFG = util.compile_jax_sdfg(fsdfg)
+        csdfg: jdace.CompiledSDFG = util.compile_jax_sdfg(tsdfg)
 
         return JaceCompiled(
             csdfg=csdfg,
-            inp_names=fsdfg.inp_names,
-            out_names=fsdfg.out_names,
+            inp_names=tsdfg.inp_names,
+            out_names=tsdfg.out_names,
         )
 
     def compiler_ir(self, dialect: str | None = None) -> translator.TranslatedJaxprSDFG:
@@ -254,7 +243,7 @@ class JaceLowered(Stage):
         """
         return self.compiler_ir().sdfg
 
-    def _make_call_decscription(
+    def _make_call_description(
         self,
         compiler_options: CompilerOptions | None = None,
     ) -> tcache.CachedCallDescription:
@@ -267,7 +256,7 @@ class JaceLowered(Stage):
         if compiler_options is None:  # Must be the same as in `compile()`!
             compiler_options = self.DEF_COMPILER_OPTIONS
         assert isinstance(compiler_options, dict)
-        fargs: tuple[tuple[str, tcache._ConcreteCallArgument], ...] = tuple(
+        fargs: tuple[tuple[str, Hashable], ...] = tuple(
             sorted(
                 ((argname, argvalue) for argname, argvalue in compiler_options.items()),
                 key=lambda X: X[0],
@@ -276,13 +265,11 @@ class JaceLowered(Stage):
         return tcache.CachedCallDescription(stage_id=id(self), fargs=fargs)
 
 
-class JaceCompiled(Stage):
+class JaceCompiled:
     """Compiled version of the SDFG.
 
-    Contains all the information to run the associated computation.
-
     Todo:
-        Handle pytrees.
+        - Handle pytrees.
     """
 
     _csdfg: jdace.CompiledSDFG  # The compiled SDFG object.
@@ -314,6 +301,10 @@ class JaceCompiled(Stage):
             args,
             kwargs,
         )
+
+
+#: Known compilation stages in Jace.
+Stage = JaceWrapped | JaceLowered | JaceCompiled
 
 
 __all__ = [

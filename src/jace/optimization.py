@@ -7,7 +7,7 @@
 
 """Module that will host all optimization functions specific to Jace.
 
-Currently it is just a dummy that exports some functions that do nothing.
+Currently just a dummy existing for the sake of providing some callable function.
 """
 
 from __future__ import annotations
@@ -17,9 +17,8 @@ from jace import translator
 
 def jace_optimize(
     tsdfg: translator.TranslatedJaxprSDFG,
-    simplify: bool = False,
+    simplify: bool = True,
     auto_optimize: bool = False,
-    **kwargs: str | bool,  # noqa: ARG001  # Unused argument, for now
 ) -> None:
     """Performs optimization of the `fsdfg` _inplace_.
 
@@ -29,10 +28,6 @@ def jace_optimize(
     Args:
         simplify:       Run the simplification pilepline.
         auto_optimize:  Run the auto optimization pipeline (currently does nothing)
-
-    Notes:
-        All optimization flags must be disabled by default!
-            The reason for this is that `jaceLowered.compile({})` will disable all optimizations.
     """
     if not tsdfg.is_finalized:
         raise ValueError("Can only optimize finalized SDFGs.")
@@ -44,8 +39,3 @@ def jace_optimize(
         pass
 
     tsdfg.validate()
-
-
-__all__ = [
-    "jace_auto_optimize",
-]

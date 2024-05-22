@@ -53,15 +53,14 @@ class JaxprTranslationDriver:
 
     Notes:
         After the main translation has been performed the translator object can be used again.
-        Currently the driver will generate only Array as SDFG variables, however, this is a temporary solution.
-            For more on that see `add_array()`.
+        Currently the driver will generate only Array as SDFG variables, however, this is a temporary solution, see `add_array()`.
     """
 
-    __slots__ = (
-        "_ctx_stack",  # Stack of all contexts
-        "_sub_translators",
-        "_jax_name_map",
-    )
+    __slots__ = ("_ctx_stack", "_sub_translators", "_jax_name_map")
+
+    _sub_translators: Mapping[str, translator.PrimitiveTranslatorCallable]
+    _jax_name_map: dict[jax_core.Var | util.JaCeVar, str]
+    _ctx_stack: list[translator.TranslatedJaxprSDFG]
 
     def __init__(
         self,
@@ -73,28 +72,24 @@ class JaxprTranslationDriver:
             sub_translators:    Use these subtranslators to perform the translation.
 
         Notes:
-            `sub_translators` is not copied, thus the user has to guarantee,
-                that it will not change during translation.
-                It is highly advised but not required to use the output of
-                `get_regsitered_primitive_translators()` or pass a copy as argument.
+            `sub_translators` is not copied, however, the user has to guarantee, that it does not change during the lifetime of `self`.
         """
 
         # Maps the name of a Jax primitive to the primitive translator that should be used.
         #  Note that the subtranslator is only required to be a callable, and immutable.
-        #  Allocated through the lifetime of `self`, and shared with the outside.
-        self._sub_translators: Mapping[str, translator.PrimitiveTranslatorCallable] = (
-            sub_translators
-        )
+        #  User has to ensure that it does not change.
+        self._sub_translators = sub_translators
 
         # Maps Jax variables to the name of its SDFG equivalent.
         #  Note that it is shared among all translation contexts.
         #  This is done to create consistency between SDFG variables
         #  and the names used pretty printed Jaxprs.
-        self._jax_name_map: dict[jax_core.Var | util.JaCeVar, str] = {}
+        self._jax_name_map = {}
 
         # Context stack and current context.
         #  If it is empty, then no translation process is in process.
-        self._ctx_stack: list[translator.TranslatedJaxprSDFG] = []
+        #  If there is one entry, `self` is the root translator.
+        self._ctx_stack = []
 
     def translate_jaxpr(
         self,
@@ -334,11 +329,11 @@ class JaxprTranslationDriver:
 
         Notes:
             Currently the function will always create an Array, even if the Jax variable refers to a scalar.
-                This is done to work around some difficulties with scalar return values and so on.
-                This issue should actually handled in the post processing stage, but currently it is not.
-                However, from a point of building an SDFG manually, there is no difference between a Scalar and an Array.
-                According to the dace developer, the majority of the backend, i.e. optimization pipeline, should be handle to handle it.
-                But there are some special parts that might explicitly want a scalar, it also might block certain compiler optimization.
+            This is done to work around some difficulties with scalar return values and so on.
+            This issue should actually handled in the post processing stage, but currently it is not.
+            However, from a point of building an SDFG manually, there is no difference between a Scalar and an Array.
+            According to the dace developer, the majority of the backend, i.e. optimization pipeline, should be handle to handle it.
+            But there are some special parts that might explicitly want a scalar, it also might block certain compiler optimization.
         """
         shape: tuple[int | dace.symbol | str, ...] = util.get_jax_var_shape(arg)
         dtype: dace.typeclass = util.get_jax_var_dtype(arg)
@@ -430,7 +425,7 @@ class JaxprTranslationDriver:
             kwargs:             Will be forwarded to `self.add_array()` in case a variable is created.
 
         Todo:
-            Rollback if the creation fails.
+            - Rollback if the creation fails.
         """
         if only_creation and prevent_creation:
             raise ValueError("Specified both 'only_creation' and 'prevent_creation'.")
@@ -459,13 +454,7 @@ class JaxprTranslationDriver:
         self,
         jaxpr: jax_core.ClosedJaxpr,
     ) -> Sequence[str]:
-        """This function will create the internal input variables that are used for the SDFG.
-
-        Args:
-            jaxpr:                  The Jaxpr that we want to translate.
-
-        Returns:
-            The list of SDFG variables used as input arguments of `jaxpr` in the same order.
+        """Creates the input variables of `jaxpr` and return a list of their SDFG names.
 
         Notes:
             The function will populate the `inp_names` member of the current context.
@@ -493,13 +482,10 @@ class JaxprTranslationDriver:
         self,
         jaxpr: jax_core.ClosedJaxpr,
     ) -> Sequence[str]:
-        """Creates all constants requested by the `jaxpr`.
+        """Creates all constants requested by the `jaxpr` and return a list with their SDFG names.
 
         The function will create an SDFG variable and add them as constant to the SDFG.
         The value they should have is deepcopied.
-
-        Returns:
-            Names of the SDFG variables created for the constants in the same order.
         """
         from copy import deepcopy
 
@@ -527,8 +513,8 @@ class JaxprTranslationDriver:
     ) -> JaxprTranslationDriver:
         """This function allocates and initialize the members of the translation context of `self`.
 
-        If this function is called and `self` is already allocated, the function will create a new context.
-        This allows the driver to handle nested Jaxpr.
+        If this function is called and `self` is already allocated, the function will create a new context,
+        allowing the driver to handle nested Jaxpr.
         The first context that is created is also known as root translator.
 
         Args:
@@ -561,7 +547,6 @@ class JaxprTranslationDriver:
         Notes:
             While it is allowed for outside code to call this function explicit it is is most likely an error.
             If `self` is not allocated this function acts as a noops.
-            If `self` is a root translator, then the function will also deallocate the shared state of `self`.
         """
         if not self.is_allocated():
             return self
@@ -581,7 +566,7 @@ class JaxprTranslationDriver:
     ) -> tuple[Sequence[str | None], Sequence[str]]:
         """Translate `eqn` into its SDFG equivalent.
 
-        To do this the function will do the following steps:
+        To do this the function will perform the following steps:
         - Assemble the in and output variables.
         - Select the appropriate subtranslator to use.
         - Create a new empty state terminal state.
@@ -671,9 +656,7 @@ class JaxprTranslationDriver:
             jaxpr:      The Jaxpr to translate.
 
         Notes:
-            The function will unconditionally handle empty Jaxpr.
-            Equations that store into drop variables, i.e. with name `_`, will be skipped.
-                Jax used such variables to indicate that it is not needed, transformations such as `grad` include them.
+            Equations that store into drop variables, i.e. with name `_`, will be ignored.
         """
         nb_translated_eqn: int = 0
         out_var_names: Sequence[str] = ()

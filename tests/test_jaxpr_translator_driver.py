@@ -338,7 +338,7 @@ def test_driver_variable_invalid_prefix(
 def test_driver_variable_alloc_list(
     translation_driver: translator.JaxprTranslationDriver,
 ) -> None:
-    """Tests part of the `JaxprTranslationDriver::create_jax_var_list()` api."""
+    """Tests part of the `JaxprTranslationDriver.create_jax_var_list()` api."""
     var_list_1 = [array1, nscal, scal2]
     exp_names_1 = ["a", nscal.name, "c"]
 
@@ -365,7 +365,7 @@ def test_driver_variable_alloc_list(
 def test_driver_variable_alloc_list_cleaning(
     translation_driver: translator.JaxprTranslationDriver,
 ) -> None:
-    """Tests part of the `JaxprTranslationDriver::create_jax_var_list()` api.
+    """Tests part of the `JaxprTranslationDriver.create_jax_var_list()` api.
 
     It will fail because `update_var_mapping=False` thus the third variable will
     cause an error because it is proposed to `a`, which is already used.
@@ -386,7 +386,7 @@ def test_driver_variable_alloc_list_cleaning(
 def test_driver_variable_alloc_list_prevent_creation(
     translation_driver: translator.JaxprTranslationDriver,
 ) -> None:
-    """Tests part of the `JaxprTranslationDriver::create_jax_var_list()` api.
+    """Tests part of the `JaxprTranslationDriver.create_jax_var_list()` api.
 
     It will test the `prevent_creation` flag.
     """
@@ -413,7 +413,7 @@ def test_driver_variable_alloc_list_prevent_creation(
 def test_driver_variable_alloc_list_only_creation(
     translation_driver: translator.JaxprTranslationDriver,
 ) -> None:
-    """Tests part of the `JaxprTranslationDriver::create_jax_var_list()` api.
+    """Tests part of the `JaxprTranslationDriver.create_jax_var_list()` api.
 
     It will test the `only_creation` flag.
     """
@@ -439,7 +439,7 @@ def test_driver_variable_alloc_list_only_creation(
 def test_driver_variable_alloc_list_handle_literal(
     translation_driver: translator.JaxprTranslationDriver,
 ) -> None:
-    """Tests part of the `JaxprTranslationDriver::create_jax_var_list()` api.
+    """Tests part of the `JaxprTranslationDriver.create_jax_var_list()` api.
 
     It will test the `handle_literals` flag.
     """
@@ -473,7 +473,7 @@ def test_driver_variable_alloc_list_handle_literal(
 def test_driver_constants(
     translation_driver: translator.JaxprTranslationDriver,
 ) -> None:
-    """Tests part of the `JaxprTranslationDriver::_create_constants()` api.
+    """Tests part of the `JaxprTranslationDriver._create_constants()` api.
 
     See also the `test_subtranslators_alu.py::test_add3` test.
     """

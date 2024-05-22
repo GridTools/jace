@@ -86,12 +86,11 @@ def run_jax_sdfg(
         cargs:      All positional arguments of the call.
         ckwargs:    All keyword arguments of the call.
 
-    Notes:
+    Note:
         There is no pytree mechanism jet, thus the return values are returned inside a `tuple`
-            or in case of one value, directly, in the order determined by Jax.
-        Currently, this function does not consider strides in the input,
-            all input must be `C_CONTIGUOUS`.
-        Currently the SDFG must not have any undefined symbols, i.e. no undefined sizes.
+        or in case of one value, directly, in the order determined by Jax.
+        Currently, this function does not consider strides in the input, all input must be `C_CONTIGUOUS`.
+        Currently, the SDFG must not have any undefined symbols, i.e. no undefined sizes.
     """
     from jace import util
 

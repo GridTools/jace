@@ -15,9 +15,9 @@ mimics the full `jax` package itself.
 
 from __future__ import annotations
 
+import dataclasses
 import itertools
 from collections.abc import Mapping
-from dataclasses import dataclass
 from typing import Any
 
 import dace
@@ -28,23 +28,21 @@ import numpy as np
 import jace.util as util
 
 
-@dataclass(repr=True, frozen=True, eq=False)
+@dataclasses.dataclass(repr=True, frozen=True, eq=False)
 class JaCeVar:
     """Replacement for the `jax.Var` class.
 
     This class can be seen as some kind of substitute `jax.core.Var`.
-    The main intention of this class is as an internal representation of values,
-    as they are used in Jax, but without the Jax machinery.
+    The main intention of this class is as an internal representation of values, as they are used in Jax, but without the Jax machinery.
     As abstract values in Jax this class has a datatype, which is a `dace.typeclass` instance and a shape.
-    In addition it has an optional name, which allows to create variables with a certain name using `JaxprTranslationDriver::add_array()`.
+    In addition it has an optional name, which allows to create variables with a certain name using `JaxprTranslationDriver.add_array()`.
 
-    Notes:
-        Main intention is to test functionality.
+    Note:
         If the name of a `JaCeVar` is '_' it is considered a drop variable.
         The definitions of `__hash__` and `__eq__` are in accordance how Jax variable works.
 
     Todo:
-        Add support for strides.
+        - Add support for strides.
     """
 
     shape: tuple[int | dace.symbol | str, ...]
@@ -78,9 +76,8 @@ def get_jax_var_name(jax_var: jax_core.Atom | JaCeVar) -> str:
 
     Notes:
         If `jax_var` is a `JaCeVar` the function will return, if defined, its `.name` property.
-            Otherwise it will compose a name similar to Jax `Var` objects.
+        Otherwise it will compose a name similar to Jax `Var` objects.
         The returned names are stable, i.e. it will output the same value for the same variable.
-        The returned name passes the `util.VALID_SDFG_VAR_NAME` pattern.
     """
     match jax_var:
         case jax_core.DropVar():
@@ -191,9 +188,9 @@ def propose_jax_name(
         jax_var:        The variable for which a name to propose.
         jax_name_map:   A mapping of all Jax variables that were already named.
 
-    Notes:
+    Note:
         The function guarantees that the returned name passes `VALID_SDFG_VAR_NAME` test
-            and that the name is not part of `util.FORBIDDEN_SDFG_VAR_NAMES`.
+        and that the name is not part of `util.FORBIDDEN_SDFG_VAR_NAMES`.
         Dropped variables will always be named `'_'`.
     """
     if isinstance(jax_var, jax_core.Literal):

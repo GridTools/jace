@@ -13,71 +13,86 @@ If not specified the content of this list is used to perform the translation.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
-from typing import TYPE_CHECKING, cast
+from collections.abc import Callable, Mapping, MutableMapping
+from typing import TYPE_CHECKING, Literal, cast, overload
 
 
 if TYPE_CHECKING:
     from jace import translator
 
 # These are the currently active primitive translators of JaCe.
-_PRIMITIVE_TRANSLATORS_DICT: dict[str, translator.PrimitiveTranslatorCallable] = {}
+_PRIMITIVE_TRANSLATORS_DICT: dict[str, translator.PrimitiveTranslator] = {}
 
 
-def register_primitive_translator(
-    prim_translator: translator.PrimitiveTranslator
-    | translator.PrimitiveTranslatorCallable
-    | None = None,
-    *,
-    primitive: str | None = None,
-    overwrite: bool = False,
+@overload
+def make_primitive_translator(
+    primitive: str,
+    prim_translator: Literal[None] = None,
+) -> Callable[[translator.PrimitiveTranslatorCallable], translator.PrimitiveTranslator]: ...
+
+
+@overload
+def make_primitive_translator(
+    primitive: str, prim_translator: translator.PrimitiveTranslatorCallable
+) -> translator.PrimitiveTranslator: ...
+
+
+def make_primitive_translator(
+    primitive: str,
+    prim_translator: translator.PrimitiveTranslatorCallable | None = None,
 ) -> (
-    translator.PrimitiveTranslator
-    | Callable[
-        [translator.PrimitiveTranslator | translator.PrimitiveTranslatorCallable],
-        translator.PrimitiveTranslator,
-    ]
+    Callable[[translator.PrimitiveTranslatorCallable], translator.PrimitiveTranslator]
+    | translator.PrimitiveTranslator
 ):
-    """Adds the primitive translator `prim_translator` to Jace's internal list of translators.
+    """Decorator to turn a Callable into a `PrimitiveTranslator` for primitive `primitive`.
 
-    If the primitive is already known an error is generated, if `overwrite` is set, it will be replaced.
-
-    Args:
-        prim_translator:    The primitive translator to annotate.
-        primitive:          Name of the primitive `prim_translator` is handled.
-                                If not given will use `prim_translator.primitive`.
-        overwrite:          Replace the current primitive translator with `prim_translator`.
-
-    Notes:
-        Can only be used to register instances.
+    This function can be used to decorate functions that should serve as primitive translators.
+    Essentially, the decorator adds a `primitive` property to the decorated function and returns it.
+    However, this function does not register the primitive into the global registry,
+    for this you have to use `register_primitive_translator()`.
     """
-    from jace import translator
 
     def wrapper(
-        prim_translator: translator.PrimitiveTranslator | translator.PrimitiveTranslatorCallable,
+        prim_translator: translator.PrimitiveTranslatorCallable,
     ) -> translator.PrimitiveTranslator:
-        if not hasattr(prim_translator, "primitive"):
-            if not primitive:
-                raise ValueError(f"Missing primitive name for '{prim_translator}'")
-            prim_translator.primitive = primitive  # type: ignore[attr-defined]
-        elif (primitive is not None) and (prim_translator.primitive != primitive):
-            raise TypeError(
-                f"Translator's primitive '{prim_translator.primitive}' doesn't match the supplied '{primitive}'."
-            )
-
-        if prim_translator.primitive in _PRIMITIVE_TRANSLATORS_DICT and not overwrite:
+        if getattr(prim_translator, "primitive", primitive) != primitive:
             raise ValueError(
-                f"Explicit override=True needed for primitive '{prim_translator.primitive}' to overwrite existing one."
+                f"Tried to change the 'primitive' property of '{prim_translator}' from '{prim_translator.primitive}' to '{primitive}'."  # type: ignore[attr-defined]
             )
-        _PRIMITIVE_TRANSLATORS_DICT[prim_translator.primitive] = prim_translator
-
-        # We add a `.primitive` property, thus it is for sure now no longer just a `PrimitiveTranslatorCallable`.
+        prim_translator.primitive = primitive  # type: ignore[attr-defined]  # we add the attribute, so it is not defined yet.
         return cast(translator.PrimitiveTranslator, prim_translator)
 
     return wrapper if prim_translator is None else wrapper(prim_translator)
 
 
-def get_regsitered_primitive_translators() -> dict[str, translator.PrimitiveTranslatorCallable]:
+def register_primitive_translator(
+    prim_translator: translator.PrimitiveTranslator,
+    overwrite: bool = False,
+) -> translator.PrimitiveTranslator:
+    """Adds the primitive translator to Jace's internal list of translators and return it again.
+
+    If the primitive is already known an error is generated, if `overwrite` is set, it will be replaced.
+    To add a `primitive` property use the `@make_primitive_translator` decorator.
+
+    Args:
+        prim_translator:    The primitive translator to annotate.
+        overwrite:          Replace the current primitive translator with `prim_translator`.
+    """
+
+    def wrapper(
+        prim_translator: translator.PrimitiveTranslator,
+    ) -> translator.PrimitiveTranslator:
+        if prim_translator.primitive in _PRIMITIVE_TRANSLATORS_DICT and not overwrite:
+            raise ValueError(
+                f"Explicit override=True needed for primitive '{prim_translator.primitive}' to overwrite existing one."
+            )
+        _PRIMITIVE_TRANSLATORS_DICT[prim_translator.primitive] = prim_translator
+        return prim_translator
+
+    return wrapper if prim_translator is None else wrapper(prim_translator)
+
+
+def get_regsitered_primitive_translators() -> dict[str, translator.PrimitiveTranslator]:
     """Returns a view of the _currently_ active set of installed primitive translators in Jace.
 
     The returned mapping represents the active primitive translators at the time of calling.
@@ -87,12 +102,12 @@ def get_regsitered_primitive_translators() -> dict[str, translator.PrimitiveTran
 
 
 def set_active_primitive_translators_to(
-    new_translators: Mapping[str, translator.PrimitiveTranslatorCallable],
-) -> Mapping[str, translator.PrimitiveTranslatorCallable]:
+    new_translators: Mapping[str, translator.PrimitiveTranslator],
+) -> MutableMapping[str, translator.PrimitiveTranslator]:
     """Exchange the currently active subtranslators in Jace with `new_translators` and returns the previous ones.
 
     This function allows you to restore a specific state that was obtained by a previous call to `get_regsitered_primitive_translators()`.
-    The function is mainly intended for debugging.
+    While the function returns a mutable object, any changes to the returned object have no effect on the global state of the registry.
     """
     global _PRIMITIVE_TRANSLATORS_DICT
     assert all(getattr(trans, "primitive", prim) for prim, trans in new_translators.items())
