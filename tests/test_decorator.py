@@ -8,7 +8,7 @@
 """Implements tests for the jit decorator.
 
 Also see the `test_jax_api.py` test file, that tests composability.
-."""
+"""
 
 from __future__ import annotations
 
