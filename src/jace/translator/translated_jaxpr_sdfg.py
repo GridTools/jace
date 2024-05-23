@@ -99,5 +99,15 @@ class TranslatedJaxprSDFG:
             )
         if not self.is_finalized:
             return True  # More we can not do for an unfinalized SDFG.
+
+        if len(self.sdfg.free_symbols) != 0:
+            # For the moment we require this.
+            #  Without it, we would get some strange error in codegen.
+            raise dace.sdfg.InvalidSDFGError(
+                f"Expected that there are no free symbols in the SDFG, but found: {self.sdfg.free_symbols}.",
+                self.sdfg,
+                self.sdfg.node_id(self.sdfg.start_state),
+            )
+
         self.sdfg.validate()
         return True
