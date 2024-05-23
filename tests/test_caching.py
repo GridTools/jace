@@ -113,7 +113,6 @@ def test_caching_different_sizes():
     assert compiled1 is not compiled2
 
 
-@pytest.mark.skip(reason="Missing primitive translators")
 def test_caching_different_structure():
     """Now tests if we can handle multiple arguments with different structures.
 
