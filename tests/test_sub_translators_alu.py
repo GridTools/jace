@@ -10,7 +10,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from typing import Any
+from typing import Any, cast
 
 import jax
 import numpy as np
@@ -93,6 +93,15 @@ def test_alu_binary_scalar_literal():
     _perform_test(testee, 7.0)
 
 
+def test_alu_binary_scalar_literal_2():
+    """Scalar binary operation, with a literal."""
+
+    def testee(A: float) -> float:
+        return 2.03 * A
+
+    _perform_test(testee, 7.0)
+
+
 def test_alu_binary_array():
     """Test binary of arrays, with same size."""
 
@@ -107,12 +116,13 @@ def test_alu_binary_array():
 def test_alu_binary_array_scalar():
     """Test binary of array with scalar."""
 
-    def testee(A: np.ndarray, B: float) -> np.ndarray:
-        return A + B
+    def testee(A: np.ndarray | float, B: float | np.ndarray) -> np.ndarray:
+        return cast(np.ndarray, A + B)
 
     A = mkarr((100, 22))
     B = np.float64(1.34)
     _perform_test(testee, A, B)
+    _perform_test(testee, B, A)
 
 
 def test_alu_binary_array_literal():
@@ -165,5 +175,33 @@ def test_alu_binary_broadcast_2():
 
     A = mkarr((100, 1))
     B = mkarr((100, 10))
+    _perform_test(testee, A, B)
+    _perform_test(testee, B, A)
+
+
+def test_alu_binary_broadcast_3():
+    """Test broadcasting."""
+
+    def testee(A: np.ndarray, B: np.ndarray) -> np.ndarray:
+        return A + B
+
+    A = mkarr(
+        (
+            5,
+            1,
+            3,
+            4,
+            1,
+        )
+    )
+    B = mkarr(
+        (
+            5,
+            1,
+            3,
+            1,
+            2,
+        )
+    )
     _perform_test(testee, A, B)
     _perform_test(testee, B, A)

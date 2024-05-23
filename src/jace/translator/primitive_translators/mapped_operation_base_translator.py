@@ -19,28 +19,26 @@ from typing_extensions import final, override
 from jace import translator
 
 
-class MappedOperationBaseTranslator(translator.PrimitiveTranslator):
+class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
     """Implements the base for all "mapped base operations".
 
     A mapped base operation `f` is an operation that has several inputs arrays that are elementwise combined to a single output array.
-    A prime example for this would be the addition of two arrays of the _same_ size.
+    A prime example for this would be the addition of two arrays.
     Essentially it assumes that the Tasklet code can be written as:
     ```
         __out0 = f(__in0, __in1, __in3, ...)
     ```
     where `__in*` are the connector names of the Tasklet and `__out0` is the output connector.
-    For problems such as this, the SDFG API provides the `SDFGState::add_mapped_tasklet()` function, however, in most cases it can not be directly used.
+    For problems such as this, the SDFG API provides the `SDFGState.add_mapped_tasklet()` function, however, in most cases it can not be directly used.
     Thus this class acts like a convenience wrapper around it.
 
     To use this class a user has to overwrite the `write_tasklet_code()` function.
     This function generates the Python code that should be put inside the Tasklet.
 
+    If needed the translator will perform broadcasting of the inputs.
+
     Notes:
         This class will always generate a mapped Tasklet, even if a scalar is handled.
-        The class will always map over the entirety of the output and assume that all inputs have the same shape as the output.
-            If you want to override this behaviour you have to override the `make_input_memlets()` method
-            and generate the appropriate Memlets to use as inputs yourself.
-        Only one output is allowed.
     """
 
     __slots__ = ("_prim_name",)
@@ -148,19 +146,32 @@ class MappedOperationBaseTranslator(translator.PrimitiveTranslator):
             in_var_names:       The list of SDFG variables used as input.
             eqn:                The equation object.
         """
-        if any(eqn.outvars[0].aval.shape != invar.aval.shape for invar in eqn.invars):
-            # If you want to use this class as base, then you must override this function.
+        out_shp = tuple(eqn.outvars[0].aval.shape)  # Shape of the output
+        out_rank = len(out_shp)
+        if any(len(invar.aval.shape) not in {0, out_rank} for invar in eqn.invars):
             raise NotImplementedError(
-                "`MappedOperationBaseTranslator` can only handle inputs and output of the same shape!\nEqn: {eqn}"
+                f"'MappedOperationTranslatorBase' Inputs must have the same rank as the output! Eqn: {eqn} || {tuple(eqn.outvars[0].aval.shape)}"
             )
 
-        return {
-            f"__in{i}": dace.Memlet.simple(
+        # Now we will generate the input Memlets.
+        tskl_inputs: dict[str, dace.Memlet] = {}
+        for i, (in_var_name, inp_shp) in enumerate(
+            zip(in_var_names, (invar.aval.shape for invar in eqn.invars))
+        ):
+            if in_var_name is None:  # Input is a literal: No Memlet needed
+                continue
+
+            if inp_shp == ():  # Scalars
+                tskl_inputs[f"__in{i}"] = dace.Memlet.simple(in_var_name, "0")  # Scalar
+                continue
+
+            # We have to to broadcasting (combine yes and no together)
+            dims_to_bcast: Sequence[int] = [dim for dim in range(out_rank) if inp_shp[dim] == 1]
+            tskl_inputs[f"__in{i}"] = dace.Memlet.simple(
                 in_var_name,
-                ", ".join(name for name, _ in tskl_ranges)
-                if eqn.outvars[0].aval.shape != ()
-                else "0",
+                ", ".join(
+                    ("0" if i in dims_to_bcast else it_var)
+                    for i, (it_var, _) in enumerate(tskl_ranges)
+                ),
             )
-            for i, in_var_name in enumerate(in_var_names)
-            if in_var_name is not None
-        }
+        return tskl_inputs

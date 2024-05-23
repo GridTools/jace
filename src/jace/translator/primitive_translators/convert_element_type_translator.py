@@ -18,11 +18,11 @@ from typing_extensions import override
 
 from jace import translator
 from jace.translator.primitive_translators.mapped_operation_base_translator import (
-    MappedOperationBaseTranslator,
+    MappedOperationTranslatorBase,
 )
 
 
-class ConvertElementTypeTranslator(MappedOperationBaseTranslator):
+class ConvertElementTypeTranslator(MappedOperationTranslatorBase):
     """Implements the `convert_element_type` primitive.
 
     Copies the input to the output and performs type conversion.
