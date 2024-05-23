@@ -16,6 +16,7 @@ import dace
 from jax import core as jax_core
 from typing_extensions import override
 
+from jace import translator
 from jace.translator.primitive_translators.mapped_operation_base_translator import (
     MappedOperationBaseTranslator,
 )
@@ -58,7 +59,9 @@ class ConvertElementTypeTranslator(MappedOperationBaseTranslator):
 
         in_var_name: str = in_var_names[0]
         in_dtype = eqn.invars[0].aval.dtype
+        in_dtype_s: str = str(in_dtype)
         out_dtype = eqn.outvars[0].aval.dtype
+        out_dtype_s: str = str(out_dtype)
 
         if in_var_name is None:
             raise NotImplementedError("'convert_element_type' is not supported for literals.")
@@ -75,13 +78,15 @@ class ConvertElementTypeTranslator(MappedOperationBaseTranslator):
         #  Thus we have to do it in this way.
         conv_code = "__in0"
 
-        if str(in_dtype).startswith("bool") and str(out_dtype).startswith("int"):
+        if in_dtype_s.startswith("bool") and out_dtype_s.startswith("int"):
             # Interestingly `__out0 = int(__in0)` will fail, Dace will optimize it away.
             conv_code = f"(1 if {conv_code} else 0)"
 
         # Now do the actual casting.
-        if hasattr(dace.dtypes, str(out_dtype)):
-            conv_code = f"dace.{out_dtype!s}(__in)"
+        if out_dtype_s == "bool":
+            conv_code = f"dace.bool_({conv_code})"
+        elif hasattr(dace.dtypes, str(out_dtype)):
+            conv_code = f"dace.{out_dtype!s}({conv_code})"
         else:
             raise NotImplementedError(
                 f"Cannot convert '{in_dtype}' to '{out_dtype}' as this type is not known to DaCe."
@@ -89,3 +94,6 @@ class ConvertElementTypeTranslator(MappedOperationBaseTranslator):
 
         # Now writing the full Tasklet, i.e. with the output.
         return f"__out0 = {conv_code}"
+
+
+_ = translator.register_primitive_translator(ConvertElementTypeTranslator())

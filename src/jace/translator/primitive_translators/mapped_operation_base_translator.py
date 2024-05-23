@@ -81,6 +81,7 @@ class MappedOperationBaseTranslator(translator.PrimitiveTranslator):
             eqn:            The Jax equation that is translated.
             eqn_state:      State into which the primitive's SDFG representation is constructed.
         """
+        assert len(out_var_names) == 1
         if eqn.outvars[0].aval.shape != ():
             tskl_ranges: list[tuple[str, str]] = [
                 (f"__i{dim}", f"0:{N}") for dim, N in enumerate(eqn.outvars[0].aval.shape)
@@ -156,11 +157,9 @@ class MappedOperationBaseTranslator(translator.PrimitiveTranslator):
         return {
             f"__in{i}": dace.Memlet.simple(
                 in_var_name,
-                (
-                    ", ".join(name for name, _ in tskl_ranges)
-                    if eqn.outvars[0].aval.shape != ()
-                    else "0"
-                ),
+                ", ".join(name for name, _ in tskl_ranges)
+                if eqn.outvars[0].aval.shape != ()
+                else "0",
             )
             for i, in_var_name in enumerate(in_var_names)
             if in_var_name is not None
