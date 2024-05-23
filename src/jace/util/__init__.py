@@ -15,6 +15,7 @@ from .compiling import (
 )
 from .jax_helper import (
     JaCeVar,
+    get_jax_literal_value,
     get_jax_var_dtype,
     get_jax_var_name,
     get_jax_var_shape,
@@ -60,6 +61,7 @@ __all__ = [
     "get_jax_var_dtype",
     "get_jax_var_name",
     "get_jax_var_shape",
+    "get_jax_literal_value",
     "translate_dtype",
     "run_jax_sdfg",
     "propose_jax_name",

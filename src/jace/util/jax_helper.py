@@ -22,6 +22,7 @@ from typing import Any
 
 import dace
 import jax.core as jax_core
+import numpy as np
 
 import jace.util as util
 
@@ -192,3 +193,17 @@ def propose_jax_name(
     if jax_name in util.FORBIDDEN_SDFG_VAR_NAMES:
         jax_name = f"__jace_forbidden_{jax_name}"
     return jax_name
+
+
+def get_jax_literal_value(lit: jax_core.Literal) -> bool | float | int | np.generic:
+    """Returns the value a literal is wrapping.
+
+    The function guarantees to return a scalar value.
+    """
+    val = lit.val
+    if isinstance(val, np.ndarray):
+        assert val.shape == ()
+        return val.max()
+    if isinstance(val, (bool, float, int)):
+        return val
+    raise TypeError(f"Failed to extract value from '{lit}'.")

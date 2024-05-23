@@ -10,13 +10,12 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Final, cast
+from typing import Final
 
-import numpy as np
 from jax import core as jax_core
 from typing_extensions import override
 
-from jace import translator
+from jace import translator, util
 from jace.translator.primitive_translators.mapped_operation_base_translator import (
     MappedOperationTranslatorBase,
 )
@@ -61,15 +60,9 @@ class ALUTranslator(MappedOperationTranslatorBase):
         for i, in_var_name in enumerate(in_var_names):
             if in_var_name is not None:
                 continue
+            t_val = util.get_jax_literal_value(eqn.invars[i])
+            tskl_code = tskl_code.replace(f"__in{i}", str(t_val))
 
-            jax_in_var: jax_core.Literal = cast(jax_core.Literal, eqn.invars[i])
-            if jax_in_var.aval.shape == ():
-                t_val = jax_in_var.val
-                if isinstance(t_val, np.ndarray):
-                    t_val = jax_in_var.val.max()  # I do not know a better way in that case
-                tskl_code = tskl_code.replace(f"__in{i}", str(t_val))
-            else:
-                raise ValueError(f"Can not handle non scalar literals: {jax_in_var}")
         if len(eqn.params) != 0:
             tskl_code = tskl_code.format(**eqn.params)
 
