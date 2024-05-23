@@ -12,13 +12,41 @@ Currently just a dummy existing for the sake of providing some callable function
 
 from __future__ import annotations
 
-from jace import translator
+from typing import TYPE_CHECKING, Final, TypedDict
+
+from typing_extensions import Unpack
+
+
+if TYPE_CHECKING:
+    from jace import translator
+
+
+class CompilerOptions(TypedDict, total=False):
+    """All known compiler options known to `JaceLowered.compile()`.
+
+    There are some predefined option sets in `jace.jax.stages`:
+    - `DEFAULT_COMPILER_OPTIONS`
+    - `NO_OPTIMIZATIONS`
+    """
+
+    auto_optimize: bool
+    simplify: bool
+
+
+DEFAULT_OPTIMIZATIONS: Final[CompilerOptions] = {
+    "auto_optimize": True,
+    "simplify": True,
+}
+
+NO_OPTIMIZATIONS: Final[CompilerOptions] = {
+    "auto_optimize": False,
+    "simplify": False,
+}
 
 
 def jace_optimize(
     tsdfg: translator.TranslatedJaxprSDFG,
-    simplify: bool = True,
-    auto_optimize: bool = False,
+    **kwargs: Unpack[CompilerOptions],
 ) -> None:
     """Performs optimization of the `fsdfg` _inplace_.
 
@@ -28,9 +56,18 @@ def jace_optimize(
     Args:
         simplify:       Run the simplification pilepline.
         auto_optimize:  Run the auto optimization pipeline (currently does nothing)
+
+    Note:
+        By default all optimizations are disabled and this function acts as a noops.
     """
     if not tsdfg.is_finalized:
         raise ValueError("Can only optimize finalized SDFGs.")
+    if not kwargs:
+        return
+
+    # Unpack the arguments, defaults are such that no optimization is done.
+    simplify = kwargs.get("simplify", False)
+    auto_optimize = kwargs.get("auto_optimize", False)
 
     if simplify:
         tsdfg.sdfg.simplify()

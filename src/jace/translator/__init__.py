@@ -12,6 +12,7 @@ from __future__ import annotations
 from .jaxpr_translator_driver import JaxprTranslationDriver
 from .managing import (
     get_regsitered_primitive_translators,
+    make_primitive_translator,
     register_primitive_translator,
     set_active_primitive_translators_to,
 )
@@ -27,4 +28,5 @@ __all__ = [
     "register_primitive_translator",
     "get_regsitered_primitive_translators",
     "set_active_primitive_translators_to",
+    "make_primitive_translator",
 ]

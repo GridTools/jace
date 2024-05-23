@@ -55,6 +55,8 @@ def make_primitive_translator(
     def wrapper(
         prim_translator: translator.PrimitiveTranslatorCallable,
     ) -> translator.PrimitiveTranslator:
+        from jace import translator  # Cyclic
+
         if getattr(prim_translator, "primitive", primitive) != primitive:
             raise ValueError(
                 f"Tried to change the 'primitive' property of '{prim_translator}' from '{prim_translator.primitive}' to '{primitive}'."  # type: ignore[attr-defined]
@@ -65,10 +67,27 @@ def make_primitive_translator(
     return wrapper if prim_translator is None else wrapper(prim_translator)
 
 
+@overload
+def register_primitive_translator(
+    prim_translator: Literal[None] = None,
+    overwrite: bool = False,
+) -> Callable[[translator.PrimitiveTranslator], translator.PrimitiveTranslator]: ...
+
+
+@overload
 def register_primitive_translator(
     prim_translator: translator.PrimitiveTranslator,
     overwrite: bool = False,
-) -> translator.PrimitiveTranslator:
+) -> translator.PrimitiveTranslator: ...
+
+
+def register_primitive_translator(
+    prim_translator: translator.PrimitiveTranslator | None = None,
+    overwrite: bool = False,
+) -> (
+    translator.PrimitiveTranslator
+    | Callable[[translator.PrimitiveTranslator], translator.PrimitiveTranslator]
+):
     """Adds the primitive translator to Jace's internal list of translators and return it again.
 
     If the primitive is already known an error is generated, if `overwrite` is set, it will be replaced.

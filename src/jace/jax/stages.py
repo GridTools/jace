@@ -24,21 +24,17 @@ As in Jax Jace has different stages, the terminology is taken from [Jax' AOT-Tut
 from __future__ import annotations
 
 import copy
-from collections.abc import Callable, Hashable, Mapping, Sequence
-from typing import Any, Final, TypeAlias
+from collections.abc import Callable, Mapping, Sequence
+from typing import Any
 
 import dace
 import jax as _jax
 
 from jace import optimization, translator, util
 from jace.jax import translation_cache as tcache
+from jace.optimization import CompilerOptions
 from jace.translator import post_translation as ptrans
 from jace.util import dace_helper as jdace
-
-
-# TODO(phimuell): Turn this into `TypedDict` thing.
-#: Map type to pass compiler options to `JaceLowered.compile()`.
-CompilerOptions: TypeAlias = dict[str, bool | str]
 
 
 class JaceWrapped(tcache.CachingStage):
@@ -159,11 +155,6 @@ class JaceLowered(tcache.CachingStage):
         - Handle pytrees.
     """
 
-    DEF_COMPILER_OPTIONS: Final[CompilerOptions] = {
-        "auto_optimize": True,
-        "simplify": True,
-    }
-
     # `self` assumes complete ownership of the
     _trans_sdfg: translator.TranslatedJaxprSDFG
 
@@ -188,33 +179,27 @@ class JaceLowered(tcache.CachingStage):
     ) -> JaceCompiled:
         """Compile the SDFG.
 
-        Returns an Object that encapsulates a compiled SDFG object.
-        You can pass a `dict` as argument which are passed to the `jace_optimize()` routine.
-        If you pass `None` then the default options are used.
-        To disable all optimization, pass an empty `dict`.
+        Returns an object that encapsulates a compiled SDFG object.
+        To influence the various optimizations and compile options of Jace you can use the `compiler_options` argument.
+        This is a `dict` which are used as arguments to `jace_optimize()`.
 
-        Notes:
-            I am pretty sure that `None` in Jax means "use the default option".
-            See also `CachedCallDescription.make_call_description()`.
+        If nothing is specified `jace.optimization.DEFAULT_OPTIMIZATIONS` will be used.
+        Before `compiler_options` is forwarded to `jace_optimize()` it is merged with the default options.
+
+        Note:
+            The result of this function is cached.
         """
         # We **must** deepcopy before we do any optimization.
-        #  There are many reasons for this but here are the most important ones:
-        #  All optimization DaCe functions works in place, if we would not copy the SDFG first, then we would have a problem.
-        #  Because, these optimization would then have a feedback of the SDFG object which is stored inside `self`.
-        #  Thus, if we would run this code `(jaceLoweredObject := jaceWrappedObject.lower()).compile({opti=True})` would return
-        #  an optimized object, which is what we intent to do.
-        #  However, if we would now call `jaceWrappedObject.lower()` (with the same arguments as before), we should get `jaceLoweredObject`,
-        #  since it was cached, but it would actually contain an already optimized SDFG, which is not what we want.
-        #  If you think you can remove this line then do it and run `tests/test_decorator.py::test_decorator_sharing`.
+        #  The reason is `self` is cached and assumed to be immutable.
+        #  Since all optimizations works in place, we would violate this assumption.
         tsdfg: translator.TranslatedJaxprSDFG = copy.deepcopy(self._trans_sdfg)
-        optimization.jace_optimize(
-            tsdfg=tsdfg,
-            **(self.DEF_COMPILER_OPTIONS if compiler_options is None else compiler_options),  # type: ignore[arg-type]  # type confusion.
-        )
-        csdfg: jdace.CompiledSDFG = util.compile_jax_sdfg(tsdfg)
+
+        # Must be the same as in `_make_call_description()`!
+        options = optimization.DEFAULT_OPTIMIZATIONS | (compiler_options or {})
+        optimization.jace_optimize(tsdfg=tsdfg, **options)
 
         return JaceCompiled(
-            csdfg=csdfg,
+            csdfg=util.compile_jax_sdfg(tsdfg),
             inp_names=tsdfg.inp_names,
             out_names=tsdfg.out_names,
         )
@@ -253,15 +238,9 @@ class JaceLowered(tcache.CachingStage):
         The function will construct a concrete description of the call using `(name, value)` pairs.
         This function is used by the cache.
         """
-        if compiler_options is None:  # Must be the same as in `compile()`!
-            compiler_options = self.DEF_COMPILER_OPTIONS
-        assert isinstance(compiler_options, dict)
-        fargs: tuple[tuple[str, Hashable], ...] = tuple(
-            sorted(
-                ((argname, argvalue) for argname, argvalue in compiler_options.items()),
-                key=lambda X: X[0],
-            )
-        )
+        # Must be the same as in `compile()`!
+        options = optimization.DEFAULT_OPTIMIZATIONS | (compiler_options or {})
+        fargs = tuple(sorted(options.items(), key=lambda X: X[0]))
         return tcache.CachedCallDescription(stage_id=id(self), fargs=fargs)
 
 
@@ -309,7 +288,7 @@ Stage = JaceWrapped | JaceLowered | JaceCompiled
 
 __all__ = [
     "Stage",
-    "CompilerOptions",
+    "CompilerOptions",  # export for compatibility with Jax.
     "JaceWrapped",
     "JaceLowered",
     "JaceCompiled",
