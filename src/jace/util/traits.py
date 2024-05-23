@@ -9,7 +9,7 @@
 
 from __future__ import annotations
 
-from typing import Any, TypeGuard
+from typing import TYPE_CHECKING, Any, TypeGuard
 
 import dace
 import jax
@@ -17,8 +17,11 @@ import numpy as np
 from jax import _src as jax_src, core as jax_core
 from jaxlib import xla_extension as jax_xe
 
-import jace.jax as jjax
 import jace.util as util
+
+
+if TYPE_CHECKING:
+    import jace.jax as jjax
 
 
 def is_jaceified(obj: Any) -> TypeGuard[jjax.JaceWrapped]:
@@ -26,6 +29,8 @@ def is_jaceified(obj: Any) -> TypeGuard[jjax.JaceWrapped]:
 
     Similar to `jace.util.is_jaxified`, but for JaCe object.
     """
+    import jace.jax as jjax  # Circular import
+
     if util.is_jaxified(obj):
         return False
     # Currently it is quite simple because we can just check if `obj`

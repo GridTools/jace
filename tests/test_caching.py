@@ -17,6 +17,7 @@ import numpy as np
 import pytest
 
 import jace
+from jace import optimization
 from jace.jax import stages
 
 
@@ -138,19 +139,32 @@ def test_caching_different_structure():
     # These are the known lowerings.
     lowerings: dict[tuple[int, int], stages.JaceLowered] = {}
     lowering_ids: set[int] = set()
+    # These are the known compilations.
+    compilations: dict[tuple[int, int], stages.JaceCompiled] = {}
+    compiled_ids: set[int] = set()
 
     # Generating the lowerings
     for arg1, arg2 in it.permutations([A, B, C, D], 2):
         lower = wrapped.lower(arg1, arg2)
+        compiled = lower.compile()
         assert id(lower) not in lowering_ids
+        assert id(compiled) not in compiled_ids
         lowerings[id(arg1), id(arg2)] = lower
         lowering_ids.add(id(lower))
+        compilations[id(arg1), id(arg2)] = compiled
+        compiled_ids.add(id(compiled))
 
     # Now check if they are still cached.
     for arg1, arg2 in it.permutations([A, B, C, D], 2):
         lower = wrapped.lower(arg1, arg2)
         clower = lowerings[id(arg1), id(arg2)]
         assert clower is lower
+
+        compiled1 = lower.compile()
+        compiled2 = clower.compile()
+        ccompiled = compilations[id(arg1), id(arg2)]
+        assert compiled1 is compiled2
+        assert compiled1 is ccompiled
 
 
 def test_caching_compilation():
@@ -170,17 +184,21 @@ def test_caching_compilation():
     # Now we lower it.
     jaceLowered = jaceWrapped.lower(A, B)
 
-    # Now we compile it with enabled optimization.
-    optiCompiled = jaceLowered.compile(stages.JaceLowered.DEF_COMPILER_OPTIONS)
+    # Compiling it without any information.
+    optiCompiled = jaceLowered.compile()
 
-    # Passing `None` also means 'default' which is a bit strange, but it is what Jax does.
-    assert optiCompiled is jaceLowered.compile(None)
+    # This should be the same as passing the defaults directly.
+    assert optiCompiled is jaceLowered.compile(optimization.DEFAULT_OPTIMIZATIONS)
 
-    # Now we compile it without any optimization.
-    unoptiCompiled = jaceLowered.compile({})
+    # Also if we pass the empty dict, we should get the default.
+    assert optiCompiled is jaceLowered.compile({})
+
+    # Now we disable all optimizations
+    unoptiCompiled = jaceLowered.compile(optimization.NO_OPTIMIZATIONS)
 
     # Because of the way how things work the optimized must have more than the unoptimized.
     #  If there is sharing, then this would not be the case.
+    assert unoptiCompiled is not optiCompiled
     assert optiCompiled._csdfg.sdfg.number_of_nodes() == 1
     assert optiCompiled._csdfg.sdfg.number_of_nodes() < unoptiCompiled._csdfg.sdfg.number_of_nodes()
 

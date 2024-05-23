@@ -5,7 +5,7 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""This package mimics parts of the interface of the `jax` package that is supported by JaCe."""
+"""This package mimics the `jax` functions and features supported by JaCe."""
 
 from __future__ import annotations
 
