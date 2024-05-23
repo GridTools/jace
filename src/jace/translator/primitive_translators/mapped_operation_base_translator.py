@@ -26,9 +26,9 @@ class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
     A prime example for this would be the addition of two arrays.
     Essentially it assumes that the Tasklet code can be written as:
     ```
-        __out0 = f(__in0, __in1, __in3, ...)
+        __out = f(__in0, __in1, __in3, ...)
     ```
-    where `__in*` are the connector names of the Tasklet and `__out0` is the output connector.
+    where `__in*` are the connector names of the Tasklet and `__out` is the output connector.
     For problems such as this, the SDFG API provides the `SDFGState.add_mapped_tasklet()` function, however, in most cases it can not be directly used.
     Thus this class acts like a convenience wrapper around it.
 
@@ -39,6 +39,9 @@ class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
 
     Notes:
         This class will always generate a mapped Tasklet, even if a scalar is handled.
+
+    Todo:
+        - `write_tasklet_code()` should no longer need to also include the `__out = ` part the base should do that.
     """
 
     __slots__ = ("_prim_name",)
@@ -85,7 +88,7 @@ class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
                 (f"__i{dim}", f"0:{N}") for dim, N in enumerate(eqn.outvars[0].aval.shape)
             ]
             tskl_output: dict[str, dace.Memlet] = {
-                "__out0": dace.Memlet.simple(
+                "__out": dace.Memlet.simple(
                     out_var_names[0],
                     ", ".join(name for name, _ in tskl_ranges),
                 )
@@ -94,7 +97,7 @@ class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
         else:
             # If we have a scalar we will generate a Map, but it will be trivial.
             tskl_ranges = [("__jace_iterator_SCALAR", "0:1")]
-            tskl_output = {"__out0": dace.Memlet.simple(out_var_names[0], "0")}
+            tskl_output = {"__out": dace.Memlet.simple(out_var_names[0], "0")}
 
         tskl_inputs: dict[str, dace.Memlet] = self.make_input_memlets(
             tskl_ranges, in_var_names, eqn
@@ -143,8 +146,8 @@ class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
         Args:
             tskl_ranges:    List of the different map parameter, first element is the name of the dimension,
                                     second is the range, i.e. `0:SIZE`.
-            in_var_names:       The list of SDFG variables used as input.
-            eqn:                The equation object.
+            in_var_names:   The list of SDFG variables used as input.
+            eqn:            The equation object.
         """
         out_shp = tuple(eqn.outvars[0].aval.shape)  # Shape of the output
         out_rank = len(out_shp)

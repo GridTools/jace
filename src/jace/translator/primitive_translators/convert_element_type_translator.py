@@ -31,7 +31,7 @@ class ConvertElementTypeTranslator(MappedOperationTranslatorBase):
         This translator ignores the `new_dtype` and `weak_type` parameter of the equation and only performs casting
 
     Todo:
-        I occasionally Jax converts from the same type to another type.
+        Occasionally Jax converts from the same type to another type.
             This case should be handled by a Memlet directly, which can then be removed.
     """
 
@@ -74,12 +74,12 @@ class ConvertElementTypeTranslator(MappedOperationTranslatorBase):
             )
 
         # This is the base of the template that we use for conversion.
-        #  You should notice that the Tasklet `__out0 = __in0` will fail, see commit `f5aabc3` of the prototype.
+        #  You should notice that the Tasklet `__out = __in0` will fail, see commit `f5aabc3` of the prototype.
         #  Thus we have to do it in this way.
         conv_code = "__in0"
 
         if in_dtype_s.startswith("bool") and out_dtype_s.startswith("int"):
-            # Interestingly `__out0 = int(__in0)` will fail, Dace will optimize it away.
+            # Interestingly `__out = int(__in0)` will fail, Dace will optimize it away.
             conv_code = f"(1 if {conv_code} else 0)"
 
         # Now do the actual casting.
@@ -93,7 +93,7 @@ class ConvertElementTypeTranslator(MappedOperationTranslatorBase):
             )
 
         # Now writing the full Tasklet, i.e. with the output.
-        return f"__out0 = {conv_code}"
+        return f"__out = {conv_code}"
 
 
 _ = translator.register_primitive_translator(ConvertElementTypeTranslator())
