@@ -11,10 +11,12 @@ from __future__ import annotations
 from .alu_translators import ALUTranslator
 from .broadcast_in_dim_translator import BroadcastInDimTranslator
 from .convert_element_type_translator import ConvertElementTypeTranslator
+from .reshape_translator import ReshapeTranslator
 
 
 __all__ = [
     "ALUTranslator",
-    "ConvertElementTypeTranslator",
     "BroadcastInDimTranslator",
+    "ConvertElementTypeTranslator",
+    "ReshapeTranslator",
 ]
