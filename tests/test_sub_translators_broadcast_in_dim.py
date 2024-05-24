@@ -7,16 +7,15 @@
 
 """Implements tests for the broadcast in dim translator.
 
+Parts of the tests are also implemented inside `test_sub_translators_squeeze_expand_dims.py`.
+
 Todo:
     - `np.meshgrid`
-    - `np.expand_dims`
     - `np.ix_`
     - `np.indices`
 """
 
 from __future__ import annotations
-
-from collections.abc import Sequence
 
 import numpy as np
 from jax import numpy as jnp
@@ -51,40 +50,3 @@ def test_bid_literal():
         assert res.shape == ref.shape
         assert res.dtype == ref.dtype
         assert np.all(res == ref)
-
-
-def _expand_dims_test_impl(
-    shape: Sequence[int],
-    axes: Sequence[int | Sequence[int]],
-) -> None:
-    """Implementation of the test for `expand_dims()`.
-
-    Args:
-        shape:  Shape of the input array.
-        axes:   A series of axis that should be tried.
-    """
-    A = np.random.random(shape)  # noqa: NPY002
-    for axis in axes:
-
-        def testee(A):
-            return jnp.expand_dims(A, axis)  # noqa: B023  # Binding loop variable.
-
-        ref = testee(A)
-        res = jace.jit(testee)(A)
-
-        assert ref.shape == res.shape, f"A.shape = {shape}; Expected: {ref.shape}; Got: {res.shape}"
-        assert np.all(ref == res), f"Value error for shape '{shape}' and axis={axis}"
-
-
-def test_expand_dims():
-    """Test various calls to `np.expand_dims()`."""
-    _expand_dims_test_impl((10,), [0, -1, 1])
-    _expand_dims_test_impl(
-        (2, 3, 4, 5),
-        [
-            0,
-            -1,
-            (1, 2, 3),
-            (3, 2, 1),
-        ],
-    )
