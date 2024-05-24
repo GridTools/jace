@@ -48,7 +48,9 @@ class BroadcastInDimTranslator(MappedOperationTranslatorBase):
         return {
             "__in0": dace.Memlet.simple(
                 in_var_names[0],
-                ", ".join(tskl_ranges[bdim][0] for bdim in eqn.params["broadcast_dimensions"]),
+                ", ".join(tskl_ranges[bdim][0] for bdim in eqn.params["broadcast_dimensions"])
+                if eqn.params["broadcast_dimensions"]
+                else "0",
             )
         }
 
