@@ -5,7 +5,7 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Implements the Translator for the `convert_element_type` primitive."""
+"""Implements the translator for the `convert_element_type` primitive."""
 
 from __future__ import annotations
 
