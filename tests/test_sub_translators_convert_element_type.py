@@ -75,3 +75,26 @@ def test_convert_element_type_complex():
 def test_convert_element_type_from_bool():
     """Tests conversions from bools to any other types."""
     _test_convert_element_type_impl([np.bool_], _DACE_COMPLEX)
+
+
+def test_convert_element_type_useless_cast():
+    """Broadcast a literal to a matrix.
+
+    This test is here to show, that in certain situation Jax inserts
+    a `convert_element_type` primitive even if it is not needed.
+    """
+
+    def testee(a: float) -> np.ndarray:
+        # For it to work we have to use `numpy` instead of the Jax substitute.
+        return np.broadcast_to(1.0, (10, 10)) + a
+
+    with pytest.warns(
+        expected_warning=UserWarning,
+        match=r"convert_element_type\(.*\): is useless, because input and output have same type.",
+    ):
+        res = jace.jit(testee)(1.0)
+
+    ref = testee(1.0)
+    assert res.shape == ref.shape
+    assert res.dtype == ref.dtype
+    assert np.all(res == ref)

@@ -46,34 +46,37 @@ class ConvertElementTypeTranslator(MappedOperationTranslatorBase):
         in_var_names: Sequence[str | None],
         eqn: jax_core.JaxprEqn,
     ) -> str:
-        assert in_var_names[0] is not None
 
-        in_var_name: str = in_var_names[0]
+        if in_var_names[0] is None:
+            raise NotImplementedError("'convert_element_type' is not supported for literals.")
+
         in_dtype = eqn.invars[0].aval.dtype
         in_dtype_s: str = str(in_dtype)
         out_dtype = eqn.outvars[0].aval.dtype
         out_dtype_s: str = str(out_dtype)
-
-        if in_var_name is None:
-            raise NotImplementedError("'convert_element_type' is not supported for literals.")
-        if in_dtype == out_dtype:
-            # TODO(phimuell): make this into a pure Memlet such that it can be optimized away by DaCe.
-            # Believe it or not but it happens.
-            warnings.warn(
-                "convert_element_type({eqn}): is useless, because input and output have same type.",
-                stacklevel=1,  # Find a better one
-            )
 
         # This is the base of the template that we use for conversion.
         #  You should notice that the Tasklet `__out = __in0` will fail, see commit `f5aabc3` of the prototype.
         #  Thus we have to do it in this way.
         conv_code = "__in0"
 
+        # Handle special cases
+        if in_dtype == out_dtype:
+            # It sounds ridiculously but it can happen.
+            #  See: tests/test_sub_translators_convert_element_type.py::test_convert_element_type_useless_cast
+            # TODO(phimuell): Make this into a pure Memlet such that it can be optimized away by DaCe.
+            warnings.warn(
+                f"convert_element_type({eqn}): is useless, because input and output have same type.",
+                category=UserWarning,
+                stacklevel=1,  # Find a better one
+            )
+            return conv_code
         if in_dtype_s.startswith("bool") and out_dtype_s.startswith("int"):
-            # Interestingly `__out = int(__in0)` will fail, Dace will optimize it away.
-            conv_code = f"(1 if {conv_code} else 0)"
+            # Interestingly `__out = int(__in0)` will at some DaCe processing stage.
+            #  See commit `f5aabc` of the prototype.
+            return f"(1 if {conv_code} else 0)"
 
-        # Now do the actual casting.
+        # The general case
         if out_dtype_s == "bool":
             conv_code = f"dace.bool_({conv_code})"
         elif hasattr(dace.dtypes, str(out_dtype)):
