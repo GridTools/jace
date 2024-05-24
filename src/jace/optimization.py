@@ -31,16 +31,19 @@ class CompilerOptions(TypedDict, total=False):
 
     auto_optimize: bool
     simplify: bool
+    persistent: bool
 
 
 DEFAULT_OPTIMIZATIONS: Final[CompilerOptions] = {
     "auto_optimize": True,
     "simplify": True,
+    "persistent": True,
 }
 
 NO_OPTIMIZATIONS: Final[CompilerOptions] = {
     "auto_optimize": False,
     "simplify": False,
+    "persistent": False,
 }
 
 
@@ -56,6 +59,8 @@ def jace_optimize(
     Args:
         simplify:       Run the simplification pilepline.
         auto_optimize:  Run the auto optimization pipeline (currently does nothing)
+        persistent:     Make the memory allocation persistent, i.e. allocate the transients only
+                            once at the beginning and then reuse the memory across the lifetime of the SDFG.
 
     Note:
         By default all optimizations are disabled and this function acts as a noops.

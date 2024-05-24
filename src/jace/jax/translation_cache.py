@@ -47,6 +47,10 @@ class CachingStage:
 
     Todo:
         - Make a generic to indicate what the result stage is.
+        - Currently the cached stages are stored until they are evicted from the cache.
+            Since the default will be "persistent" memory the transients will remain allocated and occupy memory until then.
+            This should not be and we should handle this situation.
+            It sounds like a job for `WeakKeyDictionary`, that maps the caching state to the result, in addition to the cache.
     """
 
     _cache: TranslationCache

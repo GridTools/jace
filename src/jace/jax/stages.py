@@ -247,6 +247,10 @@ class JaceLowered(tcache.CachingStage):
 class JaceCompiled:
     """Compiled version of the SDFG.
 
+    The SDFG handle, is only initialized the first time the function is called.
+    This has implications for persistent data and concurrency.
+    Thus for the time being it is unsafe to use a compiled object in multiple threads.
+
     Todo:
         - Handle pytrees.
     """
