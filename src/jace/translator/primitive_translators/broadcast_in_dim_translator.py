@@ -32,6 +32,7 @@ class BroadcastInDimTranslator(MappedOperationTranslatorBase):
     @override
     def write_tasklet_code(
         self,
+        tskl_ranges: Sequence[tuple[str, str]],
         in_var_names: Sequence[str | None],
         eqn: jax_core.JaxprEqn,
     ) -> str:

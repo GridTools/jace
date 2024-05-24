@@ -43,10 +43,10 @@ class ConvertElementTypeTranslator(MappedOperationTranslatorBase):
     @override
     def write_tasklet_code(
         self,
+        tskl_ranges: Sequence[tuple[str, str]],
         in_var_names: Sequence[str | None],
         eqn: jax_core.JaxprEqn,
     ) -> str:
-
         if in_var_names[0] is None:
             raise NotImplementedError("'convert_element_type' is not supported for literals.")
 

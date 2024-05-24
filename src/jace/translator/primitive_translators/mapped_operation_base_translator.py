@@ -100,7 +100,7 @@ class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
             tskl_ranges, in_var_names, eqn
         )
         tskl_name = f"{self.primitive}_{out_var_names[0]}"
-        tskl_code = self.write_tasklet_code(in_var_names, eqn)
+        tskl_code = self.write_tasklet_code(tskl_ranges, in_var_names, eqn)
         tskl_code = self.literal_substitution(tskl_code, in_var_names, eqn)
 
         eqn_state.add_mapped_tasklet(
@@ -117,6 +117,7 @@ class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
     @abstractmethod
     def write_tasklet_code(
         self,
+        tskl_ranges: Sequence[tuple[str, str]],
         in_var_names: Sequence[str | None],
         eqn: jax_core.JaxprEqn,
     ) -> str:
@@ -125,6 +126,8 @@ class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
         Literal substitution is allied to the returned code.
 
         Args:
+            tskl_ranges:    The iteration indexes used by the map, first element is the iteration index itself,
+                                the second index is the iteration range.
             in_var_names:   The list of SDFG variables used as input.
             eqn:            The equation.
         """

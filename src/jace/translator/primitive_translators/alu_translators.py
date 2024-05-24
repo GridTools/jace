@@ -47,17 +47,11 @@ class ALUTranslator(MappedOperationTranslatorBase):
     @override
     def write_tasklet_code(
         self,
+        tskl_ranges: Sequence[tuple[str, str]],
         in_var_names: Sequence[str | None],
         eqn: jax_core.JaxprEqn,
     ) -> str:
-        """Returns the code for the Tasklet.
-
-        The function does parameter substitution, see `integer_pow`, while literal substitution is left to the base.
-
-        Args:
-            in_var_names:   The list of SDFG variables used as input.
-            eqn:            The equation.
-        """
+        """Returns the code for the Tasklet, with all parameters replaced."""
         tskl_code = self._tskl_tmpl
         if len(eqn.params) != 0:
             tskl_code = tskl_code.format(**eqn.params)
