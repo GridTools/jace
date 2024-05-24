@@ -15,7 +15,7 @@ from typing import Final
 from jax import core as jax_core
 from typing_extensions import override
 
-from jace import translator, util
+from jace import translator
 from jace.translator.primitive_translators.mapped_operation_base_translator import (
     MappedOperationTranslatorBase,
 )
@@ -50,22 +50,17 @@ class ALUTranslator(MappedOperationTranslatorBase):
         in_var_names: Sequence[str | None],
         eqn: jax_core.JaxprEqn,
     ) -> str:
-        """Return the code that should be put inside the Tasklet, with all parameters and literals substituted with their values.
+        """Returns the code for the Tasklet.
+
+        The function does parameter substitution, see `integer_pow`, while literal substitution is left to the base.
 
         Args:
             in_var_names:   The list of SDFG variables used as input.
             eqn:            The equation.
         """
         tskl_code = self._tskl_tmpl
-        for i, in_var_name in enumerate(in_var_names):
-            if in_var_name is not None:
-                continue
-            t_val = util.get_jax_literal_value(eqn.invars[i])
-            tskl_code = tskl_code.replace(f"__in{i}", str(t_val))
-
         if len(eqn.params) != 0:
             tskl_code = tskl_code.format(**eqn.params)
-
         return tskl_code
 
 

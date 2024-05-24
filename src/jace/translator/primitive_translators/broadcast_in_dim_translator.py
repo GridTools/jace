@@ -15,7 +15,7 @@ import dace
 from jax import core as jax_core
 from typing_extensions import override
 
-from jace import translator, util
+from jace import translator
 from jace.translator.primitive_translators.mapped_operation_base_translator import (
     MappedOperationTranslatorBase,
 )
@@ -35,8 +35,6 @@ class BroadcastInDimTranslator(MappedOperationTranslatorBase):
         in_var_names: Sequence[str | None],
         eqn: jax_core.JaxprEqn,
     ) -> str:
-        if in_var_names[0] is None:
-            return f"{util.get_jax_literal_value(eqn.eqn.invars[0])}"
         return "__in0"
 
     def make_input_memlets(

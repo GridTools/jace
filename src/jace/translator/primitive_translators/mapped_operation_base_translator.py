@@ -16,7 +16,7 @@ import dace
 from jax import core as jax_core
 from typing_extensions import final, override
 
-from jace import translator
+from jace import translator, util
 
 
 class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
@@ -33,9 +33,8 @@ class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
     Thus this class acts like a convenience wrapper around it.
 
     To use this class a user has to overwrite the `write_tasklet_code()` function.
-    This function generates the Python code that should be put inside the Tasklet.
-
-    If needed the translator will perform broadcasting of the inputs.
+    This function generates the right hand side of the assignment code, i.e. everything after `__out =`.
+    If needed the translator will perform literal substitution on the returned code and broadcast the inputs to match the outputs.
 
     Notes:
         This class will always generate a mapped Tasklet, even if a scalar is handled.
@@ -69,7 +68,8 @@ class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
 
         The function will create the map ranges and based on the shape of the output array.
         It will then call `make_input_memlets()` to get the input Memlets.
-        After that it calls `write_tasklet_code()` to get the Tasklet code.
+        After that it calls `write_tasklet_code()` to get the Tasklet code
+        and perform literal substitution by forwarding it to `self.literal_substitution()`.
         After that it will create the mapped Tasklet.
 
         Args:
@@ -99,8 +99,9 @@ class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
         tskl_inputs: dict[str, dace.Memlet] = self.make_input_memlets(
             tskl_ranges, in_var_names, eqn
         )
-        tskl_name: str = f"{self.primitive}_{out_var_names[0]}"
-        tskl_code: str = self.write_tasklet_code(in_var_names, eqn)
+        tskl_name = f"{self.primitive}_{out_var_names[0]}"
+        tskl_code = self.write_tasklet_code(in_var_names, eqn)
+        tskl_code = self.literal_substitution(tskl_code, in_var_names, eqn)
 
         eqn_state.add_mapped_tasklet(
             name=tskl_name,
@@ -121,9 +122,7 @@ class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
     ) -> str:
         """Return the code that should be put at the left hand side of the assignment statement inside the Tasklet.
 
-        Note that returned code is not processed any further.
-        Thus the function has to apply literal removal on its own.
-        It is important that the function does not need to return the part of the Tasklet code that is the assignment.
+        Literal substitution is allied to the returned code.
 
         Args:
             in_var_names:   The list of SDFG variables used as input.
@@ -176,3 +175,26 @@ class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
                 ),
             )
         return tskl_inputs
+
+    def literal_substitution(
+        self,
+        tskl_code: str,
+        in_var_names: Sequence[str | None],
+        eqn: jax_core.JaxprEqn,
+    ) -> str:
+        """Perform literal substitution on the proto Tasklet code `tskl_code`.
+
+        Args:
+            tskl_code:      The proto Tasklet code with literal.
+            in_var_names:   The list of SDFG variables used as input.
+            eqn:            The equation.
+
+        Note:
+            It is allowed but not recommended to override this function.
+        """
+        for i, in_var_name in enumerate(in_var_names):
+            if in_var_name is not None:
+                continue
+            t_val = util.get_jax_literal_value(eqn.invars[i])
+            tskl_code = tskl_code.replace(f"__in{i}", str(t_val))
+        return tskl_code
