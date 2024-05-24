@@ -39,9 +39,6 @@ class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
 
     Notes:
         This class will always generate a mapped Tasklet, even if a scalar is handled.
-
-    Todo:
-        - `write_tasklet_code()` should no longer need to also include the `__out = ` part the base should do that.
     """
 
     __slots__ = ("_prim_name",)
@@ -109,7 +106,7 @@ class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
             name=tskl_name,
             map_ranges=tskl_ranges,
             inputs=tskl_inputs,
-            code=tskl_code,
+            code=f"__out = {tskl_code}",
             outputs=tskl_output,
             external_edges=True,
         )
@@ -122,10 +119,11 @@ class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
         in_var_names: Sequence[str | None],
         eqn: jax_core.JaxprEqn,
     ) -> str:
-        """Return the code that should be put inside the Tasklet.
+        """Return the code that should be put at the left hand side of the assignment statement inside the Tasklet.
 
         Note that returned code is not processed any further.
         Thus the function has to apply literal removal on its own.
+        It is important that the function does not need to return the part of the Tasklet code that is the assignment.
 
         Args:
             in_var_names:   The list of SDFG variables used as input.

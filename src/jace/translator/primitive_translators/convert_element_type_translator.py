@@ -46,15 +46,6 @@ class ConvertElementTypeTranslator(MappedOperationTranslatorBase):
         in_var_names: Sequence[str | None],
         eqn: jax_core.JaxprEqn,
     ) -> str:
-        """Return the code that should be put inside the Tasklet.
-
-        Note that returned code is not processed any further.
-        Thus the function has to apply literal removal on its own.
-
-        Args:
-            in_var_names:   The list of SDFG variables used as input.
-            eqn:            The equation.
-        """
         assert in_var_names[0] is not None
 
         in_var_name: str = in_var_names[0]
@@ -91,9 +82,7 @@ class ConvertElementTypeTranslator(MappedOperationTranslatorBase):
             raise NotImplementedError(
                 f"Cannot convert '{in_dtype}' to '{out_dtype}' as this type is not known to DaCe."
             )
-
-        # Now writing the full Tasklet, i.e. with the output.
-        return f"__out = {conv_code}"
+        return conv_code
 
 
 _ = translator.register_primitive_translator(ConvertElementTypeTranslator())

@@ -36,8 +36,8 @@ class BroadcastInDimTranslator(MappedOperationTranslatorBase):
         eqn: jax_core.JaxprEqn,
     ) -> str:
         if in_var_names[0] is None:
-            return f"__out = {util.get_jax_literal_value(eqn.eqn.invars[0])}"
-        return "__out = __in0"
+            return f"{util.get_jax_literal_value(eqn.eqn.invars[0])}"
+        return "__in0"
 
     def make_input_memlets(
         self,
