@@ -14,6 +14,7 @@ from .convert_element_type_translator import ConvertElementTypeTranslator
 from .copy_translator import CopyTranslator, DevicePutTranslator
 from .iota_translator import IotaTranslator
 from .reshape_translator import ReshapeTranslator
+from .select_n_translator import SelectNTranslator
 from .slicing import SlicingTranslator
 from .squeeze_translator import SqueezeTranslator
 
@@ -26,6 +27,7 @@ __all__ = [
     "DevicePutTranslator",
     "IotaTranslator",
     "ReshapeTranslator",
-    "SqueezeTranslator",
+    "SelectNTranslator",
     "SlicingTranslator",
+    "SqueezeTranslator",
 ]
