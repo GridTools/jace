@@ -16,12 +16,10 @@ from jax import core as jax_core
 from typing_extensions import override
 
 from jace import translator
-from jace.translator.primitive_translators.mapped_operation_base_translator import (
-    MappedOperationTranslatorBase,
-)
+from jace.translator import mapped_operation_base_translator as mapped_base
 
 
-class BroadcastInDimTranslator(MappedOperationTranslatorBase):
+class BroadcastInDimTranslator(mapped_base.MappedOperationTranslatorBase):
     """This handles the `broadcast_in_dim` primitives."""
 
     __slots__ = ()

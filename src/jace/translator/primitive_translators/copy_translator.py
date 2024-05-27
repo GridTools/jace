@@ -15,12 +15,10 @@ from jax import core as jax_core
 from typing_extensions import override
 
 from jace import translator
-from jace.translator.primitive_translators.mapped_operation_base_translator import (
-    MappedOperationTranslatorBase,
-)
+from jace.translator import mapped_operation_base_translator as mapped_base
 
 
-class CopyTranslator(MappedOperationTranslatorBase):
+class CopyTranslator(mapped_base.MappedOperationTranslatorBase):
     """Copy operations are implemented as a map to ensure that they can be fused with other maps."""
 
     __slots__ = ()
@@ -38,7 +36,7 @@ class CopyTranslator(MappedOperationTranslatorBase):
         return "__in0"
 
 
-class DevicePutTranslator(MappedOperationTranslatorBase):
+class DevicePutTranslator(mapped_base.MappedOperationTranslatorBase):
     """The `device_put` primitive is used to transfer data between host and device.
 
     The current implementation only supports the copying where the data already is.

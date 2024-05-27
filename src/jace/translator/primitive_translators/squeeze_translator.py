@@ -15,12 +15,10 @@ from jax import core as jax_core
 from typing_extensions import override
 
 from jace import translator
-from jace.translator.primitive_translators.mapped_operation_base_translator import (
-    MappedOperationTranslatorBase,
-)
+from jace.translator import mapped_operation_base_translator as mapped_base
 
 
-class SqueezeTranslator(MappedOperationTranslatorBase):
+class SqueezeTranslator(mapped_base.MappedOperationTranslatorBase):
     """Allows to remove dimensions with size one.
 
     Essentially equivalent to `np.squeeze` and the inverse to `np.expand_dims()`.

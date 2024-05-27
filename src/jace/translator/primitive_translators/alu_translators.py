@@ -16,12 +16,10 @@ from jax import core as jax_core
 from typing_extensions import override
 
 from jace import translator
-from jace.translator.primitive_translators.mapped_operation_base_translator import (
-    MappedOperationTranslatorBase,
-)
+from jace.translator import mapped_operation_base_translator as mapped_base
 
 
-class ALUTranslator(MappedOperationTranslatorBase):
+class ALUTranslator(mapped_base.MappedOperationTranslatorBase):
     """Translator for all arithmetic and logical operations.
 
     The class uses `MappedOperationBaseTranslator` for generating the maps.
