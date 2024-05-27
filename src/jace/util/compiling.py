@@ -12,6 +12,8 @@ Everything in this module is experimental and might vanish anytime.
 
 from __future__ import annotations
 
+import os
+import pathlib
 import time
 from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, Any
@@ -51,13 +53,16 @@ def compile_jax_sdfg(
     try:
         # We need to give the SDFG another name, this is needed to prevent a DaCe error/warning.
         #  This happens if we compile the same lowered SDFG multiple times with different options.
-        sdfg.name = f"{sdfg.name}__comp_{int(time.time() * 1000)}"
+        sdfg.name = f"{sdfg.name}__comp_{int(time.time() * 1000)}_{os.getpid()}"
+        assert len(sdfg.name) < 255
 
         # Actual compiling the stuff; forcing that a recompilation happens
         with dace.config.temporary_config():
+            dace.Config.set("compiler", "use_cache", value=False)
+            dace.Config.set("cache", value="name")
+            dace.Config.set("default_build_folder", value=pathlib.Path(".jacecache").resolve())
             sdfg._recompile = True
             sdfg._regenerate_code = True
-            dace.Config.set("compiler", "use_cache", value=False)
             csdfg: jdace.CompiledSDFG = sdfg.compile()
 
     finally:
