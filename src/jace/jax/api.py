@@ -19,11 +19,19 @@ from jace import translator
 from jace.jax import stages
 
 
+__all__ = [
+    "grad",
+    "jit",
+    "jacfwd",
+    "jacrev",
+]
+
+
 @overload
 def jit(
     fun: Literal[None] = None,
     /,
-    sub_translators: Mapping[str, translator.PrimitiveTranslator] | None = None,
+    primitive_translators: Mapping[str, translator.PrimitiveTranslator] | None = None,
     **kwargs: Any,
 ) -> Callable[[Callable], stages.JaceWrapped]: ...
 
@@ -32,7 +40,7 @@ def jit(
 def jit(
     fun: Callable,
     /,
-    sub_translators: Mapping[str, translator.PrimitiveTranslator] | None = None,
+    primitive_translators: Mapping[str, translator.PrimitiveTranslator] | None = None,
     **kwargs: Any,
 ) -> stages.JaceWrapped: ...
 
@@ -40,7 +48,7 @@ def jit(
 def jit(
     fun: Callable | None = None,
     /,
-    sub_translators: Mapping[str, translator.PrimitiveTranslator] | None = None,
+    primitive_translators: Mapping[str, translator.PrimitiveTranslator] | None = None,
     **kwargs: Any,
 ) -> stages.JaceWrapped | Callable[[Callable], stages.JaceWrapped]:
     """Jace's replacement for `jax.jit` (just-in-time) wrapper.
@@ -50,36 +58,28 @@ def jit(
     In addition it accepts some Jace specific arguments.
 
     Args:
-        sub_translators:    Use these subtranslators for the lowering to DaCe.
+        primitive_translators:    Use these primitive translators for the lowering to SDFG.
 
     Notes:
-        If no subtranslators are specified then the ones that are currently active,
-        i.e. the output of `get_regsitered_primitive_translators()`, are used.
-        After construction changes to the passed `sub_translators` have no effect on the returned object.
+        If no translators are specified the currently ones currently inside the global registry are used.
+        After construction changes to the passed `primitive_translators` have no effect on the returned object.
     """
     if kwargs:
+        # TODO(phimuell): Add proper name verification and exception type.
         raise NotImplementedError(
-            f"The following arguments of 'jax.jit' are not yet supported by jace: {', '.join(kwargs.keys())}."
+            f"The following arguments to 'jace.jit' are not yet supported: {', '.join(kwargs)}."
         )
 
     def wrapper(f: Callable) -> stages.JaceWrapped:
         jace_wrapper = stages.JaceWrapped(
             fun=f,
-            sub_translators=(
+            primitive_translators=(
                 translator.managing._PRIMITIVE_TRANSLATORS_DICT
-                if sub_translators is None
-                else sub_translators
+                if primitive_translators is None
+                else primitive_translators
             ),
-            jit_ops=kwargs,
+            jit_options=kwargs,
         )
         return functools.update_wrapper(jace_wrapper, f)
 
     return wrapper if fun is None else wrapper(fun)
-
-
-__all__ = [
-    "grad",
-    "jit",
-    "jacfwd",
-    "jacrev",
-]

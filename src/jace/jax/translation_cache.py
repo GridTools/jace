@@ -21,7 +21,14 @@ import collections
 import dataclasses
 import functools
 from collections.abc import Callable, Hashable
-from typing import TYPE_CHECKING, Any, Final, TypeAlias
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Generic,
+    TypeAlias,
+    TypeVar,
+    cast,
+)
 
 import dace
 from jax import core as jax_core
@@ -32,24 +39,24 @@ from jace import util
 if TYPE_CHECKING:
     from jace.jax import stages
 
-# This is the default cache size we are using
-_DEF_CACHE_SIZE: Final[int] = 256
-
-# This are the caches that we are using.
-_TRANSLATION_CACHES: dict[type[CachingStage], TranslationCache] = {}
+#: Caches used to store the state transition.
+#: The states are on a per stage and not per instant basis.
+_TRANSLATION_CACHES: dict[type[CachingStage], StageCache] = {}
 
 
-class CachingStage:
+# Denotes the stage that follows the current one.
+#  Used by the `NextStage` Mixin.
+NextStage = TypeVar("NextStage", bound="stages.Stage")
+
+
+class CachingStage(Generic[NextStage]):
     """Annotates a stage whose transition to the next one is cacheable.
 
-    This transitions are mainly `JaceWrapped.lower()` and `JaceLowered.compile()` calls.
-    To make a stage cacheable annotate the transition function with the `@cached_translation` decorator.
-
-    Todo:
-        - Make a generic to indicate what the result stage is.
+    To make a transition function cacheable it must be annotated by the
+    `@cached_transition` decorator.
     """
 
-    _cache: TranslationCache
+    _cache: StageCache[NextStage]
 
     def __init__(self) -> None:
         self._cache = get_cache(self)
@@ -59,14 +66,17 @@ class CachingStage:
         self: CachingStage,
         *args: Any,
         **kwargs: Any,
-    ) -> CachedCallDescription:
+    ) -> StageTransformationDescription:
         """Generates the key that is used to store/locate the call in the cache."""
         ...
 
 
-def cached_translation(
-    action: Callable[..., stages.Stage],
-) -> Callable:
+Action_T = TypeVar("Action_T", bound=Callable[..., Any])
+
+
+def cached_transition(
+    action: Action_T,
+) -> Action_T:
     """Decorator for making the transition function of the stage cacheable.
 
     The decorator will call the annotated function only if the call is not stored inside the cache.
@@ -79,18 +89,15 @@ def cached_translation(
         self: CachingStage,
         *args: Any,
         **kwargs: Any,
-    ) -> stages.Stage:
-        # Get the abstract description of the call, that is used as key.
-        key: CachedCallDescription = self._make_call_description(*args, **kwargs)
+    ):
+        key: StageTransformationDescription = self._make_call_description(*args, **kwargs)
         if key in self._cache:
             return self._cache[key]
-
-        # We must actually perform the call
         next_stage: stages.Stage = action(self, *args, **kwargs)
         self._cache[key] = next_stage
         return next_stage
 
-    return _action_wrapper
+    return cast(Action_T, _action_wrapper)
 
 
 def clear_translation_cache() -> None:
@@ -100,13 +107,12 @@ def clear_translation_cache() -> None:
 
 def get_cache(
     stage: CachingStage,
-) -> TranslationCache:
+) -> StageCache:
     """Returns the cache that is used for `stage`."""
-    # The caches are per stage and not per instance basis
-    tstage = type(stage)
-    if tstage not in _TRANSLATION_CACHES:
-        _TRANSLATION_CACHES[tstage] = TranslationCache(size=_DEF_CACHE_SIZE)
-    return _TRANSLATION_CACHES[tstage]
+    stage_type = type(stage)
+    if stage_type not in _TRANSLATION_CACHES:
+        _TRANSLATION_CACHES[stage_type] = StageCache()
+    return _TRANSLATION_CACHES[stage_type]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -116,6 +122,12 @@ class _AbstractCallArgument:
     It is used as part of the key in the cache.
     It represents the structure of the argument, i.e. its shape, type and so on, but nots its value.
     To construct it you should use the `from_value()` class function which interfere the characteristics from a value.
+
+    Attributes:
+        shape:      In case of an array its shape, in case of a scalar the empty tuple.
+        dtype:      The DaCe type of the argument.
+        strides:    The strides of the argument, or `None` if they are unknown or a scalar.
+        storage:    The storage type where the argument is stored.
     """
 
     shape: tuple[int, ...]
@@ -172,80 +184,69 @@ CallArgsDescription: TypeAlias = tuple[
 
 
 @dataclasses.dataclass(frozen=True)
-class CachedCallDescription:
-    """Represents the full structure of a call in the cache as a key.
+class StageTransformationDescription:
+    """Represents the call to a state transformation function.
 
-    This class is the return type of the `CachingStage._make_call_description()` function,
-    which is used by the `@cached_translation` decorator to compute a key of transition.
-    This allows to either retrieve or then store the result of the actual call in the cache.
+    State transition functions are annotated with `@cached_transition` and stored inside a cache.
+    This class serves as a key inside this cache and is generated by `CachingStage._make_call_description()`.
+    The actual key is consists of two parts.
 
-    The actual key is composed of two parts, first the "origin of the call".
-    For this we just use the address of the stage object we are caching and hope that the
-    address is not reused for another stag anytime soon.
-
-    The second part is of the key are a description of the actual arguments, see `CallArgsDescription` type alias.
-    For this the `_make_call_description()` method of the stage is used.
-    The arguments can be described in two different ways:
-    - Abstract description: In this way, the actual value of the argument is irrelevant,
-        only the structure of them are important, this is similar to the tracers used in Jax.
-    - Concrete description: Here one caches on the actual value of the argument,
-        which is similar to static arguments in Jax.
-        The only restriction is that they are hash able.
+    Attributes:
+        stage_id:   Origin of the call, for which the id of the stage object should be used.
+        call_args:  Description of the arguments of the call. There are two ways to describe
+            the arguments:
+            - Abstract description: In this way, the actual value of the argument is irrelevant,
+                only the structure of them are important, similar to the tracers used in Jax.
+            - Concrete description: Here one caches on the actual value of the argument.
+                The only requirement is that they can be hashed.
 
     Notes:
         The base assumption is that the stages are immutable.
 
     Todo:
         - pytrees.
-        - Turn the references into week references, Jax does this and I am sure there is a reason for it.
     """
 
     stage_id: int
-    fargs: CallArgsDescription
+    call_args: CallArgsDescription
 
 
-class TranslationCache:
-    """The cache object used to cache the stage transitions.
+# Denotes the stage that is stored inside the cache.
+StageType = TypeVar("StageType", bound="stages.Stage")
+
+
+class StageCache(Generic[StageType]):
+    """LRU cache that is used to cache the stage transitions, i.e. lowering and compiling, in Jace.
 
     Notes:
-        The most recently used entry is at the end of the `OrderedDict`, because it puts new entries there.
+        The most recently used entry is at the end of the `OrderedDict`.
     """
 
-    __slots__ = ("_memory", "_size")
-
-    _memory: collections.OrderedDict[CachedCallDescription, stages.Stage]
+    _memory: collections.OrderedDict[StageTransformationDescription, StageType]
     _size: int
 
     def __init__(
         self,
-        size: int,
+        size: int = 256,
     ) -> None:
-        """Creates a cache instance of size.
+        """Creates a LRU cache with `size` many entries.
 
-        The cache will have size `size` and use `key` as key function.
+        Args:
+            size:   Number of entries the cache holds, defaults to 256.
         """
-        if size <= 0:
-            raise ValueError(f"Invalid cache size of '{size}'")
         self._memory = collections.OrderedDict()
         self._size = size
 
     def __contains__(
         self,
-        key: CachedCallDescription,
+        key: StageTransformationDescription,
     ) -> bool:
-        """Check if `self` have a record of `key`."""
         return key in self._memory
 
     def __getitem__(
         self,
-        key: CachedCallDescription,
-    ) -> stages.Stage:
-        """Get the next stage associated with `key`.
-
-        Notes:
-            It is an error if `key` does not exist.
-            This function will mark `key` as most recently used.
-        """
+        key: StageTransformationDescription,
+    ) -> StageType:
         if key not in self:
             raise KeyError(f"Key '{key}' is unknown.")
         self._memory.move_to_end(key, last=True)
@@ -253,25 +254,20 @@ class TranslationCache:
 
     def __setitem__(
         self,
-        key: CachedCallDescription,
-        res: stages.Stage,
-    ) -> TranslationCache:
-        """Adds or update `key` to map to `res`."""
+        key: StageTransformationDescription,
+        res: StageType,
+    ) -> None:
         if key in self:
-            # `key` is known, so move it to the end and update the mapped value.
             self._memory.move_to_end(key, last=True)
             self._memory[key] = res
-
         else:
-            # `key` is not known so we have to add it
-            while len(self._memory) >= self._size:
+            if len(self._memory) == self._size:
                 self.popitem(None)
             self._memory[key] = res
-        return self
 
     def popitem(
         self,
-        key: CachedCallDescription | None,
+        key: StageTransformationDescription | None,
     ) -> None:
         """Evict `key` from `self`.
 
@@ -286,5 +282,4 @@ class TranslationCache:
             self._memory.popitem(last=False)
 
     def __repr__(self) -> str:
-        """Textual representation for debugging."""
-        return f"TranslationCache({len(self._memory)} / {self._size} || {', '.join( '[' + repr(k) + ']' for k in self._memory)})"
+        return f"StageCache({len(self._memory)} / {self._size} || {', '.join( '[' + repr(k) + ']' for k in self._memory)})"

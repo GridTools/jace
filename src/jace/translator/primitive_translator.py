@@ -4,14 +4,7 @@
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
-"""Contains the interface for all primitive subtranslators.
-
-Note the name of this file is because it has to be the first that is imported in the `__init__.py` file.
-If not, we would get a cyclic import error.
-However, all attempts to prevent ruff from mindlessly (rule abiding) destroying this orders failed.
-Thus the name was changed to enforce this.
-If you have the solution, feel free to implement it.
-"""
+"""Contains the interface for all primitive translators."""
 
 from __future__ import annotations
 
@@ -31,9 +24,6 @@ class PrimitiveTranslatorCallable(Protocol):
     """Callable version of the primitive translators.
 
     Used for type annotation purposes, classes should be derived from `PrimitiveTranslator` instead.
-
-    Todo:
-        - This split information `__call__()` should be documented in `PrimitiveTranslator` instead and not here.
     """
 
     __slots__ = ()
@@ -51,33 +41,30 @@ class PrimitiveTranslatorCallable(Protocol):
 
         Before the driver calls this function it will perform the following
         preparatory tasks:
-        - It will allocate the SDFG variables that are used as outputs.
-            Their names will be passed through the `out_var_names` argument,
-            in the same order as `eqn.outvars`.
-        - It will collect the names of the SDFG variables that are used as input
-            and place them in `in_var_names`, in the same order as `eqn.invars`.
-            If an input argument refers to a literal no SDFG variable is created
-            for it and `None` is passed to indicate this.
-        - The subtranslator will create variables that are used as output.
-            They are passed as `out_var_names`, same order as in the equation.
-        - The driver will create a new terminal state and pass it as
-            `eqn_state` argument. This state is guaranteed to be empty and
-            `translator.terminal_sdfg_state is eqn_state` holds.
+        - It will allocate the SDFG variables that are used as outputs. Their names will be passed
+            through the `out_var_names` argument, in the same order as `eqn.outvars`.
+        - It will collect the names of the SDFG variables that are used as input and place them in
+            `in_var_names`, in the same order as `eqn.invars`. If an input argument refers to a
+            literal no SDFG variable is created for it and `None` is passed to indicate this.
+        - The driver will create variables that are used as output. They are passed as
+            `out_var_names`, same order as in the equation.
+        - The driver will create a new terminal state and pass it as `eqn_state` argument. This
+            state is guaranteed to be empty and `translator.terminal_sdfg_state is eqn_state` holds.
 
-        Then the subtranslator is called.
-        Usually a subtranslator should construct the dataflow graph inside `eqn_state`.
-        It is allowed that the subtranslators creates more states if needed, but this state machinery
-        has to have a single terminal state, which must be returned and reachable from `eqn_state`.
-        If the function returns `None` the driver will assume that subtranslator was able to
-        fully construct the dataflow graph within `eqn_state`.
+        Then the primitive translator is called.
+        Usually a primitive translator should construct the dataflow graph inside `eqn_state`.
+        It is allowed that the primitive translators creates more states if needed, but this
+        state machinery has to have a single terminal state, which must be returned and reachable
+        from `eqn_state`. If the function returns `None` the driver will assume that primitive
+        translator was able to fully construct the dataflow graph within `eqn_state`.
 
-        While a subtranslator is forbidden from meddling with the input variables mentioned in
-        `in_var_names` in any way, it is allowed to modify the output variables.
-        For example it could create a new SDFG variable, with different strides.
-        But in that case the subtranslator must update the internal mapping of the driver TBA HOW,
-        and modify the mapping specified by `out_var_names`.
-        However, the subtranslator is allowed to create internal temporary variables.
-        It just have to ensure that no name collision will occur, a way to do this is to use a passed variable name as prefix.
+        While a primitive translator is forbidden from meddling with the input variables mentioned
+        in `in_var_names` in any way, it is allowed to modify the output variables. For example
+        it could create a new SDFG variable, with different strides. But in that case the primitive
+        translator must update the internal mapping of the driver TBA HOW, and modify the mapping
+        specified by `out_var_names`. However, the subtranslator is allowed to create internal
+        temporary variables. It just have to ensure that no name collision will occur, a way to
+        do this is to use a passed variable name as prefix.
 
         Args:
             driver:         The driver object of the translation.
@@ -94,16 +81,17 @@ class PrimitiveTranslatorCallable(Protocol):
 
 @runtime_checkable
 class PrimitiveTranslator(PrimitiveTranslatorCallable, Protocol):
-    """Interface for all Jax primitive translators, also known as subtranslator, that are implemented as class.
+    """Interface for all Jax primitive translators.
 
     A translator for a primitive translates a single equation of a Jaxpr into its SDFG equivalent.
     For satisfying this interface a concrete implementation must be immutable after construction.
 
-    Subtranslators are simple, but highly specialized objects that are only able to perform the translation of a single primitive.
-    The overall translation process itself is managed by a driver object, which also owns and manage the subtranslators.
-    In the end this implements the delegation pattern.
+    Primitive translators are simple, but highly specialized objects that are only able to perform
+    the translation of a single primitive. The overall translation process itself is managed by a
+    driver object, which also owns and manage the primitive translators. In the end this implements
+    the delegation pattern.
 
-    You can use `jace.translator.add_subtranslator()` to register your translator to Jace.
+    You can use `jace.translator.register_primitive_translator()` to register your translator to Jace.
     """
 
     __slots__ = ()
