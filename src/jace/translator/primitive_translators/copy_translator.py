@@ -33,7 +33,7 @@ class CopyTranslator(mapped_base.MappedOperationTranslatorBase):
         in_var_names: Sequence[str | None],
         eqn: jax_core.JaxprEqn,
     ) -> str:
-        return "__in0"
+        return "__out = __in0"
 
 
 class DevicePutTranslator(mapped_base.MappedOperationTranslatorBase):
@@ -61,7 +61,7 @@ class DevicePutTranslator(mapped_base.MappedOperationTranslatorBase):
             raise NotImplementedError(
                 f"Can only copy on the host, but not from {eqn.params['src']} to {eqn.params['device']}."
             )
-        return "__in0"
+        return "__out = __in0"
 
 
 _ = translator.register_primitive_translator(CopyTranslator())

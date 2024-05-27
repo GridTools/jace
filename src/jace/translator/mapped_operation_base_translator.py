@@ -33,7 +33,7 @@ class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
     Thus this class acts like a convenience wrapper around it.
 
     To use this class a user has to overwrite the `write_tasklet_code()` function.
-    This function generates the right hand side of the assignment code, i.e. everything after `__out =`.
+    This function generates the entire code that should be put into the Tasklet, include the assignment to `__out`.
     If needed the translator will perform literal substitution on the returned code and broadcast the inputs to match the outputs.
 
     Notes:
@@ -107,7 +107,7 @@ class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
             name=tskl_name,
             map_ranges=tskl_ranges,
             inputs=tskl_inputs,
-            code=f"__out = {tskl_code}",
+            code=tskl_code,
             outputs=tskl_output,
             external_edges=True,
         )
@@ -121,9 +121,10 @@ class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
         in_var_names: Sequence[str | None],
         eqn: jax_core.JaxprEqn,
     ) -> str:
-        """Return the code that should be put at the left hand side of the assignment statement inside the Tasklet.
+        """Return the (Python) code that should be put inside the Tasklet.
 
-        Literal substitution is allied to the returned code.
+        This also includes the assignment statement, i.e. `__out`.
+        However, the base will do literal substitution on the returned object.
 
         Args:
             tskl_ranges:    The iteration indexes used by the map, first element is the iteration index itself,

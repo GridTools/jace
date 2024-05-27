@@ -68,11 +68,11 @@ class ConvertElementTypeTranslator(mapped_base.MappedOperationTranslatorBase):
                 category=UserWarning,
                 stacklevel=1,  # Find a better one
             )
-            return conv_code
+            return f"__out = {conv_code}"
         if in_dtype_s.startswith("bool") and out_dtype_s.startswith("int"):
             # Interestingly `__out = int(__in0)` will at some DaCe processing stage.
             #  See commit `f5aabc` of the prototype.
-            return f"(1 if {conv_code} else 0)"
+            return f"__out = (1 if {conv_code} else 0)"
 
         # The general case
         if out_dtype_s == "bool":
@@ -83,7 +83,7 @@ class ConvertElementTypeTranslator(mapped_base.MappedOperationTranslatorBase):
             raise NotImplementedError(
                 f"Cannot convert '{in_dtype}' to '{out_dtype}' as this type is not known to DaCe."
             )
-        return conv_code
+        return f"__out = {conv_code}"
 
 
 _ = translator.register_primitive_translator(ConvertElementTypeTranslator())

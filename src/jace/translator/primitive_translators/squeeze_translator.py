@@ -36,7 +36,7 @@ class SqueezeTranslator(mapped_base.MappedOperationTranslatorBase):
         in_var_names: Sequence[str | None],
         eqn: jax_core.JaxprEqn,
     ) -> str:
-        return "__in0"
+        return "__out = __in0"
 
     @override
     def make_input_memlets(

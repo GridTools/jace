@@ -37,7 +37,7 @@ class IotaTranslator(mapped_base.MappedOperationTranslatorBase):
         in_var_names: Sequence[str | None],
         eqn: jax_core.JaxprEqn,
     ) -> str:
-        return f"{tskl_ranges[eqn.params['dimension']][0]}"
+        return f"__out = {tskl_ranges[eqn.params['dimension']][0]}"
 
     @override
     def make_input_memlets(
