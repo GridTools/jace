@@ -110,9 +110,9 @@ class JaceWrapped(tcache.CachingStage["JaceLowered"]):
         if len(kwargs) != 0:
             raise NotImplementedError("Currently only positional arguments are supported.")
 
-        # Currently the SDFG that we build only supports `C_CONTIGUOUS` memory order.
-        #  Since we support the paradigm that "everything passed to `lower` should also be
-        #  accepted as argument to call the result", we forbid other memory orders here.
+        # TODO(phimuell): Currently the SDFG that we build only supports `C_CONTIGUOUS` memory
+        #  order. Since we support the paradigm that "everything passed to `lower` should also
+        #  be accepted as argument to call the result", we forbid other memory orders here.
         if not all((not util.is_array(arg)) or arg.flags["C_CONTIGUOUS"] for arg in args):
             raise NotImplementedError("Currently can not handle strides beside 'C_CONTIGUOUS'.")
 
