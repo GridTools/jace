@@ -15,66 +15,7 @@ from typing import Any, Literal, overload
 
 from jax import grad, jacfwd, jacrev
 
-from jace import translator
-from jace.jax import stages
-
-
-@overload
-def jit(
-    fun: Literal[None] = None,
-    /,
-    sub_translators: Mapping[str, translator.PrimitiveTranslator] | None = None,
-    **kwargs: Any,
-) -> Callable[[Callable], stages.JaceWrapped]: ...
-
-
-@overload
-def jit(
-    fun: Callable,
-    /,
-    sub_translators: Mapping[str, translator.PrimitiveTranslator] | None = None,
-    **kwargs: Any,
-) -> stages.JaceWrapped: ...
-
-
-def jit(
-    fun: Callable | None = None,
-    /,
-    sub_translators: Mapping[str, translator.PrimitiveTranslator] | None = None,
-    **kwargs: Any,
-) -> stages.JaceWrapped | Callable[[Callable], stages.JaceWrapped]:
-    """Jace's replacement for `jax.jit` (just-in-time) wrapper.
-
-    It works the same way as `jax.jit` does, but instead of using XLA the computation is lowered to DaCe.
-    It supports the same arguments as `jax.jit` (although currently not) does.
-    In addition it accepts some Jace specific arguments.
-
-    Args:
-        sub_translators:    Use these subtranslators for the lowering to DaCe.
-
-    Notes:
-        If no subtranslators are specified then the ones that are currently active,
-        i.e. the output of `get_regsitered_primitive_translators()`, are used.
-        After construction changes to the passed `sub_translators` have no effect on the returned object.
-    """
-    if kwargs:
-        raise NotImplementedError(
-            f"The following arguments of 'jax.jit' are not yet supported by jace: {', '.join(kwargs.keys())}."
-        )
-
-    def wrapper(f: Callable) -> stages.JaceWrapped:
-        jace_wrapper = stages.JaceWrapped(
-            fun=f,
-            sub_translators=(
-                translator.managing._PRIMITIVE_TRANSLATORS_DICT
-                if sub_translators is None
-                else sub_translators
-            ),
-            jit_ops=kwargs,
-        )
-        return functools.update_wrapper(jace_wrapper, f)
-
-    return wrapper if fun is None else wrapper(fun)
+from jace import stages, translator
 
 
 __all__ = [
@@ -83,3 +24,61 @@ __all__ = [
     "jacfwd",
     "jacrev",
 ]
+
+
+@overload
+def jit(
+    fun: Literal[None] = None,
+    /,
+    primitive_translators: Mapping[str, translator.PrimitiveTranslator] | None = None,
+    **kwargs: Any,
+) -> Callable[[Callable], stages.JaceWrapped]: ...
+
+
+@overload
+def jit(
+    fun: Callable,
+    /,
+    primitive_translators: Mapping[str, translator.PrimitiveTranslator] | None = None,
+    **kwargs: Any,
+) -> stages.JaceWrapped: ...
+
+
+def jit(
+    fun: Callable | None = None,
+    /,
+    primitive_translators: Mapping[str, translator.PrimitiveTranslator] | None = None,
+    **kwargs: Any,
+) -> stages.JaceWrapped | Callable[[Callable], stages.JaceWrapped]:
+    """Jace's replacement for `jax.jit` (just-in-time) wrapper.
+
+    It works the same way as `jax.jit` does, but instead of using XLA the computation is lowered
+    to DaCe. It supports the same arguments as `jax.jit` (although currently not) does.
+    In addition it accepts some Jace specific arguments.
+
+    Args:
+        primitive_translators:    Use these primitive translators for the lowering to SDFG.
+
+    Notes:
+        If no translators are specified, the ones in the global registry are implicitly passed
+        as argument. After constructions any change to `primitive_translators` has no effect.
+    """
+    if kwargs:
+        # TODO(phimuell): Add proper name verification and exception type.
+        raise NotImplementedError(
+            f"The following arguments to 'jace.jit' are not yet supported: {', '.join(kwargs)}."
+        )
+
+    def wrapper(f: Callable) -> stages.JaceWrapped:
+        jace_wrapper = stages.JaceWrapped(
+            fun=f,
+            primitive_translators=(
+                translator.managing._PRIMITIVE_TRANSLATORS_DICT
+                if primitive_translators is None
+                else primitive_translators
+            ),
+            jit_options=kwargs,
+        )
+        return functools.update_wrapper(jace_wrapper, f)
+
+    return wrapper if fun is None else wrapper(fun)

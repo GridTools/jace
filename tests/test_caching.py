@@ -17,8 +17,8 @@ import numpy as np
 import pytest
 
 import jace
-from jace import optimization
-from jace.jax import stages, translation_cache as tcache
+from jace import optimization, stages
+from jace.util import translation_cache as tcache
 
 
 @pytest.fixture(autouse=True)

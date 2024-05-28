@@ -8,6 +8,8 @@
 """This module contains all functions that are related to post processing the SDFG.
 
 Most of them operate on `TranslatedJaxprSDFG` objects.
+
+Currently they mostly exist for the sake of existing.
 """
 
 from __future__ import annotations
@@ -36,6 +38,22 @@ def postprocess_jaxpr_sdfg(
         - Setting correct input names (layer that does not depend on JAX).
         - Setting the correct strides & Storage properties.
     """
+    # Currently we do nothing except finalizing.
+    finalize_jaxpr_sdfg(tsdfg)
+
+
+def finalize_jaxpr_sdfg(
+    tsdfg: translator.TranslatedJaxprSDFG,
+) -> None:
+    """Finalizes the supplied `tsdfg` object in place.
+
+    This function will turn a non finalized, i.e. canonical, SDFG into a finalized one,
+    i.e. after this function `tsdfg.is_finalized` is `True`.
+    The function will:
+    - mark all input and output variables, i.e. listed in `tsdfg.{inp, out}_names`, as globals,
+    - set the `arg_names` property of the SDFG,
+    - deallocate all members of `tsdfg` that are no longer needed.
+    """
     if tsdfg.is_finalized:
         raise ValueError("The supplied SDFG is already finalized.")
     if not tsdfg.inp_names:
@@ -52,7 +70,7 @@ def postprocess_jaxpr_sdfg(
         sdfg_arg_names.append(glob_name)
 
     # This forces the signature of the SDFG to include all arguments in order they appear.
-    #  If an argument is reused (donated) then it is only listed once, the first time it appears
+    #  If an argument is used as input and output then it is only listed as input.
     tsdfg.sdfg.arg_names = sdfg_arg_names
 
     # Now we will deallocate the fields and mark `self` as finalized.

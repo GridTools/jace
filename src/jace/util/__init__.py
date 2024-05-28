@@ -37,7 +37,6 @@ from .util import (
     FORBIDDEN_SDFG_VAR_NAMES,
     VALID_SDFG_OBJ_NAME,
     VALID_SDFG_VAR_NAME,
-    as_sequence,
 )
 
 
@@ -46,7 +45,6 @@ __all__ = [
     "VALID_SDFG_VAR_NAME",
     "FORBIDDEN_SDFG_VAR_NAMES",
     "JaCeVar",
-    "as_sequence",
     "compile_jax_sdfg",
     "dataclass_with_default_init",
     "is_array",

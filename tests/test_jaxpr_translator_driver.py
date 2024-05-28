@@ -42,7 +42,7 @@ def translation_driver():
     """Returns an allocated driver instance."""
     name = "fixture_driver"
     driver = translator.JaxprTranslationDriver(
-        sub_translators=translator.get_regsitered_primitive_translators()
+        primitive_translators=translator.get_regsitered_primitive_translators()
     )
     driver._allocate_translation_ctx(name=name)
     return driver
@@ -54,7 +54,7 @@ def test_driver_alloc() -> None:
     Does not use the fixture because it does it on its own.
     """
     driver = translator.JaxprTranslationDriver(
-        sub_translators=translator.get_regsitered_primitive_translators()
+        primitive_translators=translator.get_regsitered_primitive_translators()
     )
     assert not driver.is_allocated(), "Driver was created allocated."
     assert len(driver._ctx_stack) == 0
@@ -220,9 +220,7 @@ def test_driver_nested(translation_driver: translator.JaxprTranslationDriver) ->
     #  However, it is not able to update the mapping.
     with pytest.raises(
         expected_exception=ValueError,
-        match=re.escape(
-            f"Tried to create the mapping '{array1} -> {name_1}', but the variable is already mapped."
-        ),
+        match=re.escape(f"Cannot change the mapping of '{array1}' from '{name_1}' to '{name_1}'."),
     ):
         _ = translation_driver.add_array(array1, update_var_mapping=True)
     assert name_1 not in translation_driver.sdfg.arrays
@@ -307,7 +305,7 @@ def test_driver_variable_multiple_variables(
     with pytest.raises(
         expected_exception=ValueError,
         match=re.escape(
-            f"Tried to create the mapping '{array1} -> {prefix_expected_name}', but the variable is already mapped."
+            f"Cannot change the mapping of '{array1}' from '{translation_driver.map_jax_var_to_sdfg(array1)}' to '{prefix_expected_name}'."
         ),
     ):
         _ = translation_driver.add_array(array1, update_var_mapping=True, name_prefix=prefix)

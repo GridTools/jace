@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+import jax
 import numpy as np
 import pytest
 from jax import numpy as jnp
@@ -38,10 +39,12 @@ def _roundtrip_implementation(
     A_org = A.copy()
 
     for ops in [jnp.expand_dims, jnp.squeeze]:
-        ref = ops(A, axis)
-        res = jace.jit(lambda A: ops(A, axis))(A)  # noqa: B023  # No capturing
+        with jax.experimental.enable_x64():
+            ref = ops(A, axis)
+            res = jace.jit(lambda A: ops(A, axis))(A)  # noqa: B023  # No capturing
 
         assert ref.shape == res.shape, f"A.shape = {shape}; Expected: {ref.shape}; Got: {res.shape}"
+        assert ref.dtype == res.dtype
         assert np.all(ref == res), f"Value error for shape '{shape}' and axis={axis}"
         A = np.array(ref, copy=True)  # It is a Jax array, and we have to reverse this.
     assert A_org.shape == res.shape

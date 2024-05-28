@@ -27,7 +27,7 @@ def _clear_translation_cache():
     Todo:
         Should be used _everywhere_.
     """
-    from jace.jax import translation_cache as tcache
+    from jace.util import translation_cache as tcache
 
     tcache.clear_translation_cache()
     yield

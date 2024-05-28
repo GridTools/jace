@@ -17,10 +17,19 @@ Todo:
 
 from __future__ import annotations
 
+import jax
 import numpy as np
+import pytest
 from jax import numpy as jnp
 
 import jace
+
+
+@pytest.fixture(autouse=True)
+def _enable_x64_mode_in_jax():
+    """Ensures that x64 mode in Jax ins enabled."""
+    with jax.experimental.enable_x64():
+        yield
 
 
 def test_bid_scalar():

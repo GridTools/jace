@@ -15,26 +15,33 @@ from jace import util
 class TranslatedJaxprSDFG:
     """Encapsulates the result of a translation run of the `JaxprTranslationDriver` object.
 
-    The fields used to store the result are:
-    - `sdfg` the SDFG object that was created.
-    - `inp_names` a list of the SDFG variables that are used as input, in the same order as `Jaxpr.invars`.
-    - `out_names` a list of the SDFG variables that are used as output, in the same order as `Jaxpr.outvars`.
-    - `start_state` the first state in the SDFG state machine.
-    - `terminal_state` the last state in the state machine.
-    - `is_finalized` a bool that indicates if `self` represents a finalized or canonical SDFG, see below.
+    This class is used by the `JaxprTranslationDriver` to store the context of the SDFG that is
+    currently under construction and the return value of `JaxprTranslationDriver.translate_jaxpr()`.
+    A user should never create a `TranslatedJaxprSDFG` manually.
 
-    Note, that it might happen that a name appears in both the `inp_names` and `out_names` lists.
-    This happens if an argument is used both as input and output, and it is not an error.
-    In Jax this is called argument donation.
+    It might happen that a name appears in both the `inp_names` and `out_names` lists. This happens
+    if an argument is used both as input and output, and it is not an error. In Jax this is called
+    argument donation.
 
-    By default `self` encapsulates a canonical SDFG, see `JaxprTranslationDriver` for more information on this.
-    However, if `is_finalized` is set, then `self` contains a finalized SDFG, i.e.
-    - all input an output arrays are marked as global,
-    - however, there are no `__return` arrays, i.e. all arguments are passed as arguments,
-    - its `arg_names` are set with set `inp_names + out_names`, however,
-        arguments that are input and outputs are only listed as inputs.
+    By default `self` encapsulates a canonical SDFG, see `JaxprTranslationDriver` for more
+    information on this. However, if `is_finalized` is set, then `self` contains a finalized SDFG,
+    which differs from a canonical SDFG in the following ways:
+    - all input and output arrays are marked as global,
+    - however, there are no `__return` arrays, i.e. all return values are passed as arguments,
+    - its `arg_names` are set with set `inp_names + out_names`, however, arguments that are input
+        and outputs are only listed as inputs,
+    - only the `sdfg`, `inp_names`, `out_names` and `is_finalized` are guaranteed to be not `None`.
 
-    Furthermore, only `sdfg`, `inp_names` and `out_names` are guaranteed to be allocated, all other fields might be `None`.
+    Attributes:
+        sdfg:           The SDFG object that was created.
+        inp_names:      A list of the SDFG variables that are used as input, same order as `Jaxpr.invars`.
+        out_names:      A list of the SDFG variables that are used as output, same order as `Jaxpr.outvars`.
+        start_state:    The first state in the SDFG state machine.
+        terminal_state: The (currently) last state in the state machine.
+        is_finalized:   Indicates if `self` represents a finalized or canonical SDFG.
+
+    Args:
+        name:   The name that should be given to the SDFG, optional.
     """
 
     sdfg: dace.SDFG

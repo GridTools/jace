@@ -32,63 +32,62 @@ class JaxprTranslationDriver:
     - It lacks the special `__return` variable,
     - the `arg_names` parameter is not set.
 
-    For these reasons the SDFG is not directly usable, and further manipulations have to be performed.
-    Especially, DaCe's validation function will fail and it is unable to be processed by the optimization pipeline.
-    For more information also see `jace.translator.pre_post_translation` module.
+    For these reasons the SDFG is not directly usable, and further manipulations have to be
+    performed. Especially, DaCe's validation function will fail and it is unable to be processed
+    by the optimization pipeline. For more information also see `jace.translator.post_translation`
+    module.
 
-    The idea of the translator is extremely simple.
-    Since Jaxpr is a list consisting of more or less simple instructions/equations, they get processed one after the other.
-    Each equation is translated into its own state that is appended to the SDFG, thus the SDFG is a long list of states.
-    In certain cases it might be that an equation needs more states, but this is an exception.
+    The idea of the translator is extremely simple. Since Jaxpr is a list consisting of more or
+    less simple instructions/equations, they get processed one after the other. Each equation is
+    translated into its own state that is appended to the SDFG, thus the SDFG is a long list of
+    states. In certain cases it might be that an equation needs more states, but this is an
+    exception.
 
-    The actual translation of the equation is not handled by the driver.
-    Instead the request is forwarded to a `PrimitiveTranslator` object, also known as subtranslator.
-    This is a highly specialized object that is able to handle one kind of primitive.
-    For more information on the subtranslators see the documentation of `PrimitiveTranslator`.
+    The actual translation of the equation is not handled by the driver. Instead the request is
+    forwarded to a `PrimitiveTranslator` object, known as primitive translator or subtranslator.
+    This is a highly specialized object that is able to handle one kind of primitive. For more
+    information on them see the documentation of `PrimitiveTranslator`.
 
-    To start a translation the `translate_jaxpr()` function should be called, if this happens it is said that the driver has an ongoing translation.
-    If `translate_jaxpr()` is called on a driver that has an ongoing translation, a new translation context will be set up.
-    Thus the driver will then translate the supplied (nested) Jaxpr and return the result.
-    However, this will have no influence on the translation process that is already going.
+    To start a translation the `translate_jaxpr()` function should be called, if this happens it is
+    said that the driver has an ongoing translation. If `translate_jaxpr()` is called on a driver
+    that has an ongoing translation, a new translation context will be set up. Thus the driver
+    will then translate the supplied (nested) Jaxpr and return the result. However, this will have
+    no influence on the translation process that is already going.
+
+    Args:
+        primitive_translators:    Primitive to use during the translation.
 
     Notes:
+        The `primitive_translators` that is passed at construction is not copied. The user has
+        to ensure that it does not change.
         After the main translation has been performed the translator object can be used again.
-        Currently the driver will generate only Array as SDFG variables, however, this is a temporary solution, see `add_array()`.
+        Currently the driver will generate only Array as SDFG variables, however, this is a
+        temporary solution, see `add_array()`.
+
+
     """
 
-    __slots__ = ("_ctx_stack", "_sub_translators", "_jax_name_map")
+    __slots__ = ("_ctx_stack", "_primitive_translators", "_jax_name_map")
 
-    _sub_translators: Mapping[str, translator.PrimitiveTranslatorCallable]
+    _primitive_translators: Mapping[str, translator.PrimitiveTranslatorCallable]
     _jax_name_map: dict[jax_core.Var | util.JaCeVar, str]
     _ctx_stack: list[translator.TranslatedJaxprSDFG]
 
     def __init__(
         self,
-        sub_translators: Mapping[str, translator.PrimitiveTranslatorCallable],
+        primitive_translators: Mapping[str, translator.PrimitiveTranslatorCallable],
     ) -> None:
-        """Creates the driver.
-
-        Args:
-            sub_translators:    Use these subtranslators to perform the translation.
-
-        Notes:
-            `sub_translators` is not copied, however, the user has to guarantee, that it does not change during the lifetime of `self`.
-        """
-
-        # Maps the name of a Jax primitive to the primitive translator that should be used.
-        #  Note that the subtranslator is only required to be a callable, and immutable.
-        #  User has to ensure that it does not change.
-        self._sub_translators = sub_translators
+        # Maps name of primitives to the associated translator.
+        self._primitive_translators = primitive_translators
 
         # Maps Jax variables to the name of its SDFG equivalent.
-        #  Note that it is shared among all translation contexts.
-        #  This is done to create consistency between SDFG variables
-        #  and the names used pretty printed Jaxprs.
+        #  Shared between all translation contexts, to ensure consecutive
+        #  variable naming as seen as in a pretty printed Jaxpr.
+        #  Will be cleared by `_clear_translation_ctx()` at the end of the translation.
         self._jax_name_map = {}
 
-        # Context stack and current context.
-        #  If it is empty, then no translation process is in process.
-        #  If there is one entry, `self` is the root translator.
+        # Stack of all context, to handle nested Jaxpr instances.
+        #  The first one, i.e. index 0, is known as head translator.
         self._ctx_stack = []
 
     def translate_jaxpr(
@@ -99,36 +98,27 @@ class JaxprTranslationDriver:
     ) -> translator.TranslatedJaxprSDFG:
         """Perform the translation of a Jaxpr into a SDFG.
 
-        In case this function is called and `self` has an ongoing translation process, a new translation context will be created.
-        This means the Jaxpr will be translated independently from the previous one.
+        In case this function is called and `self` has an ongoing translation process, a new
+        translation context will be created. This means the Jaxpr will be translated independently
+        from the previous one.
 
         Returns:
             The function will translate the passed Jaxpr object into an SDFG in canonical form.
-            This SDFG together with additional meta data, that is needed for further processing is encapsulated inside a `TranslatedJaxprSDFG` object.
+            This SDFG together with additional meta data, that is needed for further processing
+            is encapsulated inside a `TranslatedJaxprSDFG` object.
 
         Args:
             name:                   Use this name for the SDFG instead some generated one.
         """
-        import jax as _jax
 
         if len(jaxpr.effects) != 0:
             raise NotImplementedError("'Jaxpr' with side effects are not supported.")
-        if not _jax.config.read("jax_enable_x64"):
-            # NOTE: What is interesting here is, that the SDFG can be called, but the result is garbage.
-            #  Beside that I think it should not work, I think it should not even call,
-            #  because of a mismatch in data types.
-            #  However, If we work with Jax arrays themselves, it should technically work.
-            #  But currently the best we can do, is forbid it!
-            raise NotImplementedError(
-                "You have disabled 'x64' support in Jax, which interferes with the calling of the SDFG. "
-                "SDFG generated in this way will fail to call."
-            )
 
         # NOTE: If `self` is already allocated, i.e. has an ongoing translation process,
         #       the `_allocate_translation_ctx()` function will start a new context.
         #       Thus the driver will start to translate a second (nested) SDFG.
-        #       Also note that there is no mechanism that forces the integration of the nested SDFG/Jaxpr,
-        #       this must be done manually.
+        #       Also note that there is no mechanism that forces the integration of the nested
+        #       SDFG/Jaxpr, this must be done manually.
         self._allocate_translation_ctx(
             name=name,
         )
@@ -136,11 +126,8 @@ class JaxprTranslationDriver:
             jaxpr=jaxpr,
         )
         self._create_initial_input(jaxpr=jaxpr)
-        # Note that `self` and `jsdfg` still share the same underlying memory, i.e. context.
-        jsdfg: translator.TranslatedJaxprSDFG = self._translate_jaxpr_internal(jaxpr)
-        self._clear_translation_ctx()
 
-        return jsdfg
+        return self._translate_jaxpr_internal(jaxpr)
 
     def append_new_state(
         self,
@@ -151,11 +138,12 @@ class JaxprTranslationDriver:
     ) -> dace.SDFGState:
         """Creates a new `SDFGState` and adds it to the SDFG.
 
-        By default the new state is appended to the current terminal state,
-        which will also update the terminal state of recorded inside `self`.
+        By default the new state is appended to the current terminal state, which will also update
+        the terminal state inside `self`.
 
-        However, if `prev_state` is specified the state new state will be appended to `prev_state` instead.
-        The terminal state of `self` will only be modified if `prev_state` is the current terminal state.
+        However, if `prev_state` is specified the state new state will be appended to `prev_state`
+        instead. The terminal state of `self` will only be modified if `prev_state` is the current
+        terminal state.
 
         Args:
             label:          The name that should be given to the new `SDFGState`.
@@ -190,8 +178,8 @@ class JaxprTranslationDriver:
         """Get all data descriptors that are currently known to the SDFG.
 
         Notes:
-            Essentially a shorthand and preferred way for `self.sdfg.arrays`.
-            For getting a specific data descriptor use `self.get_array()`.
+            Essentially a shorthand and preferred way for `self.sdfg.arrays`. For getting a
+            specific data descriptor use `self.get_array()`.
         """
         return cast(Mapping[str, ddata.Data], self._ctx.sdfg.arrays)
 
@@ -201,8 +189,8 @@ class JaxprTranslationDriver:
     ) -> ddata.Data:
         """Returns the SDFG `Data` object `name` referees to.
 
-        If `name` is a string it is directly interpreted as the name of an SDFG variable.
-        In other cases it is first translated using `self.map_jax_var_to_sdfg()`.
+        If `name` is a string it is directly interpreted as the name of an SDFG variable. In other
+        cases it is first translated using `self.map_jax_var_to_sdfg()`.
         """
         if isinstance(name, (jax_core.Var, util.JaCeVar)):
             sdfg_name: str = self.map_jax_var_to_sdfg(name)
@@ -257,7 +245,7 @@ class JaxprTranslationDriver:
     def sdfg(self) -> dace.SDFG:
         """Returns the SDFG that is currently constructed.
 
-        If you want access to the arrays of the SDFG use `self.arrays()`/`self.get_array()`.
+        If you want access to the arrays of the SDFG use `self.arrays`/`self.get_array()`.
         """
         return self._ctx.sdfg
 
@@ -271,7 +259,7 @@ class JaxprTranslationDriver:
         return False
 
     def is_root_translator(self) -> bool:
-        """Tests if `self` is a root translator.
+        """Tests if `self` is the root translator.
 
         The root translator (context) is the very first translator process that was started.
         """
@@ -288,8 +276,8 @@ class JaxprTranslationDriver:
     ) -> JaxprTranslationDriver:
         """Creates a new mapping between `jax_var` to `sdfg_name`.
 
-        If the mapping already exists an error will be generated.
-        This function is not able to delete a variable mapping that was established before, for this use TBA.
+        If the mapping already exists an error will be generated. This function is not able to
+        delete a variable mapping that was established before.
 
         Args:
             jax_var:     The Jax variable.
@@ -299,7 +287,8 @@ class JaxprTranslationDriver:
 
         if jax_var in self._jax_name_map:
             raise ValueError(
-                f"Tried to create the mapping '{jax_var} -> {sdfg_name}', but the variable is already mapped."
+                f"Cannot change the mapping of '{jax_var}' from"
+                f" '{self.map_jax_var_to_sdfg(jax_var)}' to '{sdfg_name}'."
             )
         if sdfg_name not in self._ctx.sdfg.arrays:
             raise KeyError(f"Mapping '{jax_var} -> {sdfg_name}': SDFG target unknown.")
@@ -320,12 +309,13 @@ class JaxprTranslationDriver:
 
         The SDFG object is always created as a transient.
 
-        By default the function will use `jace.util.propose_jax_name()` to derive the name that should be used.
-        However, by passing a `JaCeVar` with a name it is possible to suggest a specific name.
-        In addition it is possible to specify `name_prefix` to prefix name that would be used.
+        By default the function will use `jace.util.propose_jax_name()` to derive the name that
+        should be used. However, by passing a `JaCeVar` with a name it is possible to suggest a
+        specific name. In addition it is possible to specify `name_prefix` to prefix name that
+        would be used.
 
-        The function will not update the internal variable mapping.
-        If this is desired one can set `update_var_mapping`, for forcing this.
+        The function will not update the internal variable mapping. If this is desired one can
+        set `update_var_mapping`, for forcing this.
 
         Args:
             arg:                The Jax object for which a SDFG equivalent should be created.
@@ -333,12 +323,11 @@ class JaxprTranslationDriver:
             update_var_mapping: Update the internal variable mapping; by default `False`.
 
         Notes:
-            Currently the function will always create an Array, even if the Jax variable refers to a scalar.
-            This is done to work around some difficulties with scalar return values and so on.
-            This issue should actually handled in the post processing stage, but currently it is not.
-            However, from a point of building an SDFG manually, there is no difference between a Scalar and an Array.
-            According to the dace developer, the majority of the backend, i.e. optimization pipeline, should be handle to handle it.
-            But there are some special parts that might explicitly want a scalar, it also might block certain compiler optimization.
+            As a temporary fix for handling scalar return values, the function will always
+            generate arrays, even if `arg` is a scalar.
+            According to the dace developer, the majority of the backend, i.e. optimization
+            pipeline, should be handle to handle it. But there are some special parts that
+            might explicitly want a scalar, it also might block certain compiler optimization.
         """
         shape: tuple[int | dace.symbol | str, ...] = util.get_jax_var_shape(arg)
         dtype: dace.typeclass = util.get_jax_var_dtype(arg)
@@ -414,20 +403,20 @@ class JaxprTranslationDriver:
         If a Jax variable already has a SDFG equivalent then the function will use this variable.
         If no corresponding SDFG variable is known the function will create one using `add_array()`.
 
-        By setting `prevent_creation` the function will not create any new SDFG variables,
-        if no corresponding SDFG variable exists an error is generated.
-        By setting `only_creation` the function will only create new SDFG variables,
-        if a variable already have a corresponding SDFG variable an error will be created.
+        By setting `prevent_creation` the function will not create any new SDFG variables, if no
+        corresponding SDFG variable exists an error is generated. By setting `only_creation` the
+        function will only create new SDFG variables, if a variable already have a corresponding
+        SDFG variable an error will be created.
 
-        By default literals cause an error.
-        However, by setting `handle_literals` to `True` literals will will be included in the output with the value `None`.
+        By default literals cause an error. However, by setting `handle_literals` to `True`
+        literals will will be included in the output with the value `None`.
 
         Args:
             jax_var_list:       The list of Jax variables that should be transformed to SDFG names.
             prevent_creation:   Never create a variable, all must already be known.
             only_creation:      Always create a variable, it is an error if one already exist.
             handle_literals:    Allow the processing of literals.
-            kwargs:             Will be forwarded to `self.add_array()` in case a variable is created.
+            kwargs:             Will be forwarded to `self.add_array()` if a variable is created.
 
         Todo:
             - Rollback if the creation fails.
@@ -489,8 +478,8 @@ class JaxprTranslationDriver:
     ) -> Sequence[str]:
         """Creates all constants requested by the `jaxpr` and return a list with their SDFG names.
 
-        The function will create an SDFG variable and add them as constant to the SDFG.
-        The value they should have is deepcopied.
+        The function will create an SDFG variable and add them as constant to the SDFG. Their value
+        is deepcopied.
         """
         from copy import deepcopy
 
@@ -518,25 +507,20 @@ class JaxprTranslationDriver:
     ) -> JaxprTranslationDriver:
         """This function allocates and initialize the members of the translation context of `self`.
 
-        If this function is called and `self` is already allocated, the function will create a new context,
-        allowing the driver to handle nested Jaxpr.
-        The first context that is created is also known as root translator.
+        If this function is called and `self` is already allocated, the function will create a new
+        context, allowing the driver to handle nested Jaxpr.
+        The first context that is created is known as root translator.
 
         Args:
             name:               The name of the SDFG.
         """
         from jace import translator  # Cyclic import
 
-        # Create a new translation context and put it on the stack.
         self._ctx_stack.append(
             translator.TranslatedJaxprSDFG(
                 name=name,
             )
         )
-
-        if self.is_root_translator():
-            # In the future we will populate the generate state here, i.e. if we are on GPU or not and so on.
-            assert len(self._jax_name_map) == 0
 
         return self
 
@@ -546,15 +530,13 @@ class JaxprTranslationDriver:
         assert len(self._ctx_stack) != 0, "No context is active."
         return self._ctx_stack[-1]
 
-    def _clear_translation_ctx(self) -> JaxprTranslationDriver:
-        """This function deallocate the currently active translation context of `self`.
+    def _clear_translation_ctx(self) -> translator.TranslatedJaxprSDFG | None:
+        """Remove the current active context from `self` and returns its state.
 
-        Notes:
-            While it is allowed for outside code to call this function explicit it is is most likely an error.
-            If `self` is not allocated this function acts as a noops.
+        If `self` is not allocated it will return `None`.
         """
         if not self.is_allocated():
-            return self
+            return None
 
         if self.is_root_translator():
             # The translation as a whole has finished, so restore the driver,
@@ -562,8 +544,7 @@ class JaxprTranslationDriver:
             self._jax_name_map = {}
 
         # Remove the current head stack.
-        _ = self._ctx_stack.pop()
-        return self
+        return self._ctx_stack.pop()
 
     def _translate_single_eqn(
         self,
@@ -573,17 +554,13 @@ class JaxprTranslationDriver:
 
         To do this the function will perform the following steps:
         - Assemble the in and output variables.
-        - Select the appropriate subtranslator to use.
+        - Select the appropriate primitive translator to use.
         - Create a new empty state terminal state.
-        - Call the subtranslator to perform the translation inside the new state.
+        - Call the primitive translator to perform the translation inside the new state.
 
         Returns:
             The SDFG names that were used as input and output are returned.
             The inputs might contain `None` which indicates that that input was a Jax Literal.
-
-        Notes:
-            The equation, `eqn` must come from the unclosed jaxpr instance.
-            The function will perform some consistency checking after the subtranslator was called.
         """
         if len(eqn.effects) != 0:
             raise NotImplementedError(f"Equation '{eqn}' has side effects.")
@@ -603,24 +580,22 @@ class JaxprTranslationDriver:
             update_var_mapping=True,
         )
 
-        # Find the subtranslator
-        prim_name: str = eqn.primitive.name
-        if prim_name not in self._sub_translators:
-            raise NotImplementedError(f"No subtranslators known to handle '{prim_name}'.")
-        subtranslator = self._sub_translators[prim_name]
+        pname: str = eqn.primitive.name
+        if pname not in self._primitive_translators:
+            raise NotImplementedError(f"No translator known to handle '{pname}'.")
+        ptranslator = self._primitive_translators[pname]
 
         # Create the state into which the equation should be translated
-        last_term_state: dace.SDFGState = self._terminal_sdfg_state  # noqa: F841 # Will be used later
         eqn_state = self.append_new_state(
-            label=f"{eqn.primitive.name}_{'_'.join(out_var_names)}",
+            label=f"{pname}_{'_'.join(out_var_names)}",
             prev_state=None,  # forces terminal state to use
         )
 
         # Now perform the actual translation of the equation.
-        new_sdfg_term_state = subtranslator(
+        new_sdfg_term_state = ptranslator(
             driver=self,
             in_var_names=in_var_names,
-            out_var_names=out_var_names,  # Might be modified by the subtranslator!
+            out_var_names=out_var_names,  # Might be modified by the translator!
             eqn=eqn,
             eqn_state=eqn_state,
         )
@@ -631,8 +606,8 @@ class JaxprTranslationDriver:
                 raise RuntimeError("Inconsistent terminal state was detected.")
             new_sdfg_term_state = eqn_state
 
-        # In case a subtranslator decided to not use the variables we created for it, which is allowed
-        #  but it must update the `out_var_names` list correctly, we will now verify this.
+        # In case a translator decided to not use the variables we created for it, which is
+        #  allowed but it must update the `out_var_names` list correctly, we will now verify this.
         for expectedSDFGName, jax_var in zip(out_var_names, eqn.outvars, strict=True):
             mapped_sdfg_name = self.map_jax_var_to_sdfg(jax_var)
             if mapped_sdfg_name != expectedSDFGName:
@@ -654,8 +629,9 @@ class JaxprTranslationDriver:
         """Performs the actual translation of the Jaxpr into an SDFG.
 
         The function assumes that the context is allocated as well as the initial variables.
-        The function will return the internal state of `self` encapsulated inside a `TranslatedJaxprSDFG` object.
-        However, it will not deallocate the translation context, thus `self` and the return value share the same memory.
+        The function will return the internal state of `self` encapsulated inside a
+        `TranslatedJaxprSDFG` object. The function will also deallocate the current context
+        upon return.
 
         Args:
             jaxpr:      The Jaxpr to translate.
@@ -666,7 +642,6 @@ class JaxprTranslationDriver:
         nb_translated_eqn: int = 0
         out_var_names: Sequence[str] = ()
 
-        # Translate the equations one by one.
         for eqn in jaxpr.jaxpr.eqns:
             if any(util.is_drop_var(outVar) for outVar in eqn.outvars):
                 assert all(util.is_drop_var(outVar) for outVar in eqn.outvars)
@@ -674,14 +649,13 @@ class JaxprTranslationDriver:
             _, out_var_names = self._translate_single_eqn(eqn=eqn)
             nb_translated_eqn += 1
 
-        # There were no equation, so handle the copying of input to output.
+        # There were no (useful) equations; thus the Jaxpr was empty.
         if nb_translated_eqn == 0:
             out_var_names = self._handle_null_jaxpr(jaxpr)
 
-        # Set the output names inside the context.
         self._ctx.out_names = tuple(out_var_names)
 
-        return self._ctx
+        return cast("translator.TranslatedJaxprSDFG", self._clear_translation_ctx())
 
     def _handle_null_jaxpr(
         self,
@@ -689,9 +663,10 @@ class JaxprTranslationDriver:
     ) -> Sequence[str]:
         """This function is called in case a `Jaxpr` with zero equations is encountered.
 
-        A function with zero equation might still have output, in which case an input is copied to an output.
-        This function will handle the copying from the input into the corresponding output variable.
-        It is important that the function will remove the input and output variables from the internal mapping.
+        A function with zero equation might still have output, in which case an input is copied
+        to an output. This function will handle the copying from the input into the corresponding
+        output variable. It is important that the function will remove the variables that are used
+        as input and output from the mapping.
 
         Returns:
             The function returns a list denoting the SDFG variables that refers to the output.
@@ -705,20 +680,20 @@ class JaxprTranslationDriver:
         if len(jaxpr.out_avals) == 0:
             return ()
 
-        # List of the output variables.
+        # List of the real output variables.
         out_var_names: list[str] = []
 
         # If we are here then we are dealing with a nested SDFG/Jaxpr, that has output.
         #  Because an input also serves as output, the nested SDFG will have a connector for the
-        #  input and one for the output, but both with the same name.
-        #  This will make node validation fail.
-        #  We have to work around this by introducing some fake copies, which will be removed by DaCe later.
+        #  input and one for the output, but both with the same name. This will make node
+        #  validation fail. We have to work around this by introducing some fake copies, which
+        #  will be removed by DaCe later.
         for jax_out_var in jaxpr.jaxpr.outvars:
             # Since the output is also used as an input the variable mapping must be already known.
             sdfg_in_name: str = self.map_jax_var_to_sdfg(jax_out_var)
 
             # Now we create a variable that serves as true output, however, since the Jax variable
-            #  is already known we can not update the variable mapping.
+            #  is already known we can not update the variable mapping and must use another name.
             sdfg_out_name = self.add_array(
                 jax_out_var,
                 name_prefix="_zero_equation_output_for_",
@@ -735,11 +710,11 @@ class JaxprTranslationDriver:
                 data=dace.Memlet.from_array(sdfg_in_name, self.get_array(sdfg_in_name)),
             )
 
-            # A Jax variable now has, in some sense, two SDFG equivalent, the input, that was previously created by
-            #  `self._create_initial_input()` and the `sdfg_out_name` we just created.
-            #  But we can not add this to the mapping, because of this situation we will now remove the variable from the mapping all together.
+            # `jax_out_var` now has, in some sense, two SDFG equivalents, the input, that
+            #  was previously created by `self._create_initial_input()` and the `sdfg_out_name`
+            #  we just created. But we can not add this to the mapping. Because it is the best,
+            #  as in least worst, thing we can do we remove it from the mapping.
             #  I am open for different approaches.
-            #  Note that input variables that are not used as outputs, will remain in the mapping.
             self._jax_name_map.pop(jax_out_var)
 
         return tuple(out_var_names)
