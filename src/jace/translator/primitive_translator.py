@@ -24,6 +24,8 @@ class PrimitiveTranslatorCallable(Protocol):
     """Callable version of the primitive translators.
 
     Used for type annotation purposes, classes should be derived from `PrimitiveTranslator` instead.
+    You can use `jace.translator.make_primitive_translator()` to add a `primitive` property to
+    a callable.
     """
 
     __slots__ = ()

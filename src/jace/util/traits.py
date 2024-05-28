@@ -24,12 +24,10 @@ import jace.util as util
 def is_jaceified(obj: Any) -> TypeGuard[jjax.JaceWrapped]:
     """Tests if `obj` is decorated by JaCe.
 
-    Similar to `jace.util.is_jaxified`, but for JaCe object.
+    Similar to `is_jaxified`, but for JaCe object.
     """
     if util.is_jaxified(obj):
         return False
-    # Currently it is quite simple because we can just check if `obj`
-    #  is derived from `jace.jax.JaceWrapped`, might become harder in the future.
     return isinstance(obj, jjax.JaceWrapped)
 
 
@@ -39,9 +37,7 @@ def is_drop_var(jax_var: jax_core.Atom | util.JaCeVar) -> TypeGuard[jax_core.Dro
     if isinstance(jax_var, jax_core.DropVar):
         return True
     if isinstance(jax_var, util.JaCeVar):
-        # We type narrow it to a pure jax DropVar, because essentially
-        #  you can not do anything with it.
-        return jax_var.name == "_"
+        return jax_var.name == "_" if jax_var.name else False
     return False
 
 
@@ -51,14 +47,12 @@ def is_jaxified(
     """Tests if `obj` is a "jaxified" object.
 
     A "jaxified" object is an object that was processed by Jax.
-    While a return value of `True` guarantees a jaxified object, `False` might not proof the contrary.
-    See also `jace.util.is_jaceified()` to tests if something is a Jace object.
+    While a return value of `True` guarantees a jaxified object, `False` does not proof the
+    contrary. See also `jace.util.is_jaceified()` to tests if something is a Jace object.
     """
-
-    # These are all types we consider as jaxify
     jaxifyed_types = (
         jax_core.Primitive,
-        # jstage.Wrapped is not runtime chakable
+        # jax_core.stage.Wrapped is not runtime chakable
         jax_src.pjit.JitWrapped,
         jax_xe.PjitFunction,
     )
@@ -70,7 +64,7 @@ def is_jax_array(
 ) -> TypeGuard[jax.Array]:
     """Tests if `obj` is a jax array.
 
-    Notes jax array are special, you can not write to them directly.
+    Notes jax array are special as you can not write to them directly.
     Furthermore, they always allocate also on GPU, beside the CPU allocation.
     """
     return isinstance(obj, jax.Array)
@@ -120,8 +114,8 @@ def is_on_device(
 ) -> bool:
     """Tests if `obj` is on a device.
 
-    Jax arrays are always on the CPU and GPU (if there is one).
-    Thus for Jax arrays this function is more of a test, if there is a GPU or not.
+    Jax arrays are always on the CPU and GPU (if there is one). Thus for Jax arrays this
+    function is more of a test, if there is a GPU or not.
     """
     if is_jax_array(obj):
         try:
@@ -135,11 +129,11 @@ def is_on_device(
 def is_fully_addressable(
     obj: Any,
 ) -> bool:
-    """Tests if `obj` is fully addreassable, i.e. is only on this host.
+    """Tests if `obj` is fully addressable, i.e. is only on this host.
 
     Notes:
-        The function (currently) assumes that everything that is not a distributed
-            Jax array is on this host.
+        This function currently assumes that everything that is not a Jax array is always fully
+        addressable.
     """
     if is_jax_array(obj):
         return obj.is_fully_addressable

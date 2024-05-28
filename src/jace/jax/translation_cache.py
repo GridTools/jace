@@ -7,11 +7,10 @@
 
 """This module contains the functionality related to the compilation cache of the stages.
 
-Actually there are two different caches:
-- The lowering cache.
-- And the compilation cache.
-
-Both are implemented as a singleton.
+The cache currently caches the lowering, i.e. the result of `JaceWrapped.lower()` and the
+compilation, i.e. `JaceLowered.compile()`. The caches are on a per stage basis and not on a
+per instant basis. To make a stage cacheable, it must be derived from `CachingStage` and
+its transition function must be decoration with `@cached_transition`.
 """
 
 from __future__ import annotations
@@ -50,10 +49,14 @@ NextStage = TypeVar("NextStage", bound="stages.Stage")
 
 
 class CachingStage(Generic[NextStage]):
-    """Annotates a stage whose transition to the next one is cacheable.
+    """Annotates a stage whose transition to the next stage is cacheable.
 
-    To make a transition function cacheable it must be annotated by the
-    `@cached_transition` decorator.
+    To make the transition of a stage cacheable, the stage must be derived from this class,
+    and its initialization must call `CachingStage.__init__()`. Furthermore, its transition
+    function must be annotated by the `@cached_transition` decorator.
+
+    A class must implement the `_make_call_description()` to compute an abstract description
+    of the call. This is needed to operate the cache to store the stage transitions.
     """
 
     _cache: StageCache[NextStage]
@@ -71,21 +74,21 @@ class CachingStage(Generic[NextStage]):
         ...
 
 
-ActionFunction = TypeVar("ActionFunction", bound=Callable[..., Any])
+# Type of the transition function.
+TransitionFunction = TypeVar("TransitionFunction", bound=Callable[..., Any])
 
 
 def cached_transition(
-    action: ActionFunction,
-) -> ActionFunction:
+    transition: TransitionFunction,
+) -> TransitionFunction:
     """Decorator for making the transition function of the stage cacheable.
 
-    The decorator will call the annotated function only if the call is not stored inside the cache.
-    The key to look up the call in the cache is computed by `self._make_call_description()`.
-    For this the stage must be derived from `CachingStage`.
+    In order to work, the stage must be derived from `CachingStage`. For computing the key of a
+    call the function will use the `_make_call_description()` function of the cache.
     """
 
-    @functools.wraps(action)
-    def _action_wrapper(  # type: ignore [no-untyped-def]  # return type is deduced from `ActionFunction`
+    @functools.wraps(transition)
+    def transition_wrapper(  # type: ignore [no-untyped-def]  # return type is deduced from `TransitionFunction`
         self: CachingStage,
         *args: Any,
         **kwargs: Any,
@@ -93,11 +96,11 @@ def cached_transition(
         key: StageTransformationDescription = self._make_call_description(*args, **kwargs)
         if key in self._cache:
             return self._cache[key]
-        next_stage: stages.Stage = action(self, *args, **kwargs)
+        next_stage: stages.Stage = transition(self, *args, **kwargs)
         self._cache[key] = next_stage
         return next_stage
 
-    return cast(ActionFunction, _action_wrapper)
+    return cast(TransitionFunction, transition_wrapper)
 
 
 def clear_translation_cache() -> None:
@@ -108,7 +111,7 @@ def clear_translation_cache() -> None:
 def get_cache(
     stage: CachingStage,
 ) -> StageCache:
-    """Returns the cache that is used for `stage`."""
+    """Returns the cache that should be used for `stage`."""
     stage_type = type(stage)
     if stage_type not in _TRANSLATION_CACHES:
         _TRANSLATION_CACHES[stage_type] = StageCache()
@@ -117,11 +120,15 @@ def get_cache(
 
 @dataclasses.dataclass(frozen=True)
 class _AbstractCallArgument:
-    """Class to represent one argument to the call in an abstract way.
+    """Class to represent a single argument to the transition function in an abstract way.
 
-    It is used as part of the key in the cache.
-    It represents the structure of the argument, i.e. its shape, type and so on, but nots its value.
-    To construct it you should use the `from_value()` class function which interfere the characteristics from a value.
+    As noted in `StageTransformationDescription` there are two ways to describe an argument,
+    either using its concrete value or an abstract description, which is similar to tracers in Jax.
+    This class represents the second way.
+    To create an instance you should use `_AbstractCallArgument.from_value()`.
+
+    Its description is limited to scalars and arrays. To describe more complex types, they
+    should be processed by pytrees first.
 
     Attributes:
         shape:      In case of an array its shape, in case of a scalar the empty tuple.
@@ -138,41 +145,39 @@ class _AbstractCallArgument:
     @classmethod
     def from_value(
         cls,
-        val: Any,
+        value: Any,
     ) -> _AbstractCallArgument:
-        """Construct an `_AbstractCallArgument` from a value.
-
-        Todo:
-            Handle storage location of arrays correctly.
-        """
-        if not util.is_fully_addressable(val):
+        """Construct an `_AbstractCallArgument` from `value`."""
+        if not util.is_fully_addressable(value):
             raise NotImplementedError("Distributed arrays are not addressed yet.")
-        if isinstance(val, jax_core.Literal):
+        if isinstance(value, jax_core.Literal):
             raise TypeError("Jax Literals are not supported as cache keys.")
 
-        if util.is_array(val):
-            if util.is_jax_array(val):
-                val = val.__array__()  # Passing `copy=False` leads to error in NumPy.
-            shape = val.shape
-            dtype = util.translate_dtype(val.dtype)
-            strides = getattr(val, "strides", None)
+        if util.is_array(value):
+            if util.is_jax_array(value):
+                value = value.__array__()  # Passing `copy=False` leads to error in NumPy.
+            shape = value.shape
+            dtype = util.translate_dtype(value.dtype)
+            strides = getattr(value, "strides", None)
             # Is `CPU_Heap` always okay? There would also be `CPU_Pinned`.
             storage = (
-                dace.StorageType.GPU_Global if util.is_on_device(val) else dace.StorageType.CPU_Heap
+                dace.StorageType.GPU_Global
+                if util.is_on_device(value)
+                else dace.StorageType.CPU_Heap
             )
 
             return cls(shape=shape, dtype=dtype, strides=strides, storage=storage)
 
-        if util.is_scalar(val):
+        if util.is_scalar(value):
             shape = ()
-            dtype = util.translate_dtype(type(val))
+            dtype = util.translate_dtype(type(value))
             strides = None
             # Scalar arguments are always on the CPU and never on the GPU.
             storage = dace.StorageType.CPU_Heap
 
             return cls(shape=shape, dtype=dtype, strides=strides, storage=storage)
 
-        raise TypeError(f"Can not make 'an abstract description from '{type(val).__name__}'.")
+        raise TypeError(f"Can not make 'an abstract description from '{type(value).__name__}'.")
 
 
 #: This type is the abstract description of a function call.
@@ -185,11 +190,12 @@ CallArgsDescription: TypeAlias = tuple[
 
 @dataclasses.dataclass(frozen=True)
 class StageTransformationDescription:
-    """Represents the call to a state transformation function.
+    """Represents the entire call to a state transformation function of a stage.
 
-    State transition functions are annotated with `@cached_transition` and stored inside a cache.
-    This class serves as a key inside this cache and is generated by `CachingStage._make_call_description()`.
-    The actual key is consists of two parts.
+    State transition functions are annotated with `@cached_transition` and their result may be
+    cached. They key to locate them inside the cache is represented by this class.
+    The cache will call the `CachingStage._make_call_description()` function to get a key.
+    The actual key is consists of two parts, `stage_id` and `call_args`.
 
     Attributes:
         stage_id:   Origin of the call, for which the id of the stage object should be used.
@@ -200,11 +206,8 @@ class StageTransformationDescription:
             - Concrete description: Here one caches on the actual value of the argument.
                 The only requirement is that they can be hashed.
 
-    Notes:
-        The base assumption is that the stages are immutable.
-
     Todo:
-        - pytrees.
+        In the future pytrees will be used as third part.
     """
 
     stage_id: int
@@ -216,7 +219,7 @@ StageType = TypeVar("StageType", bound="stages.Stage")
 
 
 class StageCache(Generic[StageType]):
-    """LRU cache that is used to cache the stage transitions, i.e. lowering and compiling, in Jace.
+    """Simple LRU cache to cache the results of the stage transition function.
 
     Notes:
         The most recently used entry is at the end of the `OrderedDict`.

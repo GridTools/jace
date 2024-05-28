@@ -53,16 +53,16 @@ def jit(
 ) -> stages.JaceWrapped | Callable[[Callable], stages.JaceWrapped]:
     """Jace's replacement for `jax.jit` (just-in-time) wrapper.
 
-    It works the same way as `jax.jit` does, but instead of using XLA the computation is lowered to DaCe.
-    It supports the same arguments as `jax.jit` (although currently not) does.
+    It works the same way as `jax.jit` does, but instead of using XLA the computation is lowered
+    to DaCe. It supports the same arguments as `jax.jit` (although currently not) does.
     In addition it accepts some Jace specific arguments.
 
     Args:
         primitive_translators:    Use these primitive translators for the lowering to SDFG.
 
     Notes:
-        If no translators are specified the currently ones currently inside the global registry are used.
-        After construction changes to the passed `primitive_translators` have no effect on the returned object.
+        If no translators are specified, the ones in the global registry are implicitly passed
+        as argument. After constructions any change to `primitive_translators` has no effect.
     """
     if kwargs:
         # TODO(phimuell): Add proper name verification and exception type.

@@ -24,6 +24,8 @@ if TYPE_CHECKING:
 class CompilerOptions(TypedDict, total=False):
     """All known compiler options known to `JaceLowered.compile()`.
 
+    See `jace_optimize()` for a description of the different options.
+
     There are some predefined option sets in `jace.jax.stages`:
     - `DEFAULT_COMPILER_OPTIONS`
     - `NO_OPTIMIZATIONS`
@@ -48,13 +50,13 @@ def jace_optimize(
     tsdfg: translator.TranslatedJaxprSDFG,
     **kwargs: Unpack[CompilerOptions],
 ) -> None:
-    """Performs optimization of the `fsdfg` _inplace_.
+    """Performs optimization of the `fsdfg` _in place_.
 
     Currently this function only supports simplification.
     Its main job is to exists that we have something that we can call in the tool chain.
 
     Args:
-        simplify:       Run the simplification pilepline.
+        simplify:       Run the simplification pipeline.
         auto_optimize:  Run the auto optimization pipeline (currently does nothing)
 
     Note:

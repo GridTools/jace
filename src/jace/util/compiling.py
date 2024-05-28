@@ -5,10 +5,7 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""This module contains functions for debugging the translator.
-
-Everything in this module is experimental and might vanish anytime.
-"""
+"""Contains everything for compiling and running `TranslatedJaxprSDFG` instances."""
 
 from __future__ import annotations
 
@@ -18,20 +15,20 @@ from typing import TYPE_CHECKING, Any
 
 import dace
 import numpy as np
-from dace import data as ddata
+from dace import data as dace_data
 
 
 if TYPE_CHECKING:
     from jace import translator
-    from jace.util import dace_helper as jdace
+    from jace.util import dace_helper
 
 
 def compile_jax_sdfg(
     tsdfg: translator.TranslatedJaxprSDFG,
-) -> jdace.CompiledSDFG:
-    """This function compiles the SDFG embedded in the embedded `tsdfg` (`TranslatedJaxprSDFG`).
+) -> dace_helper.CompiledSDFG:
+    """Compiles the SDFG embedded in `tsdfg` and return the resulting `CompiledSDFG` object.
 
-    For executing the SDFG, the `run_jax_sdfg()` function, together with the `tsdfg.{inp, out}_names` can be used.
+    The function requires that `tsdfg` is finalized.
     """
     if not tsdfg.is_finalized:
         raise ValueError("Can only compile a finalized SDFG.")
@@ -53,12 +50,11 @@ def compile_jax_sdfg(
         #  This happens if we compile the same lowered SDFG multiple times with different options.
         sdfg.name = f"{sdfg.name}__comp_{int(time.time() * 1000)}"
 
-        # Actual compiling the stuff; forcing that a recompilation happens
         with dace.config.temporary_config():
             sdfg._recompile = True
             sdfg._regenerate_code = True
             dace.Config.set("compiler", "use_cache", value=False)
-            csdfg: jdace.CompiledSDFG = sdfg.compile()
+            csdfg: dace_helper.CompiledSDFG = sdfg.compile()
 
     finally:
         sdfg.name = org_sdfg_name
@@ -69,7 +65,7 @@ def compile_jax_sdfg(
 
 
 def run_jax_sdfg(
-    csdfg: jdace.CompiledSDFG,
+    csdfg: dace_helper.CompiledSDFG,
     inp_names: Sequence[str],
     out_names: Sequence[str],
     cargs: Sequence[Any],
@@ -78,6 +74,8 @@ def run_jax_sdfg(
     """Run the compiled SDFG.
 
     The function assumes that the SDFG was finalized and then compiled by `compile_jax_sdfg()`.
+    For running the SDFG you also have to pass the input names (`inp_names`) and output names
+    (`out_names`) that where inside the `TranslatedJaxprSDFG` from which `csdfg` was compiled from.
 
     Args:
         csdfg:      The `CompiledSDFG` object.
@@ -89,8 +87,13 @@ def run_jax_sdfg(
     Note:
         There is no pytree mechanism jet, thus the return values are returned inside a `tuple`
         or in case of one value, directly, in the order determined by Jax.
-        Currently, this function does not consider strides in the input, all input must be `C_CONTIGUOUS`.
-        Currently, the SDFG must not have any undefined symbols, i.e. no undefined sizes.
+        Currently, this function does not consider strides in the input, all input must be
+        `C_CONTIGUOUS` nor have any undefined symbols.
+
+    Todo:
+        Since we do not have symbols and a fixed size this works and there is no problem.
+        However, if we have symbols or variable sizes, we must ensure that the init function of
+        the SDFG is called every time, or ensure that its exit function runs every time.
     """
     from jace import util
 
@@ -117,8 +120,8 @@ def run_jax_sdfg(
 
     for out_name, sarray in ((name, sdfg.arrays[name]) for name in out_names):
         assert not (out_name in call_args and util.is_jax_array(call_args[out_name]))
-        assert isinstance(sarray, ddata.Array)
-        call_args[out_name] = ddata.make_array_from_descriptor(sarray)
+        assert isinstance(sarray, dace_data.Array)
+        call_args[out_name] = dace_data.make_array_from_descriptor(sarray)
 
     assert len(call_args) == len(csdfg.argnames), (
         "Failed to construct the call arguments,"

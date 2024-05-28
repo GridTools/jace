@@ -11,15 +11,15 @@ import re
 from typing import Final
 
 
-# Valid name for an SDFG variable.
+#: Valid name for an SDFG variable.
 VALID_SDFG_VAR_NAME: re.Pattern = re.compile("[a-zA-Z_][a-zA-Z0-9_]*")
 
-# Valid name for an SDFG itself, includes `SDFGState` objects.
+#: Valid name for an SDFG itself, includes `SDFGState` objects.
 VALID_SDFG_OBJ_NAME: re.Pattern = re.compile("[a-zA-Z_][a-zA-Z0-9_]*")
 
 
 # fmt: off
-# This is a set of all names that are invalid SDFG names.
+#: This is a set of all names that are invalid SDFG names.
 FORBIDDEN_SDFG_VAR_NAMES: Final[set[str]] = {
     # These should be most of the C++ keywords, it is more important to have the short ones.
     #  Taken from 'https://learn.microsoft.com/en-us/cpp/cpp/keywords-cpp?view=msvc-170'
