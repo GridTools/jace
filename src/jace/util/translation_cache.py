@@ -23,7 +23,9 @@ from collections.abc import Callable, Hashable
 from typing import (
     TYPE_CHECKING,
     Any,
+    Concatenate,
     Generic,
+    ParamSpec,
     TypeAlias,
     TypeVar,
     cast,
@@ -77,13 +79,15 @@ class CachingStage(Generic[NextStage]):
         ...
 
 
-# Type of the transition function.
-TransitionFunction = TypeVar("TransitionFunction", bound=Callable[..., Any])
+# Type annotation of the caching Stuff.
+P = ParamSpec("P")
+TransitionFunction = Callable[Concatenate[CachingStage[NextStage], P], NextStage]
+CachingStageType = TypeVar("CachingStageType", bound=CachingStage)
 
 
 def cached_transition(
-    transition: TransitionFunction,
-) -> TransitionFunction:
+    transition: Callable[Concatenate[CachingStageType, P], NextStage],
+) -> Callable[Concatenate[CachingStage[NextStage], P], NextStage]:
     """Decorator for making the transition function of the stage cacheable.
 
     In order to work, the stage must be derived from `CachingStage`. For computing the key of a
@@ -91,11 +95,11 @@ def cached_transition(
     """
 
     @functools.wraps(transition)
-    def transition_wrapper(  # type: ignore [no-untyped-def]  # return type is deduced from `TransitionFunction`
-        self: CachingStage,
-        *args: Any,
-        **kwargs: Any,
-    ):
+    def transition_wrapper(
+        self: CachingStageType,
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> NextStage:
         key: StageTransformationSpec = self._make_call_description(*args, **kwargs)
         if key in self._cache:
             return self._cache[key]
