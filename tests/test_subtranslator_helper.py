@@ -34,10 +34,10 @@ def _conserve_builtin_translators():
 
 
 @pytest.fixture()
-def no_builtin_translators() -> str:
+def no_builtin_translators():  # noqa: PT004  # This is how you should do it: https://docs.pytest.org/en/7.1.x/how-to/fixtures.html#use-fixtures-in-classes-and-modules-with-usefixtures
     """This fixture can be used if the test does not want any builtin translators."""
     initial_translators = translator.set_active_primitive_translators_to({})
-    yield "DUMMY_VALUE"
+    yield
     translator.set_active_primitive_translators_to(initial_translators)
 
 
@@ -76,7 +76,8 @@ def test_are_subtranslators_imported():
     assert len(get_regsitered_primitive_translators()) == 37
 
 
-def test_subtranslatior_managing(no_builtin_translators):
+@pytest.mark.usefixtures("no_builtin_translators")
+def test_subtranslatior_managing():
     """Basic functionality of the subtranslators."""
     original_active_subtrans = get_regsitered_primitive_translators()
     assert len(original_active_subtrans) == 0
@@ -142,7 +143,8 @@ def test_subtranslatior_managing_swap():
     assert same_structure(mutated_primitives, get_regsitered_primitive_translators())
 
 
-def test_subtranslatior_managing_callable_annotation(no_builtin_translators):
+@pytest.mark.usefixtures("no_builtin_translators")
+def test_subtranslatior_managing_callable_annotation():
     """Test if `make_primitive_translator()` works."""
 
     prim_name = "non_existing_property"
@@ -181,7 +183,8 @@ def test_subtranslatior_managing_overwriting():
     assert useless_add_translator is get_regsitered_primitive_translators()["add"]
 
 
-def test_subtranslatior_managing_overwriting_2(no_builtin_translators):
+@pytest.mark.usefixtures("no_builtin_translators")
+def test_subtranslatior_managing_overwriting_2():
     """Again an overwriting test, but this time a bit more complicated."""
 
     trans_cnt = [0]

@@ -197,7 +197,6 @@ class JaceLowered(tcache.CachingStage["JaceCompiled"]):
         #  The reason is `self` is cached and assumed to be immutable.
         #  Since all optimizations works in place, we would violate this assumption.
         tsdfg: translator.TranslatedJaxprSDFG = copy.deepcopy(self._translated_sdfg)
-
         optimization.jace_optimize(tsdfg=tsdfg, **self._make_compiler_options(compiler_options))
 
         return JaceCompiled(

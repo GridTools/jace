@@ -40,7 +40,7 @@ if TYPE_CHECKING:
     from jace.jax import stages
 
 #: Caches used to store the state transition.
-#: The states are on a per stage and not per instant basis.
+#: The caches are on a per stage and not per instant basis.
 _TRANSLATION_CACHES: dict[type[CachingStage], StageCache] = {}
 
 
@@ -71,12 +71,12 @@ class CachingStage(Generic[NextStage]):
         ...
 
 
-Action_T = TypeVar("Action_T", bound=Callable[..., Any])
+ActionFunction = TypeVar("ActionFunction", bound=Callable[..., Any])
 
 
 def cached_transition(
-    action: Action_T,
-) -> Action_T:
+    action: ActionFunction,
+) -> ActionFunction:
     """Decorator for making the transition function of the stage cacheable.
 
     The decorator will call the annotated function only if the call is not stored inside the cache.
@@ -85,7 +85,7 @@ def cached_transition(
     """
 
     @functools.wraps(action)
-    def _action_wrapper(
+    def _action_wrapper(  # type: ignore [no-untyped-def]  # return type is deduced from `ActionFunction`
         self: CachingStage,
         *args: Any,
         **kwargs: Any,
@@ -97,7 +97,7 @@ def cached_transition(
         self._cache[key] = next_stage
         return next_stage
 
-    return cast(Action_T, _action_wrapper)
+    return cast(ActionFunction, _action_wrapper)
 
 
 def clear_translation_cache() -> None:
