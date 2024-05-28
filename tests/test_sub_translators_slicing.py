@@ -9,10 +9,18 @@
 
 from __future__ import annotations
 
+import jax
 import numpy as np
 import pytest
 
 import jace
+
+
+@pytest.fixture(autouse=True)
+def _enable_x64_mode_in_jax():
+    """Ensures that x64 mode in Jax ins enabled."""
+    with jax.experimental.enable_x64():
+        yield
 
 
 @pytest.fixture()
@@ -133,4 +141,18 @@ def test_slice_too_big(A_4x4):
     ref = A_4x4[:20]
 
     assert ref.shape == res.shape
+    assert np.all(ref == res)
+
+
+def test_dynamic_slice(A_4x4):
+    def testee(A: np.ndarray, s1: int, s2: int) -> np.ndarray:
+        return jax.lax.dynamic_slice(A, (s1, s2), (2, 2))
+
+    ref = testee(A_4x4, 1, 1)
+
+    with pytest.warns(
+        expected_warning=UserWarning,
+    ):
+        res = jace.jit(testee)(A_4x4, 1, 1)
+
     assert np.all(ref == res)
