@@ -17,8 +17,7 @@ import numpy as np
 import pytest
 
 import jace
-from jace import optimization
-from jace.jax import stages
+from jace import optimization, stages
 
 
 @pytest.fixture(autouse=True)
@@ -30,7 +29,7 @@ def _clear_translation_cache():
     Todo:
         Ask Enrique how I can make that fixture apply everywhere not just in the file but the whole test suite.
     """
-    from jace.jax import translation_cache as tcache
+    from jace.util import translation_cache as tcache
 
     tcache.clear_translation_cache()
     yield

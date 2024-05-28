@@ -36,7 +36,7 @@ from jace import util
 
 
 if TYPE_CHECKING:
-    from jace.jax import stages
+    from jace import stages
 
 #: Caches used to store the state transition.
 #: The caches are on a per stage and not per instant basis.
@@ -72,7 +72,7 @@ class CachingStage(Generic[NextStage]):
         self: CachingStage,
         *args: Any,
         **kwargs: Any,
-    ) -> StageTransformationDescription:
+    ) -> StageTransformationSpec:
         """Generates the key that is used to store/locate the call in the cache."""
         ...
 
@@ -96,10 +96,10 @@ def cached_transition(
         *args: Any,
         **kwargs: Any,
     ):
-        key: StageTransformationDescription = self._make_call_description(*args, **kwargs)
+        key: StageTransformationSpec = self._make_call_description(*args, **kwargs)
         if key in self._cache:
             return self._cache[key]
-        next_stage: stages.Stage = transition(self, *args, **kwargs)
+        next_stage = transition(self, *args, **kwargs)
         self._cache[key] = next_stage
         return next_stage
 
@@ -125,7 +125,7 @@ def get_cache(
 class _AbstractCallArgument:
     """Class to represent a single argument to the transition function in an abstract way.
 
-    As noted in `StageTransformationDescription` there are two ways to describe an argument,
+    As noted in `StageTransformationSpec` there are two ways to describe an argument,
     either using its concrete value or an abstract description, which is similar to tracers in Jax.
     This class represents the second way.
     To create an instance you should use `_AbstractCallArgument.from_value()`.
@@ -185,14 +185,14 @@ class _AbstractCallArgument:
 
 #: This type is the abstract description of a function call.
 #:  It is part of the key used in the cache.
-CallArgsDescription: TypeAlias = tuple[
+CallArgsSpec: TypeAlias = tuple[
     _AbstractCallArgument | Hashable | tuple[str, _AbstractCallArgument | Hashable],
     ...,
 ]
 
 
 @dataclasses.dataclass(frozen=True)
-class StageTransformationDescription:
+class StageTransformationSpec:
     """Represents the entire call to a state transformation function of a stage.
 
     State transition functions are annotated with `@cached_transition` and their result may be
@@ -214,7 +214,7 @@ class StageTransformationDescription:
     """
 
     stage_id: int
-    call_args: CallArgsDescription
+    call_args: CallArgsSpec
 
 
 # Denotes the stage that is stored inside the cache.
@@ -231,7 +231,7 @@ class StageCache(Generic[StageType]):
         The most recently used entry is at the end of the `OrderedDict`.
     """
 
-    _memory: collections.OrderedDict[StageTransformationDescription, StageType]
+    _memory: collections.OrderedDict[StageTransformationSpec, StageType]
     _size: int
 
     def __init__(
@@ -243,13 +243,13 @@ class StageCache(Generic[StageType]):
 
     def __contains__(
         self,
-        key: StageTransformationDescription,
+        key: StageTransformationSpec,
     ) -> bool:
         return key in self._memory
 
     def __getitem__(
         self,
-        key: StageTransformationDescription,
+        key: StageTransformationSpec,
     ) -> StageType:
         if key not in self:
             raise KeyError(f"Key '{key}' is unknown.")
@@ -258,7 +258,7 @@ class StageCache(Generic[StageType]):
 
     def __setitem__(
         self,
-        key: StageTransformationDescription,
+        key: StageTransformationSpec,
         res: StageType,
     ) -> None:
         if key in self:
@@ -271,7 +271,7 @@ class StageCache(Generic[StageType]):
 
     def popitem(
         self,
-        key: StageTransformationDescription | None,
+        key: StageTransformationSpec | None,
     ) -> None:
         """Evict `key` from `self`.
 

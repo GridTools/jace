@@ -17,18 +17,18 @@ import numpy as np
 from jax import _src as jax_src, core as jax_core
 from jaxlib import xla_extension as jax_xe
 
-import jace.jax as jjax
 import jace.util as util
+from jace import stages
 
 
-def is_jaceified(obj: Any) -> TypeGuard[jjax.JaceWrapped]:
+def is_jaceified(obj: Any) -> TypeGuard[stages.JaceWrapped]:
     """Tests if `obj` is decorated by JaCe.
 
     Similar to `is_jaxified`, but for JaCe object.
     """
     if util.is_jaxified(obj):
         return False
-    return isinstance(obj, jjax.JaceWrapped)
+    return isinstance(obj, stages.JaceWrapped)
 
 
 def is_drop_var(jax_var: jax_core.Atom | util.JaCeVar) -> TypeGuard[jax_core.DropVarp]:

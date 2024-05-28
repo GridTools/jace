@@ -32,10 +32,9 @@ import dace
 import jax as _jax
 
 from jace import optimization, translator, util
-from jace.jax import translation_cache as tcache
 from jace.optimization import CompilerOptions
 from jace.translator import post_translation as ptrans
-from jace.util import dace_helper
+from jace.util import dace_helper, translation_cache as tcache
 
 
 class JaceWrapped(tcache.CachingStage["JaceLowered"]):
@@ -139,14 +138,14 @@ class JaceWrapped(tcache.CachingStage["JaceLowered"]):
     def _make_call_description(
         self,
         *args: Any,
-    ) -> tcache.StageTransformationDescription:
+    ) -> tcache.StageTransformationSpec:
         """This function computes the key for the `JaceWrapped.lower()` call to cache it.
 
         The function will compute a full abstract description on its argument. Currently it is
         only able to handle positional argument and does not support static arguments.
         """
         call_args = tuple(tcache._AbstractCallArgument.from_value(x) for x in args)
-        return tcache.StageTransformationDescription(stage_id=id(self), call_args=call_args)
+        return tcache.StageTransformationSpec(stage_id=id(self), call_args=call_args)
 
 
 class JaceLowered(tcache.CachingStage["JaceCompiled"]):
@@ -228,7 +227,7 @@ class JaceLowered(tcache.CachingStage["JaceCompiled"]):
     def _make_call_description(
         self,
         compiler_options: CompilerOptions | None = None,
-    ) -> tcache.StageTransformationDescription:
+    ) -> tcache.StageTransformationSpec:
         """This function computes the key for the `self.compile()` call to cache it.
 
         The key that is computed by this function is based on the concrete values of the passed
@@ -237,7 +236,7 @@ class JaceLowered(tcache.CachingStage["JaceCompiled"]):
         """
         options = self._make_compiler_options(compiler_options)
         call_args = tuple(sorted(options.items(), key=lambda X: X[0]))
-        return tcache.StageTransformationDescription(stage_id=id(self), call_args=call_args)
+        return tcache.StageTransformationSpec(stage_id=id(self), call_args=call_args)
 
     def _make_compiler_options(
         self,

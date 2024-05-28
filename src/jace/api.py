@@ -15,8 +15,7 @@ from typing import Any, Literal, overload
 
 from jax import grad, jacfwd, jacrev
 
-from jace import translator
-from jace.jax import stages
+from jace import stages, translator
 
 
 __all__ = [
