@@ -57,6 +57,8 @@ class ALUTranslator(mapped_base.MappedOperationTranslatorBase):
 
 
 # Contains all the templates for ALU operations.
+#  TODO(phimuell): Import them also from `frontend/python/replacements.py`, however, the names
+#   do not fully matches the Jax names, `grep -P '^[a-zA-Z0-9_]+_p[[:space:]]+' -r -o -h | sort -u`
 # fmt: off
 _ALU_OPS_TMPL: Final[dict[str, str]] = {
     # Unary operations
