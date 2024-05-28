@@ -49,6 +49,11 @@ class JaceWrapped(tcache.CachingStage["JaceLowered"]):
     lowered later, with the same argument the result is taken from the cache.
     Furthermore, a `JaceWrapped` object is composable with all Jax transformations.
 
+    Args:
+        fun:                    The function that is wrapped.
+        primitive_translators:  The list of subtranslators that that should be used.
+        jit_options:            Options to influence the jit process.
+
     Todo:
         - Handle pytrees.
         - Handle all options to `jax.jit`.
@@ -68,13 +73,6 @@ class JaceWrapped(tcache.CachingStage["JaceLowered"]):
         primitive_translators: Mapping[str, translator.PrimitiveTranslator],
         jit_options: Mapping[str, Any],
     ) -> None:
-        """Creates a wrapped jitable object of `fun`.
-
-        Args:
-            fun:                    The function that is wrapped.
-            primitive_translators:  The list of subtranslators that that should be used.
-            jit_options:            Options to influence the jit process.
-        """
         super().__init__()
         # We have to shallow copy both the translator and the jit options.
         #  This prevents that any modifications affect `self`.
@@ -159,6 +157,12 @@ class JaceLowered(tcache.CachingStage["JaceCompiled"]):
     Although, `JaceWrapped` is composable with Jax transformations `JaceLowered` is not.
     A user should never create such an object, instead `JaceWrapped.lower()` should be used.
 
+    Args:
+        tsdfg:  The lowered SDFG with metadata. Must be finalized.
+
+    Note:
+        `self` will manage the passed `tsdfg` object. Modifying it results in undefined behavior.
+
     Todo:
         - Handle pytrees.
     """
@@ -169,14 +173,6 @@ class JaceLowered(tcache.CachingStage["JaceCompiled"]):
         self,
         tsdfg: translator.TranslatedJaxprSDFG,
     ) -> None:
-        """Initialize the lowered object.
-
-        Args:
-            tsdfg:      The lowered SDFG with metadata. Must be finalized.
-
-        Notes:
-            The passed `tsdfg` will be managed by `self`.
-        """
         if not tsdfg.is_finalized:
             raise ValueError("The translated SDFG must be finalized.")
         super().__init__()
@@ -252,6 +248,17 @@ class JaceLowered(tcache.CachingStage["JaceCompiled"]):
 
 class JaceCompiled:
     """Compiled version of the SDFG.
+
+    This is the last stage of the jit chain. A user should never create a `JaceCompiled` instance,
+    instead `JaceLowered.compile()` should be used.
+
+    Args:
+        csdfg:      The compiled SDFG object.
+        inp_names:  Names of the SDFG variables used as inputs.
+        out_names:  Names of the SDFG variables used as outputs.
+
+    Note:
+        The class assumes ownership of its input arguments.
 
     Todo:
         - Handle pytrees.

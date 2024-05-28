@@ -39,6 +39,9 @@ class TranslatedJaxprSDFG:
         start_state:    The first state in the SDFG state machine.
         terminal_state: The (currently) last state in the state machine.
         is_finalized:   Indicates if `self` represents a finalized or canonical SDFG.
+
+    Args:
+        name:   The name that should be given to the SDFG, optional.
     """
 
     sdfg: dace.SDFG

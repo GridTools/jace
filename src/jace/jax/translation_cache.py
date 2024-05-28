@@ -57,6 +57,9 @@ class CachingStage(Generic[NextStage]):
 
     A class must implement the `_make_call_description()` to compute an abstract description
     of the call. This is needed to operate the cache to store the stage transitions.
+
+    Notes:
+        The `__init__()` function must explicitly be called to fully setup `self`.
     """
 
     _cache: StageCache[NextStage]
@@ -197,7 +200,7 @@ class StageTransformationDescription:
     The cache will call the `CachingStage._make_call_description()` function to get a key.
     The actual key is consists of two parts, `stage_id` and `call_args`.
 
-    Attributes:
+    Args:
         stage_id:   Origin of the call, for which the id of the stage object should be used.
         call_args:  Description of the arguments of the call. There are two ways to describe
             the arguments:
@@ -221,6 +224,9 @@ StageType = TypeVar("StageType", bound="stages.Stage")
 class StageCache(Generic[StageType]):
     """Simple LRU cache to cache the results of the stage transition function.
 
+    Args:
+        size:   The size of the cache, defaults to 256.
+
     Notes:
         The most recently used entry is at the end of the `OrderedDict`.
     """
@@ -232,11 +238,6 @@ class StageCache(Generic[StageType]):
         self,
         size: int = 256,
     ) -> None:
-        """Creates a LRU cache with `size` many entries.
-
-        Args:
-            size:   Number of entries the cache holds, defaults to 256.
-        """
         self._memory = collections.OrderedDict()
         self._size = size
 

@@ -34,6 +34,11 @@ class JaCeVar:
     instance and a shape. In addition it has an optional name, which allows to create variables
     with a certain name using `JaxprTranslationDriver.add_array()`.
 
+    Args:
+        shape:      The shape of the variable.
+        dtype:      The dace datatype of the variable.
+        name:       Name the variable should have, optional.
+
     Note:
         If the name of a `JaCeVar` is '_' it is considered a drop variable.
         The definitions of `__hash__` and `__eq__` are in accordance with how Jax variable works.

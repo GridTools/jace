@@ -54,10 +54,17 @@ class JaxprTranslationDriver:
     will then translate the supplied (nested) Jaxpr and return the result. However, this will have
     no influence on the translation process that is already going.
 
+    Args:
+        primitive_translators:    Primitive to use during the translation.
+
     Notes:
+        The `primitive_translators` that is passed at construction is not copied. The user has
+        to ensure that it does not change.
         After the main translation has been performed the translator object can be used again.
         Currently the driver will generate only Array as SDFG variables, however, this is a
         temporary solution, see `add_array()`.
+
+
     """
 
     __slots__ = ("_ctx_stack", "_primitive_translators", "_jax_name_map")
@@ -70,15 +77,6 @@ class JaxprTranslationDriver:
         self,
         primitive_translators: Mapping[str, translator.PrimitiveTranslatorCallable],
     ) -> None:
-        """Creates the driver ready for translation.
-
-        Args:
-            primitive_translators:    Primitive to use during the translation.
-
-        Note:
-            The primitive translators are not copied, thus the user has to ensure that the
-            passed mapping does not change during the translation.
-        """
         # Maps name of primitives to the associated translator.
         self._primitive_translators = primitive_translators
 
