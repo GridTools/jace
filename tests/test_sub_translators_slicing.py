@@ -37,19 +37,12 @@ def A_4x4x4x4():
     params=[
         (1, 2, 1, 2),
         (0, 0, 0, 0),
-        pytest.param(
-            (3, 3, 3, 3), marks=pytest.mark.skip("Overrun dynamic windows are not supported.")
-        ),
+        (3, 3, 3, 3),  # Will lead to readjustment.
+        (3, 1, 3, 0),  # Will lead to readjustment.
     ]
 )
 def full_dynamic_start_idx(request):
-    """Start indexes for the slice window of `test_dynamic_slice_full_dynamic()`.
-
-    Note:
-        The `(3, 3, 3, 3)` is clearly out of bound for the `A_4x4x4x4` case, however, Jax
-        explicitly allows [this](https://jax.readthedocs.io/en/latest/_autosummary/jax.lax.dynamic_slice.html).
-        However, it is not supported in Jace.
-    """
+    """Start indexes for the slice window of `test_dynamic_slice_full_dynamic()`."""
     return request.param
 
 
