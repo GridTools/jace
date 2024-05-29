@@ -32,7 +32,7 @@ def is_jaceified(obj: Any) -> TypeGuard[stages.JaceWrapped]:
     return isinstance(obj, stages.JaceWrapped)
 
 
-def is_drop_var(jax_var: jax_core.Atom | util.JaCeVar) -> TypeGuard[jax_core.DropVarp]:
+def is_drop_var(jax_var: jax_core.Atom | util.JaCeVar) -> TypeGuard[jax_core.DropVar]:
     """Tests if `jax_var` is a drop variable, i.e. a variable that is not read from in a Jaxpr."""
 
     if isinstance(jax_var, jax_core.DropVar):
@@ -119,11 +119,7 @@ def is_on_device(
     function is more of a test, if there is a GPU or not.
     """
     if is_jax_array(obj):
-        try:
-            _ = obj.__cuda_array_interface__
-            return True
-        except AttributeError:
-            return False
+        return hasattr(obj, "__cuda_array_interface__")
     return dace.is_gpu_array(obj)
 
 

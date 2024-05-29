@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import functools
 from collections.abc import Callable, Mapping
-from typing import Any, Literal, overload
+from typing import Any, Literal, cast, overload
 
 from jax import grad, jacfwd, jacrev
 
@@ -20,9 +20,9 @@ from jace import stages, translator
 
 __all__ = [
     "grad",
-    "jit",
     "jacfwd",
     "jacrev",
+    "jit",
 ]
 
 
@@ -79,6 +79,6 @@ def jit(
             ),
             jit_options=kwargs,
         )
-        return functools.update_wrapper(jace_wrapper, f)
+        return cast(stages.JaceWrapped, functools.update_wrapper(jace_wrapper, f))
 
     return wrapper if fun is None else wrapper(fun)

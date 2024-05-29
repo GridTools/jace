@@ -67,7 +67,7 @@ class JaxprTranslationDriver:
 
     """
 
-    __slots__ = ("_ctx_stack", "_primitive_translators", "_jax_name_map")
+    __slots__ = ("_ctx_stack", "_jax_name_map", "_primitive_translators")
 
     _primitive_translators: Mapping[str, translator.PrimitiveTranslatorCallable]
     _jax_name_map: dict[jax_core.Var | util.JaCeVar, str]
@@ -205,14 +205,13 @@ class JaxprTranslationDriver:
     @overload
     def map_jax_var_to_sdfg(
         self,
-        jax_var: str | jax_core.Atom | util.JaCeVar,
+        jax_var: jax_core.Atom | util.JaCeVar,
+        allow_fail: Literal[False] = False,
     ) -> str: ...
 
     @overload
     def map_jax_var_to_sdfg(
-        self,
-        jax_var: str | jax_core.Atom | util.JaCeVar,
-        allow_fail: Literal[True],
+        self, jax_var: jax_core.Atom | util.JaCeVar, allow_fail: Literal[True]
     ) -> str | None: ...
 
     def map_jax_var_to_sdfg(
@@ -227,7 +226,7 @@ class JaxprTranslationDriver:
             allow_fail:     If mapping is not known return `None` instead of raising `KeyError`.
         """
         if isinstance(jax_var, jax_core.Literal):
-            raise RuntimeError("There is no SDFG variable for literal '{jax_var}'.")
+            raise RuntimeError(f"There is no SDFG variable for literal '{jax_var}'.")
         if jax_var in self._jax_name_map:
             sdfg_name = self._jax_name_map[jax_var]
         elif allow_fail:
@@ -254,9 +253,7 @@ class JaxprTranslationDriver:
 
         If `self` is allocated then there is also an ongoing translation process.
         """
-        if len(self._ctx_stack) != 0:
-            return True
-        return False
+        return len(self._ctx_stack) != 0
 
     def is_root_translator(self) -> bool:
         """Tests if `self` is the root translator.
@@ -265,9 +262,7 @@ class JaxprTranslationDriver:
         """
         if not self.is_allocated():
             raise RuntimeError("Driver is not allocated.")
-        if len(self._ctx_stack) == 1:
-            return True
-        return False
+        return len(self._ctx_stack) == 1
 
     def add_jax_name_mapping(
         self,
@@ -329,6 +324,10 @@ class JaxprTranslationDriver:
             pipeline, should be handle to handle it. But there are some special parts that
             might explicitly want a scalar, it also might block certain compiler optimization.
         """
+
+        if isinstance(arg, jax_core.Literal):
+            raise ValueError(f"Can not generate an SDFG variable for literal '{arg}'.")
+
         shape: tuple[int | dace.symbol | str, ...] = util.get_jax_var_shape(arg)
         dtype: dace.typeclass = util.get_jax_var_dtype(arg)
         storage: dace.StorageType = dace.StorageType.Default  # Set at later stages (optimization)
