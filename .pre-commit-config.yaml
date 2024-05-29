@@ -48,11 +48,10 @@ repos:
   - id: mixed-line-ending
   - id: name-tests-test
     args: ["--pytest-test-first"]
-  - id: requirements-txt-fixer
   - id: trailing-whitespace
 
 - repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: v0.4.6
+  rev: v0.4.8
   hooks:
   - id: ruff
     args: ["--fix", "--show-fixes", "--preview"]
@@ -68,7 +67,8 @@ repos:
     - dace==0.15.1
     - jax[cpu]==0.4.28
     - numpy==1.26.4
-    - pytest==8.2.1
+    - pytest==8.2.2
+    - typing-extensions==4.12.2
 - repo: https://github.com/codespell-project/codespell
   rev: "v2.2.6"
   hooks:

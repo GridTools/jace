@@ -10,7 +10,7 @@ import nox
 DIR = Path(__file__).parent.resolve()
 
 nox.needs_version = ">=2024.3.2"
-nox.options.sessions = ["lint", "pylint", "tests"]
+nox.options.sessions = ["lint", "tests"]
 nox.options.default_venv_backend = "uv|virtualenv"
 
 
@@ -101,3 +101,22 @@ def build(session: nox.Session) -> None:
 
     session.install("build")
     session.run("python", "-m", "build")
+
+
+@nox.session
+def requirements(session: nox.Session) -> None:
+    """
+    Freeze dependencies from input specs and synchronize across tools.
+    """
+    requirements_path = DIR / "requirements"
+    req_sync_tool = requirements_path / "sync_tool.py"
+
+    dependencies = ["pre-commit"] + nox.project.load_toml(req_sync_tool)["dependencies"]
+    session.install(*dependencies)
+    session.install("pip-compile-multi")
+
+    session.run("python", req_sync_tool, "pull")
+    session.run("pip-compile-multi", "-g", "--skip-constraints")
+    session.run("python", req_sync_tool, "push")
+
+    session.run("pre-commit", "run", "--files", ".pre-commit-config.yaml", success_codes=[0, 1])

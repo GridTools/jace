@@ -3,9 +3,7 @@ build-backend = "setuptools.build_meta"
 requires = ["setuptools>=61"]
 
 [project]
-authors = [
-  {name = "ETH Zurich", email = "gridtools@cscs.ch"}
-]
+authors = [{name = "ETH Zurich", email = "gridtools@cscs.ch"}]
 classifiers = [
   "Development Status :: 1 - Planning",
   "Intended Audience :: Science/Research",
@@ -21,11 +19,7 @@ classifiers = [
   "Topic :: Scientific/Engineering",
   "Typing :: Typed"
 ]
-dependencies = [
-  "dace>=0.15",
-  "jax[cpu]>=0.4.24",
-  "numpy>=1.26.0"
-]
+dependencies = ["dace>=0.15", "jax[cpu]>=0.4.24", "numpy>=1.26.0"]
 description = "JAX jit using DaCe (Data Centric Parallel Programming)"
 name = "JaCe"
 readme = "README.md"
@@ -34,11 +28,7 @@ version = "0.1.0"
 license.file = "LICENSE"
 
 [project.optional-dependencies]
-cuda12 = [
-  "cupy-cuda12x>=12.1.0",
-  "jax[cuda12]>=0.4.24",
-  "optuna>=3.4.0"
-]
+cuda12 = ["cupy-cuda12x>=12.1.0", "jax[cuda12]>=0.4.24", "optuna>=3.4.0"]
 
 [project.urls]
 "Bug Tracker" = "https://github.com/GridTools/JaCe/issues"
@@ -47,10 +37,7 @@ Discussions = "https://github.com/GridTools/JaCe/discussions"
 Homepage = "https://github.com/GridTools/JaCe"
 
 [tool.coverage]
-report.exclude_also = [
-  '\.\.\.',
-  'if typing.TYPE_CHECKING:'
-]
+report.exclude_also = ['\.\.\.', 'if typing.TYPE_CHECKING:']
 run.source = ["jace"]
 
 # -- mypy  --
@@ -83,14 +70,10 @@ module = ["tests.*", "dace.*", "jax.*", "jaxlib.*"]
 
 [tool.pytest.ini_options]
 addopts = ["-ra", "--showlocals", "--strict-markers", "--strict-config"]
-filterwarnings = [
-  "error"
-]
+filterwarnings = ["error"]
 log_cli_level = "INFO"
 minversion = "6.0"
-testpaths = [
-  "tests"
-]
+testpaths = ["tests"]
 xfail_strict = true
 
 # -- ruff --
@@ -109,7 +92,9 @@ extend-select = [
   "B",  # flake8-bugbear
   "I",  # isort
   "G",  # flake8-logging-format
+  "W",  # pycodestyle-warning
   "C4",  # flake8-comprehensions
+  "C90",  # mccabe
   "PT",  # flake8-pytest-style
   "UP",  # pyupgrade       # TODO: in evaluation
   "ARG",  # flake8-unused-arguments
@@ -129,6 +114,7 @@ extend-select = [
 ignore = [
   'B905',  # [zip-without-explicit-strict]
   'E501',  # [line-too-long]
+  'TCH003',  # [typing-only-standard-library-import]
   'UP038'  # [non-pep604-isinstance]
 ]
 # ignore-init-module-imports = true  # deprecated in preview mode
@@ -160,7 +146,13 @@ section-order = [
 [tool.ruff.lint.isort.sections]
 tests = ["tests", "unit_tests", "integration_tests"]
 
+[tool.ruff.lint.mccabe]
+max-complexity = 12
+
 [tool.ruff.lint.per-file-ignores]
 "!tests/**.py" = ["PT"]  # Ignore `flake8-pytest-style` everywhere except in `tests/`
 "noxfile.py" = ["T20"]  # Ignore `flake8-print`
 "tests/**" = ["T10", "T20"]  # Ignore `flake8-debugger` and `flake8-print`
+
+[tool.ruff.lint.pycodestyle]
+max-doc-length = 85
