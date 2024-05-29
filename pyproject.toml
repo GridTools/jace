@@ -21,13 +21,24 @@ classifiers = [
   "Topic :: Scientific/Engineering",
   "Typing :: Typed"
 ]
-dependencies = []
+dependencies = [
+  "dace>=0.15",
+  "jax[cpu]>=0.4.24",
+  "numpy>=1.26.0"
+]
 description = "JAX jit using DaCe (Data Centric Parallel Programming)"
 name = "JaCe"
 readme = "README.md"
 requires-python = ">=3.10"
 version = "0.1.0"
 license.file = "LICENSE"
+
+[project.optional-dependencies]
+cuda12 = [
+  "cupy-cuda12x>=12.1.0",
+  "jax[cuda12]>=0.4.24",
+  "optuna>=3.4.0"
+]
 
 [project.urls]
 "Bug Tracker" = "https://github.com/GridTools/JaCe/issues"
@@ -120,7 +131,7 @@ ignore = [
   'E501',  # [line-too-long]
   'UP038'  # [non-pep604-isinstance]
 ]
-ignore-init-module-imports = true
+# ignore-init-module-imports = true  # deprecated in preview mode
 unfixable = []
 
 [tool.ruff.lint.isort]
@@ -145,6 +156,9 @@ section-order = [
   'tests',
   'local-folder'
 ]
+
+[tool.ruff.lint.isort.sections]
+tests = ["tests", "unit_tests", "integration_tests"]
 
 [tool.ruff.lint.per-file-ignores]
 "!tests/**.py" = ["PT"]  # Ignore `flake8-pytest-style` everywhere except in `tests/`
