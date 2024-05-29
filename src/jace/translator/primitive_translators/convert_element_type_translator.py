@@ -26,11 +26,13 @@ class ConvertElementTypeTranslator(mapped_base.MappedOperationTranslatorBase):
     Copies the input to the output and performs type conversion.
 
     Notes:
-        This translator ignores the `new_dtype` and `weak_type` parameter of the equation and only performs casting
+        This translator ignores the `new_dtype` and `weak_type` parameter the equation
+        and only performs the casting.
 
     Todo:
-        Occasionally Jax converts from the same type to another type.
-            This case should be handled by a Memlet directly, which can then be removed.
+        - Occasionally Jax generates a cast that is not needed, because the types are the same.
+            Currently this is handled, by generating an explicit copy, however, it should be
+            handled by a Memlet.
     """
 
     __slots__ = ()
@@ -54,8 +56,8 @@ class ConvertElementTypeTranslator(mapped_base.MappedOperationTranslatorBase):
         out_dtype_s: str = str(out_dtype)
 
         # This is the base of the template that we use for conversion.
-        #  You should notice that the Tasklet `__out = __in0` will fail, see commit `f5aabc3` of the prototype.
-        #  Thus we have to do it in this way.
+        #  You should notice that the Tasklet `__out = __in0` will fail, see commit
+        #  `f5aabc3` of the prototype. Thus we have to do it in this way.
         conv_code = "__in0"
 
         # Handle special cases
@@ -64,7 +66,7 @@ class ConvertElementTypeTranslator(mapped_base.MappedOperationTranslatorBase):
             #  See: tests/test_sub_translators_convert_element_type.py::test_convert_element_type_useless_cast
             # TODO(phimuell): Make this into a pure Memlet such that it can be optimized away by DaCe.
             warnings.warn(
-                f"convert_element_type({eqn}): is useless, because input and output have same type.",
+                f"convert_element_type({eqn}): is useless, input and output have same type.",
                 category=UserWarning,
                 stacklevel=1,  # Find a better one
             )

@@ -169,9 +169,7 @@ def test_dynamic_slice_full_dynamic(A_4x4x4x4, full_dynamic_start_idx):
         return jax.lax.dynamic_slice(A, (s1, s2, s3, s4), (2, 2, 2, 2))
 
     # TODO(phimuell): Get rid of this warning, or allow it to disable.
-    with pytest.warns(
-        expected_warning=UserWarning,
-    ):
+    with pytest.warns(expected_warning=UserWarning):
         res = jace.jit(testee)(A_4x4x4x4, *full_dynamic_start_idx)
     ref = testee(A_4x4x4x4, *full_dynamic_start_idx)
 
@@ -185,9 +183,7 @@ def test_dynamic_slice_partially_dynamic(A_4x4x4x4):
         return jax.lax.dynamic_slice(A, (s1, 1, s2, 2), (2, 2, 2, 2))
 
     # TODO(phimuell): Get rid of this warning, or allow it to disable.
-    with pytest.warns(
-        expected_warning=UserWarning,
-    ):
+    with pytest.warns(expected_warning=UserWarning):
         res = jace.jit(testee)(A_4x4x4x4, 1, 2)
     ref = testee(A_4x4x4x4, 1, 2)
 

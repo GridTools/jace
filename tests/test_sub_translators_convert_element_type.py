@@ -90,7 +90,7 @@ def test_convert_element_type_useless_cast():
 
     with pytest.warns(
         expected_warning=UserWarning,
-        match=r"convert_element_type\(.*\): is useless, because input and output have same type.",
+        match=r"convert_element_type\(.*\): is useless, input and output have same type.",
     ):
         res = jace.jit(testee)(1.0)
 

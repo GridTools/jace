@@ -93,7 +93,8 @@ class PrimitiveTranslator(PrimitiveTranslatorCallable, Protocol):
     driver object, which also owns and manage the primitive translators. In the end this implements
     the delegation pattern.
 
-    You can use `jace.translator.register_primitive_translator()` to register your translator to Jace.
+    You can use `jace.translator.register_primitive_translator()` to register your translator to
+    Jace.
     """
 
     __slots__ = ()

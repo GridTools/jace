@@ -73,7 +73,7 @@ def fake_add_translator(*args: Any, **kwargs: Any) -> None:
 def test_are_subtranslators_imported():
     """Tests if something is inside the list of subtranslators."""
     # Must be adapted if new primitives are implemented.
-    assert len(get_regsitered_primitive_translators()) == 46
+    assert len(get_regsitered_primitive_translators()) == 47
 
 
 @pytest.mark.usefixtures("no_builtin_translators")

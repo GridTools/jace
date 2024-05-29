@@ -23,10 +23,7 @@ def test_iota_arange():
 
     ref = testee(0)
 
-    with pytest.warns(
-        expected_warning=UserWarning,
-        match=r"convert_element_type\(.*\): is useless, because input and output have same type.",
-    ):
+    with pytest.warns(expected_warning=UserWarning):
         res = jace.jit(testee)(0)
     assert np.all(ref == res)
 
