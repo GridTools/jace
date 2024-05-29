@@ -28,6 +28,31 @@ def A_4x4():
     return np.arange(16).reshape((4, 4))
 
 
+@pytest.fixture()
+def A_4x4x4x4():
+    return np.arange(4**4).reshape((4, 4, 4, 4))
+
+
+@pytest.fixture(
+    params=[
+        (1, 2, 1, 2),
+        (0, 0, 0, 0),
+        pytest.param(
+            (3, 3, 3, 3), marks=pytest.mark.skip("Overrun dynamic windows are not supported.")
+        ),
+    ]
+)
+def full_dynamic_start_idx(request):
+    """Start indexes for the slice window of `test_dynamic_slice_full_dynamic()`.
+
+    Note:
+        The `(3, 3, 3, 3)` is clearly out of bound for the `A_4x4x4x4` case, however, Jax
+        explicitly allows [this](https://jax.readthedocs.io/en/latest/_autosummary/jax.lax.dynamic_slice.html).
+        However, it is not supported in Jace.
+    """
+    return request.param
+
+
 def test_slice_sub_view(A_4x4):
     """Simple extraction of a subsize."""
 
@@ -144,15 +169,45 @@ def test_slice_too_big(A_4x4):
     assert np.all(ref == res)
 
 
-def test_dynamic_slice(A_4x4):
-    def testee(A: np.ndarray, s1: int, s2: int) -> np.ndarray:
-        return jax.lax.dynamic_slice(A, (s1, s2), (2, 2))
+def test_dynamic_slice_full_dynamic(A_4x4x4x4, full_dynamic_start_idx):
+    """Dynamic slicing where all start index are input parameters."""
 
-    ref = testee(A_4x4, 1, 1)
+    def testee(A: np.ndarray, s1: int, s2: int, s3: int, s4: int) -> np.ndarray:
+        return jax.lax.dynamic_slice(A, (s1, s2, s3, s4), (2, 2, 2, 2))
 
+    # TODO(phimuell): Get rid of this warning, or allow it to disable.
     with pytest.warns(
         expected_warning=UserWarning,
     ):
-        res = jace.jit(testee)(A_4x4, 1, 1)
+        res = jace.jit(testee)(A_4x4x4x4, *full_dynamic_start_idx)
+    ref = testee(A_4x4x4x4, *full_dynamic_start_idx)
+
+    assert np.all(ref == res)
+
+
+def test_dynamic_slice_partially_dynamic(A_4x4x4x4):
+    """Dynamic slicing where some start index are input parameters and others are literals."""
+
+    def testee(A: np.ndarray, s1: int, s2: int) -> np.ndarray:
+        return jax.lax.dynamic_slice(A, (s1, 1, s2, 2), (2, 2, 2, 2))
+
+    # TODO(phimuell): Get rid of this warning, or allow it to disable.
+    with pytest.warns(
+        expected_warning=UserWarning,
+    ):
+        res = jace.jit(testee)(A_4x4x4x4, 1, 2)
+    ref = testee(A_4x4x4x4, 1, 2)
+
+    assert np.all(ref == res)
+
+
+def test_dynamic_slice_full_literal(A_4x4x4x4):
+    """Dynamic slicing where all start indexes are literals."""
+
+    def testee(A: np.ndarray) -> np.ndarray:
+        return jax.lax.dynamic_slice(A, (0, 1, 0, 2), (2, 2, 2, 2))
+
+    res = jace.jit(testee)(A_4x4x4x4)
+    ref = testee(A_4x4x4x4)
 
     assert np.all(ref == res)
