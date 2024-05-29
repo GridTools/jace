@@ -9,7 +9,6 @@
 
 from __future__ import annotations
 
-import warnings
 from collections.abc import Sequence
 
 import dace
@@ -62,14 +61,11 @@ class ConvertElementTypeTranslator(mapped_base.MappedOperationTranslatorBase):
 
         # Handle special cases
         if in_dtype == out_dtype:
-            # It sounds ridiculously but it can happen.
-            #  See: tests/test_sub_translators_convert_element_type.py::test_convert_element_type_useless_cast
-            # TODO(phimuell): Make this into a pure Memlet such that it can be optimized away by DaCe.
-            warnings.warn(
-                f"convert_element_type({eqn}): is useless, input and output have same type.",
-                category=UserWarning,
-                stacklevel=1,  # Find a better one
-            )
+            # This happens and previously there was a warning here, but that thing got so annoying
+            #  We handle it explicitly because otherwise, DaCe could not remove the Tasklet.
+            #  inside the tests that it was removed, see the `tests/test_sub_translators_convert_element_type.py::test_convert_element_type_useless_cast`
+            #  for more.
+            # TODO(phimuell): Make this into a pure Memlet.
             return f"__out = {conv_code}"
         if in_dtype_s.startswith("bool") and out_dtype_s.startswith("int"):
             # Interestingly `__out = int(__in0)` will at some DaCe processing stage.

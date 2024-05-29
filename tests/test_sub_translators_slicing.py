@@ -168,9 +168,7 @@ def test_dynamic_slice_full_dynamic(A_4x4x4x4, full_dynamic_start_idx):
     def testee(A: np.ndarray, s1: int, s2: int, s3: int, s4: int) -> np.ndarray:
         return jax.lax.dynamic_slice(A, (s1, s2, s3, s4), (2, 2, 2, 2))
 
-    # TODO(phimuell): Get rid of this warning, or allow it to disable.
-    with pytest.warns(expected_warning=UserWarning):
-        res = jace.jit(testee)(A_4x4x4x4, *full_dynamic_start_idx)
+    res = jace.jit(testee)(A_4x4x4x4, *full_dynamic_start_idx)
     ref = testee(A_4x4x4x4, *full_dynamic_start_idx)
 
     assert np.all(ref == res)
@@ -182,9 +180,7 @@ def test_dynamic_slice_partially_dynamic(A_4x4x4x4):
     def testee(A: np.ndarray, s1: int, s2: int) -> np.ndarray:
         return jax.lax.dynamic_slice(A, (s1, 1, s2, 2), (2, 2, 2, 2))
 
-    # TODO(phimuell): Get rid of this warning, or allow it to disable.
-    with pytest.warns(expected_warning=UserWarning):
-        res = jace.jit(testee)(A_4x4x4x4, 1, 2)
+    res = jace.jit(testee)(A_4x4x4x4, 1, 2)
     ref = testee(A_4x4x4x4, 1, 2)
 
     assert np.all(ref == res)

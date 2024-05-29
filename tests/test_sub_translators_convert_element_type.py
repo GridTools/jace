@@ -77,11 +77,13 @@ def test_convert_element_type_from_bool():
     _test_convert_element_type_impl([np.bool_], _DACE_COMPLEX)
 
 
+@pytest.mark.skip(reason="The warning was disabled, so the test is useless.")
 def test_convert_element_type_useless_cast():
-    """Broadcast a literal to a matrix.
+    """Shows that under some conditions there is really a casting from one type to the same.
 
-    This test is here to show, that in certain situation Jax inserts
-    a `convert_element_type` primitive even if it is not needed.
+    In certain cases, also in some slicing tests, this useless cast is inserted by Jax.
+    This test was originally here to show this. However, that thing got so annoying that it was
+    removed. The test is kept here to serve as some kind of a reference.
     """
 
     def testee(a: float) -> np.ndarray:
@@ -90,7 +92,7 @@ def test_convert_element_type_useless_cast():
 
     with pytest.warns(
         expected_warning=UserWarning,
-        match=r"convert_element_type\(.*\): is useless, input and output have same type.",
+        match=r"convert_element_type\(.*\): is useless, input and output have same type\.",
     ):
         res = jace.jit(testee)(1.0)
 

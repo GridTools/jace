@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import jax
 import numpy as np
-import pytest
 from jax import numpy as jnp
 
 import jace
@@ -22,9 +21,7 @@ def test_iota_arange():
         return jnp.arange(18, dtype=int) + A
 
     ref = testee(0)
-
-    with pytest.warns(expected_warning=UserWarning):
-        res = jace.jit(testee)(0)
+    res = jace.jit(testee)(0)
     assert np.all(ref == res)
 
 
