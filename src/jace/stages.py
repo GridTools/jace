@@ -299,9 +299,9 @@ Stage = JaceWrapped | JaceLowered | JaceCompiled
 
 
 __all__ = [
-    "Stage",
     "CompilerOptions",  # export for compatibility with Jax.
-    "JaceWrapped",
-    "JaceLowered",
     "JaceCompiled",
+    "JaceLowered",
+    "JaceWrapped",
+    "Stage",
 ]

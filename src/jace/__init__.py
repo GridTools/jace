@@ -18,11 +18,11 @@ from .api import grad, jacfwd, jacrev, jit
 __all__ = [
     "__author__",
     "__copyright__",
-    "grad",
-    "jit",
-    "jacfwd",
-    "jacrev",
     "__license__",
     "__version__",
     "__version_info__",
+    "grad",
+    "jacfwd",
+    "jacrev",
+    "jit",
 ]
