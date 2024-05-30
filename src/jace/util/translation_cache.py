@@ -112,7 +112,8 @@ def cached_transition(
 
 def clear_translation_cache() -> None:
     """Clear all caches associated to translation."""
-    _TRANSLATION_CACHES.clear()
+    for stage_caches in _TRANSLATION_CACHES.values():
+        stage_caches.clear()
 
 
 def get_cache(
@@ -288,6 +289,9 @@ class StageCache(Generic[StageType]):
         elif key in self:
             self._memory.move_to_end(key, last=False)
             self._memory.popitem(last=False)
+
+    def clear(self) -> None:
+        self._memory.clear()
 
     def __repr__(self) -> str:
         return f"StageCache({len(self._memory)} / {self._size} || {', '.join( '[' + repr(k) + ']' for k in self._memory)})"
