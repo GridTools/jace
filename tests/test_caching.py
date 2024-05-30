@@ -18,6 +18,7 @@ import pytest
 
 import jace
 from jace import optimization, stages
+from jace.util import translation_cache as tcache
 
 
 @pytest.fixture(autouse=True)
@@ -29,15 +30,13 @@ def _clear_translation_cache():
     Todo:
         Ask Enrique how I can make that fixture apply everywhere not just in the file but the whole test suite.
     """
-    from jace.util import translation_cache as tcache
-
     tcache.clear_translation_cache()
     yield
     tcache.clear_translation_cache()
 
 
-def test_caching_same_sizes():
-    """The behaviour of the cache if same sizes are used."""
+def test_caching_same_sizes() -> None:
+    """The behaviour of the cache if same sizes are used, in two different functions."""
 
     # Counter for how many time it was lowered.
     lowering_cnt = [0]
@@ -61,8 +60,8 @@ def test_caching_same_sizes():
     BB = B + 0.638956
 
     # Now let's lower it once directly and call it.
-    lowered: stages.JaceLowered = wrapped.lower(A, B)
-    compiled: stages.JaceCompiled = lowered.compile()
+    lowered: stages.JaCeLowered = wrapped.lower(A, B)
+    compiled: stages.JaCeCompiled = lowered.compile()
     assert lowering_cnt[0] == 1
     assert np.allclose(testee(A, B), compiled(A, B))
 
@@ -112,8 +111,7 @@ def test_caching_different_sizes():
     assert compiled1 is not compiled2
 
 
-@pytest.mark.skip(reason="Missing primitive translators")
-def test_caching_different_structure():
+def test_caching_different_structure() -> None:
     """Now tests if we can handle multiple arguments with different structures.
 
     Todo:
@@ -133,13 +131,11 @@ def test_caching_different_structure():
     C = np.full((5, 3), 14, dtype=np.float64)
     D = np.full((6, 3), 14, dtype=np.int64)
 
-    # These are the arrays.
-    args: dict[int, np.ndarray] = {id(x): x for x in [A, B, C, D]}
     # These are the known lowerings.
-    lowerings: dict[tuple[int, int], stages.JaceLowered] = {}
+    lowerings: dict[tuple[int, int], stages.JaCeLowered] = {}
     lowering_ids: set[int] = set()
     # These are the known compilations.
-    compilations: dict[tuple[int, int], stages.JaceCompiled] = {}
+    compilations: dict[tuple[int, int], stages.JaCeCompiled] = {}
     compiled_ids: set[int] = set()
 
     # Generating the lowerings
@@ -166,7 +162,7 @@ def test_caching_different_structure():
         assert compiled1 is ccompiled
 
 
-def test_caching_compilation():
+def test_caching_compilation() -> None:
     """Tests the compilation cache, this is just very simple, since it uses the same code paths as lowering."""
 
     @jace.jit
@@ -226,6 +222,103 @@ def test_caching_dtype():
         assert lowering_cnt[0] == i + 1
 
 
+def test_caching_eviction_simple():
+    """Simple tests for cache eviction."""
+
+    @jace.jit
+    def testee(A: np.ndarray) -> np.ndarray:
+        return A + 1.0
+
+    cache: tcache.StageCache = testee._cache
+
+    first_lowered = testee.lower(np.ones(10))
+    first_key = cache.front()[0]
+    second_lowered = testee.lower(np.ones(11))
+    second_key = cache.front()[0]
+    third_lowered = testee.lower(np.ones(12))
+    third_key = cache.front()[0]
+
+    assert first_key != second_key
+    assert first_key != third_key
+    assert second_key != third_key
+    assert cache[first_key] is first_lowered
+    assert cache[second_key] is second_lowered
+    assert cache[third_key] is third_lowered
+
+    assert first_key in cache
+    assert second_key in cache
+    assert third_key in cache
+    assert cache.front()[0] == third_key
+
+    # We now evict the second key, which should not change anything on the order.
+    cache.popitem(second_key)
+    assert first_key in cache
+    assert second_key not in cache
+    assert third_key in cache
+    assert cache.front()[0] == third_key
+
+    # Now we modify first_key, which moves it to the front.
+    cache[first_key] = first_lowered
+    assert first_key in cache
+    assert second_key not in cache
+    assert third_key in cache
+    assert cache.front()[0] == first_key
+
+    # Now we evict the oldest one, which is third_key
+    cache.popitem(None)
+    assert first_key in cache
+    assert second_key not in cache
+    assert third_key not in cache
+    assert cache.front()[0] == first_key
+
+
+def test_caching_eviction_complex():
+    """Tests if the stuff is properly evicted if the cache is full."""
+
+    @jace.jit
+    def testee(A: np.ndarray) -> np.ndarray:
+        return A + 1.0
+
+    cache: tcache.StageCache = testee._cache
+    capacity = cache.capacity
+    assert len(cache) == 0
+
+    # Lets fill the cache to the brim.
+    for i in range(capacity):
+        A = np.ones(i + 10)
+        lowered = testee.lower(A)
+        assert len(cache) == i + 1
+
+        if i == 0:
+            first_key: tcache.StageTransformationSpec = cache.front()[0]
+            first_lowered = cache[first_key]
+            assert lowered is first_lowered
+        elif i == 1:
+            second_key: tcache.StageTransformationSpec = cache.front()[0]
+            assert second_key != first_key
+            assert cache[second_key] is lowered
+        assert first_key in cache
+
+    assert len(cache) == capacity
+    assert first_key in cache
+    assert second_key in cache
+
+    # Now we will modify the first key, this should make it the newest.
+    assert cache.front()[0] != first_key
+    cache[first_key] = first_lowered
+    assert len(cache) == capacity
+    assert first_key in cache
+    assert second_key in cache
+    assert cache.front()[0] == first_key
+
+    # Now we will add a new entry to the cache, this will evict the second entry.
+    _ = testee.lower(np.ones(capacity + 1000))
+    assert len(cache) == capacity
+    assert cache.front()[0] != first_key
+    assert first_key in cache
+    assert second_key not in cache
+
+
 def test_caching_strides() -> None:
     """Test if the cache detects a change in strides."""
 
@@ -257,6 +350,6 @@ def test_caching_strides() -> None:
         F_lower = wrapped.lower(F)
         F_res = wrapped(F)
     assert F_lower is None  # Remove later.
-    assert C_res is not F_res  # Remove later
+    assert C_res is not F_res  # type: ignore[unreachable]
     assert np.allclose(F_res, C_res)
     assert F_lower is not C_lower

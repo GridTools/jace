@@ -7,8 +7,8 @@
 
 """This module contains the functionality related to the compilation cache of the stages.
 
-The cache currently caches the lowering, i.e. the result of `JaceWrapped.lower()` and the
-compilation, i.e. `JaceLowered.compile()`. The caches are on a per stage basis and not on a
+The cache currently caches the lowering, i.e. the result of `JaCeWrapped.lower()` and the
+compilation, i.e. `JaCeLowered.compile()`. The caches are on a per stage basis and not on a
 per instant basis. To make a stage cacheable, it must be derived from `CachingStage` and
 its transition function must be decoration with `@cached_transition`.
 """

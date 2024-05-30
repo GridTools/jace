@@ -26,8 +26,8 @@ __all__ = [
     "PrimitiveTranslator",
     "PrimitiveTranslatorCallable",
     "TranslatedJaxprSDFG",
-    "register_primitive_translator",
     "get_regsitered_primitive_translators",
-    "set_active_primitive_translators_to",
     "make_primitive_translator",
+    "register_primitive_translator",
+    "set_active_primitive_translators_to",
 ]

@@ -15,13 +15,17 @@ from __future__ import annotations
 
 import dataclasses
 import itertools
-from collections.abc import Mapping
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import dace
 import jax.core as jax_core
+import numpy as np
 
 import jace.util as util
+
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 
 @dataclasses.dataclass(repr=True, frozen=True, eq=False)
@@ -103,6 +107,8 @@ def get_jax_var_shape(jax_var: jax_core.Atom | JaCeVar) -> tuple[int | dace.symb
     """Returns the shape of `jax_var`."""
     match jax_var:
         case jax_core.Var() | jax_core.Literal():
+            # AbstractValue, does not have a `shape` attribute, but in all cases we care, it will.
+            assert hasattr(jax_var.aval, "shape")
             return jax_var.aval.shape
         case JaCeVar():
             return jax_var.shape
@@ -114,6 +120,8 @@ def get_jax_var_dtype(jax_var: jax_core.Atom | JaCeVar) -> dace.typeclass:
     """Returns the DaCe equivalent of `jax_var`s datatype."""
     match jax_var:
         case jax_core.Var() | jax_core.Literal():
+            # AbstractValue, does not have a `dtype` attribute, but in all cases we care, it will.
+            assert hasattr(jax_var.aval, "dtype")
             return translate_dtype(jax_var.aval.dtype)
         case JaCeVar():
             return jax_var.dtype
@@ -192,3 +200,19 @@ def propose_jax_name(
     if jax_name in util.FORBIDDEN_SDFG_VAR_NAMES:
         jax_name = f"__jace_forbidden_{jax_name}"
     return jax_name
+
+
+def get_jax_literal_value(lit: jax_core.Atom) -> bool | float | int | np.generic:
+    """Returns the value a literal is wrapping.
+
+    The function guarantees to return a scalar value.
+    """
+    if not isinstance(lit, jax_core.Literal):
+        raise ValueError(f"Can only extract literals not '{type(lit)}'.")
+    val = lit.val
+    if isinstance(val, np.ndarray):
+        assert val.shape == ()
+        return val.max()
+    if isinstance(val, (bool, float, int)):
+        return val
+    raise TypeError(f"Failed to extract value from '{lit}'.")

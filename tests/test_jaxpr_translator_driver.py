@@ -21,7 +21,7 @@ from jace import translator, util
 from jace.util import JaCeVar
 
 
-# These are some Jace variables that we use inside the tests
+# These are some JaCe variables that we use inside the tests
 #  Unnamed arrays
 array1 = JaCeVar((10, 12), dace.float64)
 array2 = JaCeVar((10, 13), dace.float32)
@@ -315,6 +315,7 @@ def test_driver_variable_multiple_variables(
     prefix_sdfg_name = translation_driver.add_array(
         array1, update_var_mapping=False, name_prefix=prefix
     )
+    assert prefix_expected_name == prefix_sdfg_name
     assert prefix_expected_name in translation_driver.sdfg.arrays
     assert narray1 == translation_driver.map_jax_var_to_sdfg(array1)
 
@@ -369,13 +370,12 @@ def test_driver_variable_alloc_list_cleaning(
     cause an error because it is proposed to `a`, which is already used.
     """
     var_list = [array1, nscal, scal2]
-    exp_names = ["a", nscal.name, "c"]
 
     with pytest.raises(
         expected_exception=ValueError,
         match=re.escape(f"add_array({scal2}): The proposed name 'a', is used."),
     ):
-        res_names = translation_driver.create_jax_var_list(var_list)
+        _ = translation_driver.create_jax_var_list(var_list)
 
     # This currently fails, because the `create_jax_var_list()` function does not clean up.
     assert len(translation_driver.arrays) == 0
@@ -496,10 +496,8 @@ def test_driver_constants(
     assert np.all(translation_driver.sdfg.constants["__const_a"] == constant)
 
 
-def test_driver_scalar_return_value(
-    translation_driver: translator.JaxprTranslationDriver,
-) -> None:
-    """Tests if scalars can be returned directly"""
+def test_driver_scalar_return_value() -> None:
+    """Tests if scalars can be returned directly."""
 
     def scalar_ops(A: float) -> float:
         return A + A - A * A
@@ -519,6 +517,18 @@ def test_driver_scalar_return_value(
     assert lower_cnt[0] == 1
 
 
+@pytest.mark.skip(reason="Currently 'scalar' return values, are actually shape '(1,)' arrays.")
+def test_driver_scalar_return_type() -> None:
+    """Tests if the type is the same, in case of scalar return."""
+
+    @jace.jit
+    def wrapped(A: np.float64) -> np.float64:
+        return A + A - A * A
+
+    A = np.float64(1.0)
+    assert type(A) is np.float64, f"Expected type 'np.float64', but got '{type(A).__name__}'."
+
+
 def test_driver_jace_var() -> None:
     """Simple tests about the `JaCeVar` objects."""
     for iname in ["do", "", "_ _", "9al", "_!"]:
@@ -529,9 +539,7 @@ def test_driver_jace_var() -> None:
             _ = JaCeVar((), dace.int8, name=iname)
 
 
-def test_driver_F_strides(
-    translation_driver: translator.JaxprTranslationDriver,
-) -> None:
+def test_driver_F_strides() -> None:
     """Tests if we can lower without a standard stride.
 
     Notes:

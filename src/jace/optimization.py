@@ -5,7 +5,7 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Module that will host all optimization functions specific to Jace.
+"""Module that will host all optimization functions specific to JaCe.
 
 Currently just a dummy existing for the sake of providing some callable function.
 """
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
 
 class CompilerOptions(TypedDict, total=False):
-    """All known compiler options known to `JaceLowered.compile()`.
+    """All known compiler options known to `JaCeLowered.compile()`.
 
     See `jace_optimize()` for a description of the different options.
 

@@ -5,7 +5,7 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Implements tests to check if the sorting algorithm is correct."""
+"""Implements tests for managing the primitive subtranslators."""
 
 from __future__ import annotations
 
@@ -61,19 +61,19 @@ class SubTrans2(translator.PrimitiveTranslator):
 
 
 @make_primitive_translator("non_existing_callable_primitive3")
-def SubTrans3_Callable(*args: Any, **kwargs: Any) -> None:
+def SubTrans3_Callable(*args: Any, **kwargs: Any) -> None:  # noqa: ARG001
     raise NotImplementedError
 
 
 @make_primitive_translator("add")
-def fake_add_translator(*args: Any, **kwargs: Any) -> None:
+def fake_add_translator(*args: Any, **kwargs: Any) -> None:  # noqa: ARG001
     raise NotImplementedError
 
 
 def test_are_subtranslators_imported():
     """Tests if something is inside the list of subtranslators."""
     # Must be adapted if new primitives are implemented.
-    assert len(get_regsitered_primitive_translators()) == 37
+    assert len(get_regsitered_primitive_translators()) == 47
 
 
 @pytest.mark.usefixtures("no_builtin_translators")
@@ -104,7 +104,7 @@ def test_subtranslatior_managing_isolation():
     """Tests if `get_regsitered_primitive_translators()` protects the internal registry."""
     assert (
         get_regsitered_primitive_translators()
-        is not translator.primitive_translator._PRIMITIVE_TRANSLATORS_REGISTRY
+        is not translator.managing._PRIMITIVE_TRANSLATORS_DICT
     )
 
     initial_primitives = get_regsitered_primitive_translators()
@@ -138,7 +138,7 @@ def test_subtranslatior_managing_swap():
     # Now change the initial one with the mutated one.
     #  The object is copied but should still have the same structure.
     old_active = set_active_primitive_translators_to(mutated_primitives)
-    assert mutated_primitives is not translator.primitive_translator._PRIMITIVE_TRANSLATORS_REGISTRY
+    assert mutated_primitives is not translator.managing._PRIMITIVE_TRANSLATORS_DICT
     assert same_structure(old_active, initial_primitives)
     assert same_structure(mutated_primitives, get_regsitered_primitive_translators())
 
@@ -150,7 +150,7 @@ def test_subtranslatior_managing_callable_annotation():
     prim_name = "non_existing_property"
 
     @make_primitive_translator(prim_name)
-    def non_existing_translator(*args: Any, **kwargs: Any) -> None:
+    def non_existing_translator(*args: Any, **kwargs: Any) -> None:  # noqa: ARG001
         raise NotImplementedError
 
     assert hasattr(non_existing_translator, "primitive")
@@ -163,7 +163,7 @@ def test_subtranslatior_managing_overwriting():
     current_add_translator = get_regsitered_primitive_translators()["add"]
 
     @make_primitive_translator("add")
-    def useless_add_translator(*args: Any, **kwargs: Any) -> None:
+    def useless_add_translator(*args: Any, **kwargs: Any) -> None:  # noqa: ARG001
         raise NotImplementedError
 
     # This will not work because it is not overwritten.
@@ -191,7 +191,7 @@ def test_subtranslatior_managing_overwriting_2():
 
     @register_primitive_translator(overwrite=True)
     @make_primitive_translator("add")
-    def still_useless_but_a_bit_less(*args: Any, **kwargs: Any) -> None:
+    def still_useless_but_a_bit_less(*args: Any, **kwargs: Any) -> None:  # noqa: ARG001
         trans_cnt[0] += 1
         return
 
@@ -222,7 +222,7 @@ def test_subtranslatior_managing_decoupling():
 
     @register_primitive_translator(overwrite=True)
     @make_primitive_translator("add")
-    def useless_add_translator(*args: Any, **kwargs: Any) -> None:
+    def useless_add_translator(*args: Any, **kwargs: Any) -> None:  # noqa: ARG001
         raise NotImplementedError("The 'useless_add_translator' was called as expected.")
 
     # Since `foo` was already constructed, a new registering can not change anything.

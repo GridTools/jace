@@ -9,15 +9,18 @@
 
 from __future__ import annotations
 
-from collections.abc import MutableSequence, Sequence
-from typing import Any, Final, cast
+from typing import TYPE_CHECKING, Any, Final, cast
 
 import dace
 import numpy as np
 from jax import core as jax_core
 from typing_extensions import override
 
-from jace import translator
+from jace import translator, util
+
+
+if TYPE_CHECKING:
+    from collections.abc import MutableSequence, Sequence
 
 
 class ALUTranslator(translator.PrimitiveTranslator):
@@ -65,12 +68,13 @@ class ALUTranslator(translator.PrimitiveTranslator):
         assert self._prim_name == eqn.primitive.name
 
         # Determine what kind of input we got and how we should proceed.
-        is_scalar = len(eqn.outvars[0].aval.shape) == 0
-        inp_scalars = [len(Inp.aval.shape) == 0 for i, Inp in enumerate(eqn.invars)]
+        is_scalar = len(util.get_jax_var_shape(eqn.outvars[0])) == 0
+        inp_scalars = [len(util.get_jax_var_shape(Inp)) == 0 for i, Inp in enumerate(eqn.invars)]
         has_scalars_as_inputs = any(inp_scalars)
         has_some_literals = any(x is None for x in in_var_names)
         inps_same_shape = all(
-            eqn.invars[0].aval.shape == eqn.invars[i].aval.shape for i in range(1, len(eqn.invars))
+            util.get_jax_var_shape(eqn.invars[0]) == util.get_jax_var_shape(eqn.invars[i])
+            for i in range(1, len(eqn.invars))
         )
 
         # We will now look which dimensions have to be broadcasted on which operator.
@@ -85,12 +89,12 @@ class ALUTranslator(translator.PrimitiveTranslator):
         elif has_some_literals or has_scalars_as_inputs:
             # This is essentially an array plus a scalar, that is eitehr a literal or a variable.
             assert (not has_some_literals) or all(
-                invar.aval.shape == eqn.outvars[0].aval.shape
+                util.get_jax_var_shape(invar) == util.get_jax_var_shape(eqn.outvars[0])
                 for (invar, x) in zip(eqn.invars, in_var_names, strict=False)
                 if x is not None
             )
             assert (not has_scalars_as_inputs) or all(
-                invar.aval.shape in {eqn.outvars[0].aval.shape, ()}
+                util.get_jax_var_shape(invar) in {util.get_jax_var_shape(eqn.outvars[0]), ()}
                 for (invar, x) in zip(eqn.invars, in_var_names, strict=False)
                 if x is not None
             )
@@ -101,9 +105,11 @@ class ALUTranslator(translator.PrimitiveTranslator):
             #  It seems that Jax ensures this.
             #  We further assume that if the size in a dimension differs then one must have size 1.
             #  This is the size we broadcast over, i.e. conceptually replicated.
-            out_shps = tuple(eqn.outvars[0].aval.shape)  # Shape of the output
-            inp_shpl = tuple(eqn.invars[0].aval.shape)  # Shape of the left/first input
-            inp_shpr = tuple(eqn.invars[1].aval.shape)  # Shape of the right/second input
+            out_shps = tuple(util.get_jax_var_shape(eqn.outvars[0]))  # Shape of the output
+            inp_shpl = tuple(util.get_jax_var_shape(eqn.invars[0]))  # Shape of the left/first input
+            inp_shpr = tuple(
+                util.get_jax_var_shape(eqn.invars[1])
+            )  # Shape of the right/second input
 
             if not ((len(inp_shpl) == len(inp_shpr)) and (len(out_shps) == len(inp_shpr))):
                 raise NotImplementedError("Can not broadcast over different ranks.")
@@ -124,7 +130,7 @@ class ALUTranslator(translator.PrimitiveTranslator):
         tskl_code: str = self._write_tasklet_code(in_var_names, eqn)
         tskl_name: str = eqn.primitive.name
         tskl_map_ranges: list[tuple[str, str]] = [
-            (f"__i{dim}", f"0:{N}") for dim, N in enumerate(eqn.outvars[0].aval.shape)
+            (f"__i{dim}", f"0:{N}") for dim, N in enumerate(util.get_jax_var_shape(eqn.outvars[0]))
         ]
         tskl_output: tuple[str, dace.Memlet] = None  # type: ignore[assignment]
         tskl_inputs: list[tuple[str, dace.Memlet] | tuple[None, None]] = []
@@ -214,14 +220,14 @@ class ALUTranslator(translator.PrimitiveTranslator):
                 continue
 
             jax_in_var: jax_core.Literal = cast(jax_core.Literal, eqn.invars[i])
-            if jax_in_var.aval.shape == ():
+            if util.get_jax_var_shape(jax_in_var) == ():
                 t_val = jax_in_var.val
                 if isinstance(t_val, np.ndarray):
                     t_val = jax_in_var.val.max()  # I do not know a better way in that case
                 t_code = t_code.replace(f"__in{i}", str(t_val))
             else:
                 raise ValueError(
-                    f"Can not handle the literal case of shape: {jax_in_var.aval.shape}"
+                    f"Can not handle the literal case of shape: {util.get_jax_var_shape(jax_in_var)}"
                 )
 
         # Now replace the parameters

@@ -14,11 +14,12 @@ Currently they mostly exist for the sake of existing.
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from jace import translator
 
 
