@@ -129,8 +129,15 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"]):
                 primitive_translators=self._primitive_translators
             )
             jaxpr = _jax.make_jaxpr(self._fun)(*args)
-            tsdfg: translator.TranslatedJaxprSDFG = driver.translate_jaxpr(jaxpr)
-        ptrans.postprocess_jaxpr_sdfg(tsdfg=tsdfg, fun=self.wrapped_fun)
+            trans_ctx: translator.TranslationContext = driver.translate_jaxpr(jaxpr)
+
+        # Perform the post processing and turn it into a `TranslatedJaxprSDFG` that can be
+        #  compiled and called later.
+        # NOTE: `tsdfg` was deepcopied as a side effect of post processing.
+        tsdfg: translator.TranslatedJaxprSDFG = ptrans.postprocess_jaxpr_sdfg(
+            trans_ctx=trans_ctx,
+            fun=self.wrapped_fun,
+        )
 
         return JaCeLowered(tsdfg)
 
@@ -160,9 +167,6 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"]):
     Although, `JaCeWrapped` is composable with Jax transformations `JaCeLowered` is not.
     A user should never create such an object, instead `JaCeWrapped.lower()` should be used.
 
-    Args:
-        tsdfg:  The lowered SDFG with metadata. Must be finalized.
-
     Note:
         `self` will manage the passed `tsdfg` object. Modifying it results in undefined behavior.
 
@@ -176,8 +180,6 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"]):
         self,
         tsdfg: translator.TranslatedJaxprSDFG,
     ) -> None:
-        if not tsdfg.is_finalized:
-            raise ValueError("The translated SDFG must be finalized.")
         super().__init__()
         self._translated_sdfg = tsdfg
 

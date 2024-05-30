@@ -9,7 +9,7 @@
 
 from __future__ import annotations
 
-from .jaxpr_translator_driver import JaxprTranslationDriver
+from .jaxpr_translator_driver import JaxprTranslationDriver, TranslationContext
 from .primitive_translator import (
     PrimitiveTranslator,
     PrimitiveTranslatorCallable,
@@ -26,6 +26,7 @@ __all__ = [
     "PrimitiveTranslator",
     "PrimitiveTranslatorCallable",
     "TranslatedJaxprSDFG",
+    "TranslationContext",
     "get_regsitered_primitive_translators",
     "make_primitive_translator",
     "register_primitive_translator",

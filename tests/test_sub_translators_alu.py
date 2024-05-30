@@ -46,7 +46,7 @@ def test_add2():
     ref = testee(A, B)
     res = jace.jit(testee)(A, B)
 
-    assert np.allclose(ref, res), f"Expected '{ref}' got '{res}'."
+    assert np.allclose(ref, res), f"Expected '{ref.tolist()}' got '{res.tolist()}'."
 
 
 def test_add3():

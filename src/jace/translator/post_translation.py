@@ -14,6 +14,7 @@ Currently they mostly exist for the sake of existing.
 
 from __future__ import annotations
 
+import copy
 from typing import TYPE_CHECKING
 
 
@@ -24,23 +25,31 @@ if TYPE_CHECKING:
 
 
 def postprocess_jaxpr_sdfg(
-    tsdfg: translator.TranslatedJaxprSDFG,
+    trans_ctx: translator.TranslationContext,
     fun: Callable,  # noqa: ARG001  # Currently unused
-) -> None:
-    """Perform the final post processing steps on the SDFG in place.
+) -> translator.TranslatedJaxprSDFG:
+    """Perform the final post processing steps on the `TranslationContext`.
 
-    Afterwards `tsdfg` will be finalized.
+    Returns:
+        The function returns a valid `TranslationContext` that is decoupled from the one
+        that was originally part of `trans_ctx`.
 
     Args:
-        tsdfg:  The translated SDFG object.
-        fun:    The original function that we translated.
+        trans_ctx:  The `TranslationContext` obtained from the `translate_jaxpr()` function.
+        fun:        The original function that was translated.
 
     Todo:
         - Setting correct input names (layer that does not depend on JAX).
         - Setting the correct strides & Storage properties.
     """
     # Currently we do nothing except finalizing.
+    trans_ctx.validate()
+    tsdfg: translator.TranslatedJaxprSDFG = copy.deepcopy(trans_ctx.jsdfg)
+
     finalize_jaxpr_sdfg(tsdfg)
+
+    tsdfg.validate()
+    return tsdfg
 
 
 def finalize_jaxpr_sdfg(
@@ -49,14 +58,10 @@ def finalize_jaxpr_sdfg(
     """Finalizes the supplied `tsdfg` object in place.
 
     This function will turn a non finalized, i.e. canonical, SDFG into a finalized one,
-    i.e. after this function `tsdfg.is_finalized` is `True`.
     The function will:
     - mark all input and output variables, i.e. listed in `tsdfg.{inp, out}_names`, as globals,
     - set the `arg_names` property of the SDFG,
-    - deallocate all members of `tsdfg` that are no longer needed.
     """
-    if tsdfg.is_finalized:
-        raise ValueError("The supplied SDFG is already finalized.")
     if not tsdfg.inp_names:
         raise ValueError("Input names are not specified.")
     if not tsdfg.out_names:
@@ -73,8 +78,3 @@ def finalize_jaxpr_sdfg(
     # This forces the signature of the SDFG to include all arguments in order they appear.
     #  If an argument is used as input and output then it is only listed as input.
     tsdfg.sdfg.arg_names = sdfg_arg_names
-
-    # Now we will deallocate the fields and mark `self` as finalized.
-    tsdfg.start_state = None
-    tsdfg.terminal_state = None
-    tsdfg.is_finalized = True

@@ -29,12 +29,7 @@ if TYPE_CHECKING:
 def compile_jax_sdfg(
     tsdfg: translator.TranslatedJaxprSDFG,
 ) -> dace_helper.CompiledSDFG:
-    """Compiles the SDFG embedded in `tsdfg` and return the resulting `CompiledSDFG` object.
-
-    The function requires that `tsdfg` is finalized.
-    """
-    if not tsdfg.is_finalized:
-        raise ValueError("Can only compile a finalized SDFG.")
+    """Compiles the SDFG embedded in `tsdfg` and return the resulting `CompiledSDFG` object."""
     if any(  # We do not support the DaCe return mechanism
         arrname.startswith("__return")
         for arrname in tsdfg.sdfg.arrays.keys()  # noqa: SIM118  # we can not use `in` because we are also interested in `__return_`!

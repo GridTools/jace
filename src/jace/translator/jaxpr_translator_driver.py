@@ -66,7 +66,7 @@ class JaxprTranslationDriver:
 
     _primitive_translators: Mapping[str, translator.PrimitiveTranslatorCallable]
     _jax_name_map: dict[jax_core.Var | util.JaCeVar, str]
-    _ctx_stack: list[translator.TranslatedJaxprSDFG]
+    _ctx_stack: list[TranslationContext]
 
     def __init__(
         self,
@@ -90,7 +90,7 @@ class JaxprTranslationDriver:
         jaxpr: jax_core.ClosedJaxpr,
         *,
         name: str | None = None,
-    ) -> translator.TranslatedJaxprSDFG:
+    ) -> TranslationContext:
         """Perform the translation of a Jaxpr into a SDFG.
 
         In case this function is called and `self` has an ongoing translation process, a new
@@ -100,7 +100,7 @@ class JaxprTranslationDriver:
         Returns:
             The function will translate the passed Jaxpr object into an SDFG in canonical form.
             This SDFG together with additional meta data, that is needed for further processing
-            is encapsulated inside a `TranslatedJaxprSDFG` object.
+            is encapsulated inside a `TranslationContext` object.
 
         Args:
             name:                   Use this name for the SDFG instead some generated one.
@@ -506,10 +506,9 @@ class JaxprTranslationDriver:
         Args:
             name:               The name of the SDFG.
         """
-        from jace import translator  # Cyclic import
 
         self._ctx_stack.append(
-            translator.TranslatedJaxprSDFG(
+            TranslationContext(
                 name=name,
             )
         )
@@ -517,12 +516,12 @@ class JaxprTranslationDriver:
         return self
 
     @property
-    def _ctx(self) -> translator.TranslatedJaxprSDFG:
+    def _ctx(self) -> TranslationContext:
         """Returns the currently active translation context."""
         assert len(self._ctx_stack) != 0, "No context is active."
         return self._ctx_stack[-1]
 
-    def _clear_translation_ctx(self) -> translator.TranslatedJaxprSDFG | None:
+    def _clear_translation_ctx(self) -> TranslationContext | None:
         """Remove the current active context from `self` and returns its state.
 
         If `self` is not allocated it will return `None`.
@@ -617,12 +616,12 @@ class JaxprTranslationDriver:
     def _translate_jaxpr_internal(
         self,
         jaxpr: jax_core.ClosedJaxpr,
-    ) -> translator.TranslatedJaxprSDFG:
+    ) -> TranslationContext:
         """Performs the actual translation of the Jaxpr into an SDFG.
 
         The function assumes that the context is allocated as well as the initial variables.
         The function will return the internal state of `self` encapsulated inside a
-        `TranslatedJaxprSDFG` object. The function will also deallocate the current context
+        `TranslationContext` object. The function will also deallocate the current context
         upon return.
 
         Args:
@@ -647,7 +646,7 @@ class JaxprTranslationDriver:
 
         self._ctx.out_names = tuple(out_var_names)
 
-        return cast("translator.TranslatedJaxprSDFG", self._clear_translation_ctx())
+        return cast(TranslationContext, self._clear_translation_ctx())
 
     def _handle_null_jaxpr(
         self,
@@ -719,3 +718,99 @@ class JaxprTranslationDriver:
     def _terminal_sdfg_state(self) -> dace.SDFGState:
         """Returns the current terminal state of the SDFG under construction."""
         return cast(dace.SDFGState, self._ctx.terminal_state)
+
+
+class TranslationContext:
+    """Translation context used by the `JaxprTranslationDriver`.
+
+    Essentially it is a `TranslatedJaxprSDFG` object together with some additional meta data,
+    that is needed during translation. It is also returned by the `translate_jaxpr()` function.
+    It is important that the SDFG it encapsulates is not directly usable and should be passed
+    to the post processing stage.
+
+    Attributes:
+        start_state:    The first state in the SDFG state machine.
+        terminal_state: The (currently) last state in the state machine.
+
+    Args:
+        name:       The name of the SDFG, will be forwarded to the encapsulated `TranslatedJaxprSDFG`.
+    """
+
+    jsdfg: translator.TranslatedJaxprSDFG
+    start_state: dace.SDFGState
+    terminal_state: dace.SDFGState
+
+    def __init__(
+        self,
+        name: str | None = None,
+    ) -> None:
+        from jace import translator  # Cyclic import
+
+        self.jsdfg = translator.TranslatedJaxprSDFG(name=name)
+        self.start_state = self.sdfg.add_state(label="initial_state", is_start_block=True)
+        self.terminal_state = self.start_state
+
+    @property
+    def sdfg(self) -> dace.SDFG:
+        return self.jsdfg.sdfg
+
+    @property
+    def inp_names(self) -> tuple[str, ...]:
+        return self.jsdfg.inp_names
+
+    @inp_names.setter
+    def inp_names(self, inp_names: tuple[str, ...]) -> None:
+        if len(inp_names) == 0:
+            raise dace.sdfg.InvalidSDFGError(
+                "There are no input arguments.",
+                self.sdfg,
+                self.sdfg.node_id(self.sdfg.start_state),
+            )
+        if any(inp not in self.sdfg.arrays for inp in inp_names):
+            raise dace.sdfg.InvalidSDFGError(
+                f"Expected to find: {(inp for inp in inp_names if inp not in self.sdfg.arrays)}",
+                self.sdfg,
+                self.sdfg.node_id(self.start_state),
+            )
+        self.jsdfg.inp_names = inp_names
+
+    @property
+    def out_names(self) -> tuple[str, ...]:
+        return self.jsdfg.out_names
+
+    @out_names.setter
+    def out_names(self, out_names: tuple[str, ...]) -> None:
+        if len(out_names) == 0:
+            raise dace.sdfg.InvalidSDFGError(
+                "There are no output arguments.",
+                self.sdfg,
+                self.sdfg.node_id(self.start_state),
+            )
+        if any(out not in self.sdfg.arrays for out in out_names):
+            raise dace.sdfg.InvalidSDFGError(
+                f"Expected to find: {(out for out in out_names if out not in self.sdfg.arrays)}",
+                self.sdfg,
+                self.sdfg.node_id(self.start_state),
+            )
+        self.jsdfg.out_names = out_names
+
+    def validate(self) -> bool:
+        """Validate internal state of `self`.
+
+        This function will not check the embedded SDFG.
+        """
+        if self.start_state and (self.start_state is not self.sdfg.start_block):
+            raise dace.sdfg.InvalidSDFGError(
+                f"Expected to find '{self.start_state}' ({self.sdfg.node_id(self.start_state)}),"
+                f" instead found '{self.sdfg.start_block} ({self.sdfg.node_id(self.sdfg.start_block)}).",
+                self.sdfg,
+                self.sdfg.node_id(self.start_state),
+            )
+        if self.start_state and ({self.terminal_state} != set(self.sdfg.sink_nodes())):
+            raise dace.sdfg.InvalidSDFGError(
+                f"Expected to find '{self.terminal_state}' ({self.sdfg.node_id(self.terminal_state)}),"
+                f" instead found '{self.sdfg.sink_nodes()}.",
+                self.sdfg,
+                self.sdfg.node_id(self.terminal_state),
+            )
+        return True
