@@ -9,14 +9,19 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
 import dace
-from jax import core as jax_core
 from typing_extensions import override
 
 from jace import translator, util
 from jace.translator import mapped_operation_base_translator as mapped_base
+
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from jax import core as jax_core
 
 
 class ConvertElementTypeTranslator(mapped_base.MappedOperationTranslatorBase):
@@ -49,10 +54,10 @@ class ConvertElementTypeTranslator(mapped_base.MappedOperationTranslatorBase):
         if in_var_names[0] is None:
             raise NotImplementedError("'convert_element_type' is not supported for literals.")
 
-        in_dtype = util.get_jax_var_dtype(eqn.invars[0])
-        in_dtype_s: str = str(in_dtype)
-        out_dtype = util.get_jax_var_dtype(eqn.outvars[0])
-        out_dtype_s: str = str(out_dtype)
+        in_dtype = util.get_jax_var_dtype(eqn.invars[0]).type
+        in_dtype_s: str = in_dtype.__name__
+        out_dtype = util.get_jax_var_dtype(eqn.outvars[0]).type
+        out_dtype_s: str = out_dtype.__name__
 
         # This is the base of the template that we use for conversion.
         #  You should notice that the Tasklet `__out = __in0` will fail, see commit
@@ -75,8 +80,8 @@ class ConvertElementTypeTranslator(mapped_base.MappedOperationTranslatorBase):
         # The general case
         if out_dtype_s == "bool":
             conv_code = f"dace.bool_({conv_code})"
-        elif hasattr(dace.dtypes, str(out_dtype)):
-            conv_code = f"dace.{out_dtype!s}({conv_code})"
+        elif hasattr(dace.dtypes, out_dtype_s):
+            conv_code = f"dace.{out_dtype_s}({conv_code})"
         else:
             raise NotImplementedError(
                 f"Cannot convert '{in_dtype}' to '{out_dtype}' as this type is not known to DaCe."

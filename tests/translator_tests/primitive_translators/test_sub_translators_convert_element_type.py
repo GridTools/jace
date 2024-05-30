@@ -9,14 +9,18 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from typing import Final
+from typing import TYPE_CHECKING, Final
 
+import jax
 import numpy as np
 import pytest
 from jax import numpy as jnp
 
 import jace
+
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 # fmt: off
@@ -44,7 +48,7 @@ def _test_convert_element_type_impl(
             lowering_cnt[1] += 1
 
             @jace.jit
-            def converter(A: np.ndarray) -> np.ndarray:
+            def converter(A: np.ndarray) -> jax.Array:
                 lowering_cnt[0] += 1
                 return jnp.array(A, copy=False, dtype=output_type)  # noqa: B023  # Loop variable.
 

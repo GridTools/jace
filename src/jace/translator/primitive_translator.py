@@ -9,14 +9,15 @@
 from __future__ import annotations
 
 from abc import abstractmethod
-from collections.abc import MutableSequence, Sequence
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
-
-import dace
-from jax import core as jax_core
 
 
 if TYPE_CHECKING:
+    from collections.abc import MutableSequence, Sequence
+
+    import dace
+    from jax import core as jax_core
+
     from jace import translator
 
 
@@ -94,7 +95,7 @@ class PrimitiveTranslator(PrimitiveTranslatorCallable, Protocol):
     the delegation pattern.
 
     You can use `jace.translator.register_primitive_translator()` to register your translator to
-    Jace.
+    JaCe.
     """
 
     __slots__ = ()

@@ -5,7 +5,7 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Implements general tests for Jace."""
+"""Implements general tests for JaCe."""
 
 from __future__ import annotations
 

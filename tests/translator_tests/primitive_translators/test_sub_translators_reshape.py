@@ -9,13 +9,18 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
+import jax
 import numpy as np
 import pytest
 from jax import numpy as jnp
 
 import jace
+
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 def _test_impl_reshaping(
@@ -27,10 +32,8 @@ def _test_impl_reshaping(
     A = np.random.random(src_shape)  # noqa: NPY002
     A = np.array(A, order=order)  # type: ignore[call-overload]  # MyPy wants a literal as order.
 
-    def testee(A: np.ndarray) -> np.ndarray:
+    def testee(A: np.ndarray) -> jax.Array:
         return jnp.reshape(A, dst_shape)
-
-    print(f"SHAPE: {A.shape} -> {dst_shape}")
 
     ref = testee(A)
     res = jace.jit(testee)(A)

@@ -10,12 +10,15 @@
 from __future__ import annotations
 
 import functools
-from collections.abc import Callable, Mapping
-from typing import Any, Literal, cast, overload
+from typing import TYPE_CHECKING, Any, Literal, cast, overload
 
 from jax import grad, jacfwd, jacrev
 
 from jace import stages, translator
+
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Mapping
 
 
 __all__ = [
@@ -32,7 +35,7 @@ def jit(
     /,
     primitive_translators: Mapping[str, translator.PrimitiveTranslator] | None = None,
     **kwargs: Any,
-) -> Callable[[Callable], stages.JaceWrapped]: ...
+) -> Callable[[Callable], stages.JaCeWrapped]: ...
 
 
 @overload
@@ -41,7 +44,7 @@ def jit(
     /,
     primitive_translators: Mapping[str, translator.PrimitiveTranslator] | None = None,
     **kwargs: Any,
-) -> stages.JaceWrapped: ...
+) -> stages.JaCeWrapped: ...
 
 
 def jit(
@@ -49,12 +52,12 @@ def jit(
     /,
     primitive_translators: Mapping[str, translator.PrimitiveTranslator] | None = None,
     **kwargs: Any,
-) -> stages.JaceWrapped | Callable[[Callable], stages.JaceWrapped]:
-    """Jace's replacement for `jax.jit` (just-in-time) wrapper.
+) -> stages.JaCeWrapped | Callable[[Callable], stages.JaCeWrapped]:
+    """JaCe's replacement for `jax.jit` (just-in-time) wrapper.
 
     It works the same way as `jax.jit` does, but instead of using XLA the computation is lowered
     to DaCe. It supports the same arguments as `jax.jit` (although currently not) does.
-    In addition it accepts some Jace specific arguments.
+    In addition it accepts some JaCe specific arguments.
 
     Args:
         primitive_translators:    Use these primitive translators for the lowering to SDFG.
@@ -69,8 +72,8 @@ def jit(
             f"The following arguments to 'jace.jit' are not yet supported: {', '.join(kwargs)}."
         )
 
-    def wrapper(f: Callable) -> stages.JaceWrapped:
-        jace_wrapper = stages.JaceWrapped(
+    def wrapper(f: Callable) -> stages.JaCeWrapped:
+        jace_wrapper = stages.JaCeWrapped(
             fun=f,
             primitive_translators=(
                 translator.managing._PRIMITIVE_TRANSLATORS_DICT
@@ -79,6 +82,6 @@ def jit(
             ),
             jit_options=kwargs,
         )
-        return cast(stages.JaceWrapped, functools.update_wrapper(jace_wrapper, f))
+        return cast(stages.JaCeWrapped, functools.update_wrapper(jace_wrapper, f))
 
     return wrapper if fun is None else wrapper(fun)

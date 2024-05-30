@@ -21,7 +21,7 @@ from jace import translator, util
 from jace.util import JaCeVar
 
 
-# These are some Jace variables that we use inside the tests
+# These are some JaCe variables that we use inside the tests
 #  Unnamed arrays
 array1 = JaCeVar((10, 12), dace.float64)
 array2 = JaCeVar((10, 13), dace.float32)

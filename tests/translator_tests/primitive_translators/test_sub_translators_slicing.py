@@ -165,7 +165,7 @@ def test_slice_too_big(A_4x4):
 def test_dynamic_slice_full_dynamic(A_4x4x4x4, full_dynamic_start_idx):
     """Dynamic slicing where all start index are input parameters."""
 
-    def testee(A: np.ndarray, s1: int, s2: int, s3: int, s4: int) -> np.ndarray:
+    def testee(A: np.ndarray, s1: int, s2: int, s3: int, s4: int) -> jax.Array:
         return jax.lax.dynamic_slice(A, (s1, s2, s3, s4), (2, 2, 2, 2))
 
     res = jace.jit(testee)(A_4x4x4x4, *full_dynamic_start_idx)
@@ -177,7 +177,7 @@ def test_dynamic_slice_full_dynamic(A_4x4x4x4, full_dynamic_start_idx):
 def test_dynamic_slice_partially_dynamic(A_4x4x4x4):
     """Dynamic slicing where some start index are input parameters and others are literals."""
 
-    def testee(A: np.ndarray, s1: int, s2: int) -> np.ndarray:
+    def testee(A: np.ndarray, s1: int, s2: int) -> jax.Array:
         return jax.lax.dynamic_slice(A, (s1, 1, s2, 2), (2, 2, 2, 2))
 
     res = jace.jit(testee)(A_4x4x4x4, 1, 2)
@@ -189,7 +189,7 @@ def test_dynamic_slice_partially_dynamic(A_4x4x4x4):
 def test_dynamic_slice_full_literal(A_4x4x4x4):
     """Dynamic slicing where all start indexes are literals."""
 
-    def testee(A: np.ndarray) -> np.ndarray:
+    def testee(A: np.ndarray) -> jax.Array:
         return jax.lax.dynamic_slice(A, (0, 1, 0, 2), (2, 2, 2, 2))
 
     res = jace.jit(testee)(A_4x4x4x4)

@@ -17,7 +17,7 @@ import jace
 def test_iota_arange():
     """Tests `jnp.arange` functionality."""
 
-    def testee(A: int) -> np.ndarray:
+    def testee(A: int) -> jax.Array:
         return jnp.arange(18, dtype=int) + A
 
     ref = testee(0)
@@ -31,7 +31,7 @@ def test_iota_broadcast():
 
     for d in range(len(shape)):
 
-        def testee(A: np.int32) -> np.ndarray:
+        def testee(A: np.int32) -> jax.Array:
             return jax.lax.broadcasted_iota("int32", shape, d) + A  # noqa: B023  # Variable capturing.
 
         ref = testee(np.int32(0))

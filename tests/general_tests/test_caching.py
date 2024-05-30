@@ -35,7 +35,7 @@ def _clear_translation_cache():
     tcache.clear_translation_cache()
 
 
-def test_caching_same_sizes():
+def test_caching_same_sizes() -> None:
     """The behaviour of the cache if same sizes are used."""
 
     # Counter for how many time it was lowered.
@@ -60,8 +60,8 @@ def test_caching_same_sizes():
     BB = B + 0.638956
 
     # Now let's lower it once directly and call it.
-    lowered: stages.JaceLowered = wrapped.lower(A, B)
-    compiled: stages.JaceCompiled = lowered.compile()
+    lowered: stages.JaCeLowered = wrapped.lower(A, B)
+    compiled: stages.JaCeCompiled = lowered.compile()
     assert lowering_cnt[0] == 1
     assert np.allclose(testee(A, B), compiled(A, B))
 
@@ -111,7 +111,7 @@ def test_caching_different_sizes():
     assert compiled1 is not compiled2
 
 
-def test_caching_different_structure():
+def test_caching_different_structure() -> None:
     """Now tests if we can handle multiple arguments with different structures.
 
     Todo:
@@ -134,10 +134,10 @@ def test_caching_different_structure():
     # These are the arrays.
     args: dict[int, np.ndarray] = {id(x): x for x in [A, B, C, D]}
     # These are the known lowerings.
-    lowerings: dict[tuple[int, int], stages.JaceLowered] = {}
+    lowerings: dict[tuple[int, int], stages.JaCeLowered] = {}
     lowering_ids: set[int] = set()
     # These are the known compilations.
-    compilations: dict[tuple[int, int], stages.JaceCompiled] = {}
+    compilations: dict[tuple[int, int], stages.JaCeCompiled] = {}
     compiled_ids: set[int] = set()
 
     # Generating the lowerings
@@ -164,7 +164,7 @@ def test_caching_different_structure():
         assert compiled1 is ccompiled
 
 
-def test_caching_compilation():
+def test_caching_compilation() -> None:
     """Tests the compilation cache, this is just very simple, since it uses the same code paths as lowering."""
 
     @jace.jit
@@ -255,6 +255,6 @@ def test_caching_strides() -> None:
         F_lower = wrapped.lower(F)
         F_res = wrapped(F)
     assert F_lower is None  # Remove later.
-    assert C_res is not F_res  # Remove later
+    assert C_res is not F_res  # type: ignore[unreachable]
     assert np.allclose(F_res, C_res)
     assert F_lower is not C_lower

@@ -8,14 +8,19 @@
 from __future__ import annotations
 
 import itertools
-from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
 import dace
-from jax import core as jax_core
 from typing_extensions import override
 
 from jace import translator, util
 from jace.translator import mapped_operation_base_translator as mapped_base
+
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from jax import core as jax_core
 
 
 class SqueezeTranslator(mapped_base.MappedOperationTranslatorBase):

@@ -21,7 +21,7 @@ import jace.util as util
 from jace import stages
 
 
-def is_jaceified(obj: Any) -> TypeGuard[stages.JaceWrapped]:
+def is_jaceified(obj: Any) -> TypeGuard[stages.JaCeWrapped]:
     """Tests if `obj` is decorated by JaCe.
 
     Similar to `is_jaxified`, but for JaCe object.
@@ -29,7 +29,7 @@ def is_jaceified(obj: Any) -> TypeGuard[stages.JaceWrapped]:
 
     if util.is_jaxified(obj):
         return False
-    return isinstance(obj, stages.JaceWrapped)
+    return isinstance(obj, stages.JaCeWrapped)
 
 
 def is_drop_var(jax_var: jax_core.Atom | util.JaCeVar) -> TypeGuard[jax_core.DropVar]:
@@ -49,7 +49,7 @@ def is_jaxified(
 
     A "jaxified" object is an object that was processed by Jax.
     While a return value of `True` guarantees a jaxified object, `False` does not proof the
-    contrary. See also `jace.util.is_jaceified()` to tests if something is a Jace object.
+    contrary. See also `jace.util.is_jaceified()` to tests if something is a JaCe object.
     """
     jaxifyed_types = (
         jax_core.Primitive,

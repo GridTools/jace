@@ -15,14 +15,17 @@ from __future__ import annotations
 
 import dataclasses
 import itertools
-from collections.abc import Mapping
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import dace
 import jax.core as jax_core
 import numpy as np
 
 import jace.util as util
+
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 
 @dataclasses.dataclass(repr=True, frozen=True, eq=False)

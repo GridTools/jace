@@ -9,13 +9,18 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
-from jax import core as jax_core
 from typing_extensions import override
 
 from jace import translator
 from jace.translator import mapped_operation_base_translator as mapped_base
+
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from jax import core as jax_core
 
 
 class CopyTranslator(mapped_base.MappedOperationTranslatorBase):
@@ -40,7 +45,7 @@ class DevicePutTranslator(mapped_base.MappedOperationTranslatorBase):
     """The `device_put` primitive is used to transfer data between host and device.
 
     The current implementation only supports the copying where the data already is. Currently DaCe
-    only knows about the Host and the GPU. Furthermore, currently Jace works in such a way that
+    only knows about the Host and the GPU. Furthermore, currently JaCe works in such a way that
     everything is either put on the host or the device. Because of this, the `DevicePutTranslator`
     is, currently, just a simple copy operation that should be removed, by the optimization.
 

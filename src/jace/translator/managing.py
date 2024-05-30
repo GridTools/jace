@@ -15,11 +15,12 @@ currently active you can use the `get_regsitered_primitive_translators()` functi
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, MutableMapping
 from typing import TYPE_CHECKING, Literal, cast, overload
 
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Mapping, MutableMapping
+
     from jace import translator
 
 #: Global registry of the active primitive translators.
@@ -94,7 +95,7 @@ def register_primitive_translator(
     translator.PrimitiveTranslator
     | Callable[[translator.PrimitiveTranslator], translator.PrimitiveTranslator]
 ):
-    """Adds a primitive translator to Jace's global registry.
+    """Adds a primitive translator to JaCe's global registry.
 
     If a translator for `primitive` is already registered an error will be generated. However,
     by specifying `overwrite` `primitive_translator` will replace the current one.
@@ -124,7 +125,7 @@ def register_primitive_translator(
 
 
 def get_regsitered_primitive_translators() -> dict[str, translator.PrimitiveTranslator]:
-    """Returns a copy of the current state of Jace's global primitive registry.
+    """Returns a copy of the current state of JaCe's global primitive registry.
 
     The function returns a mapping that maps the name of a primitive to the associated translator.
     No change to the global registry will affect the return value and vice versa.
@@ -135,7 +136,7 @@ def get_regsitered_primitive_translators() -> dict[str, translator.PrimitiveTran
 def set_active_primitive_translators_to(
     new_translators: Mapping[str, translator.PrimitiveTranslator],
 ) -> MutableMapping[str, translator.PrimitiveTranslator]:
-    """Exchange the global translator registry of Jace with `new_translators`.
+    """Exchange the global translator registry of JaCe with `new_translators`.
 
     The function will return the state of the global translator registry just before this call.
     Any changes to `new_translators` after calling this function will have no effect on the

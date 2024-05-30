@@ -45,7 +45,7 @@ def test_jit():
 
 
 def test_composition_itself():
-    """Tests if Jace is composable with itself."""
+    """Tests if JaCe is composable with itself."""
 
     # Pure Python functions
     def f_ref(x):
@@ -83,7 +83,7 @@ def test_composition_itself():
 
 @pytest.mark.skip(reason="Nested Jaxpr are not handled.")
 def test_composition_with_jax():
-    """Tests if Jace can interact with Jax and vice versa."""
+    """Tests if JaCe can interact with Jax and vice versa."""
 
     def base_fun(A, B, C):
         return A + B * jnp.sin(C) - A * B
@@ -102,7 +102,7 @@ def test_composition_with_jax():
 
 @pytest.mark.skip(reason="Nested Jaxpr are not handled.")
 def test_composition_with_jax_2():
-    """Second test if Jace can interact with Jax and vice versa."""
+    """Second test if JaCe can interact with Jax and vice versa."""
 
     @jax.jit
     def f1_jax(A, B):
@@ -187,7 +187,7 @@ def test_grad_control_flow():
     assert df(x2) == df_x2, f"Failed upper branch, expected '{df_x2}', got '{res_2}'."
 
 
-@pytest.mark.skip(reason="Running Jace with disabled 'x64' support does not work.")
+@pytest.mark.skip(reason="Running JaCe with disabled 'x64' support does not work.")
 def test_disabled_x64():
     """Tests the behaviour of the tool chain if we explicitly disable x64 support in Jax.
 
@@ -203,7 +203,7 @@ def test_disabled_x64():
 
     # Run them with disabled x64 support
     with disable_x64():
-        # Jace
+        # JaCe
         jace_testee = jace.jit(testee)
         jace_lowered = jace_testee.lower(A, B)
         jace_comp = jace_lowered.compile()

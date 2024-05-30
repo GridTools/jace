@@ -7,13 +7,18 @@
 
 from __future__ import annotations
 
-from collections.abc import MutableSequence, Sequence
+from typing import TYPE_CHECKING
 
 import dace
-from jax import core as jax_core
 from typing_extensions import override
 
 from jace import translator, util
+
+
+if TYPE_CHECKING:
+    from collections.abc import MutableSequence, Sequence
+
+    from jax import core as jax_core
 
 
 class ReshapeTranslator(translator.PrimitiveTranslator):

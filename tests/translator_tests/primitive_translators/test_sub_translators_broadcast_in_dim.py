@@ -35,7 +35,7 @@ def _enable_x64_mode_in_jax():
 def test_bid_scalar():
     """Broadcast a scalar to a matrix."""
 
-    def testee(A: float) -> np.ndarray:
+    def testee(A: float) -> jax.Array:
         return jnp.broadcast_to(A, (2, 2))
 
     for a in [1, 1.0, 3.1415]:
@@ -50,7 +50,7 @@ def test_bid_scalar():
 def test_bid_literal():
     """Broadcast a literal to a matrix."""
 
-    def testee(a: float) -> np.ndarray:
+    def testee(a: float) -> np.ndarray | jax.Array:
         return jnp.broadcast_to(1.0, (10, 10)) + a
 
     for a in [1, 1.0, 3.1415]:

@@ -12,7 +12,6 @@ from __future__ import annotations
 import os
 import pathlib
 import time
-from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, Any
 
 import dace
@@ -21,6 +20,8 @@ from dace import data as dace_data
 
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping, Sequence
+
     from jace import translator
     from jace.util import dace_helper
 

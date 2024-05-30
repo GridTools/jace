@@ -9,14 +9,18 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from typing import Final
+from typing import TYPE_CHECKING, Final
 
-from jax import core as jax_core
 from typing_extensions import override
 
 from jace import translator
 from jace.translator import mapped_operation_base_translator as mapped_base
+
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from jax import core as jax_core
 
 
 class ALUTranslator(mapped_base.MappedOperationTranslatorBase):

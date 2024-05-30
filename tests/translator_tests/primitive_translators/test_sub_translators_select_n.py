@@ -25,12 +25,19 @@ def _disable_jit():
 
     The reason we do this is because we can currently not handle this nested jits.
     It is important that it also disabled explicit usage of `jax.jit`.
-    However, since Jace does not honor this flag we it does not affect us.
+    However, since JaCe does not honor this flag we it does not affect us.
 
     Todo:
         Remove as soon as we can handle nested `jit`.
     """
     with jax.disable_jit(disable=True):
+        yield
+
+
+@pytest.fixture(autouse=True)
+def _enable_x64_mode_in_jax():
+    """Ensures that x64 mode in Jax ins enabled."""
+    with jax.experimental.enable_x64():
         yield
 
 
@@ -46,7 +53,7 @@ def tbranch() -> np.ndarray:
 
 @pytest.fixture()
 def fbranch() -> np.ndarray:
-    return np.ones((10, 10))
+    return np.zeros((10, 10))
 
 
 def _perform_test(P: Any, T: Any, F: Any):
@@ -82,7 +89,7 @@ def test_select_n_many_inputs():
     cases = [np.full(shape, i) for i in range(nbcases)]
     pred = np.arange(cases[0].size).reshape(shape) % 5
 
-    def testee(pred: np.ndarray, *cases: np.ndarray) -> np.ndarray:
+    def testee(pred: np.ndarray, *cases: np.ndarray) -> jax.Array:
         return jax.lax.select_n(pred, *cases)
 
     ref = testee(pred, *cases)

@@ -9,14 +9,17 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import jax
 import numpy as np
 from jax import numpy as jnp
 
 import jace
+
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Sequence
 
 
 def _perform_test(testee: Callable, *args: Any) -> None:
@@ -38,7 +41,7 @@ def mkarr(
 def test_alu_unary_scalar():
     """Test unary ALU translator in the scalar case."""
 
-    def testee(A: float) -> float:
+    def testee(A: float) -> float | jax.Array:
         return jnp.cos(A)
 
     _perform_test(testee, 1.0)
@@ -47,7 +50,7 @@ def test_alu_unary_scalar():
 def test_alu_unary_array():
     """Test unary ALU translator with array argument."""
 
-    def testee(A: np.ndarray) -> np.ndarray:
+    def testee(A: np.ndarray) -> jax.Array:
         return jnp.sin(A)
 
     A = mkarr((100, 10, 3))
@@ -58,7 +61,7 @@ def test_alu_unary_array():
 def test_alu_unary_scalar_literal():
     """Test unary ALU translator with literal argument"""
 
-    def testee(A: float) -> float:
+    def testee(A: float) -> float | jax.Array:
         return jnp.sin(1.98) + A
 
     _perform_test(testee, 10.0)
@@ -149,7 +152,7 @@ def test_alu_binary_array_constants():
     """Test binary of array with constant."""
 
     def testee(A: np.ndarray) -> np.ndarray:
-        return A + jax.numpy.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]])
+        return A + jnp.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]])
 
     A = mkarr((3, 3))
     _perform_test(testee, A)
@@ -185,23 +188,7 @@ def test_alu_binary_broadcast_3():
     def testee(A: np.ndarray, B: np.ndarray) -> np.ndarray:
         return A + B
 
-    A = mkarr(
-        (
-            5,
-            1,
-            3,
-            4,
-            1,
-        )
-    )
-    B = mkarr(
-        (
-            5,
-            1,
-            3,
-            1,
-            2,
-        )
-    )
+    A = mkarr((5, 1, 3, 4, 1))
+    B = mkarr((5, 1, 3, 1, 2))
     _perform_test(testee, A, B)
     _perform_test(testee, B, A)
