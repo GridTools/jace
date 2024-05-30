@@ -499,7 +499,7 @@ def test_driver_constants(
 def test_driver_scalar_return_value(
     translation_driver: translator.JaxprTranslationDriver,
 ) -> None:
-    """Tests if scalars can be returned directly"""
+    """Tests if scalars can be returned directly."""
 
     def scalar_ops(A: float) -> float:
         return A + A - A * A
@@ -517,6 +517,20 @@ def test_driver_scalar_return_value(
         ref = scalar_ops(vals[i])
         assert np.allclose(res, ref)
     assert lower_cnt[0] == 1
+
+
+@pytest.mark.skip(reason="Currently 'scalar' return values, are actually shape '(1,)' arrays.")
+def test_driver_scalar_return_type(
+    translation_driver: translator.JaxprTranslationDriver,
+) -> None:
+    """Tests if the type is the same, in case of scalar return."""
+
+    @jace.jit
+    def wrapped(A: np.float64) -> np.float64:
+        return A + A - A * A
+
+    A = np.float64(1.0)
+    assert type(A) is np.float64, f"Expected type 'np.float64', but got '{type(A).__name__}'."
 
 
 def test_driver_jace_var() -> None:

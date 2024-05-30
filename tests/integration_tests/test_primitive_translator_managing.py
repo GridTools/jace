@@ -5,7 +5,7 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Implements tests to check if the sorting algorithm is correct."""
+"""Implements tests for managing the primitive subtranslators."""
 
 from __future__ import annotations
 

@@ -6,7 +6,10 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 """Implements tests for empty jaxprs.
-."""
+
+Todo:
+    Add more tests that are related to `cond`, i.e. not all inputs are needed.
+"""
 
 from __future__ import annotations
 

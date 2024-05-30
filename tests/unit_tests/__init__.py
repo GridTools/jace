@@ -5,4 +5,4 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""General JaCe tests."""
+"""JaCe's unit tests."""

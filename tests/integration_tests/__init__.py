@@ -5,4 +5,7 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Tests related to the translators."""
+"""JaCe's integration tests.
+
+Currently they are mostly related to the primitive translators.
+"""
