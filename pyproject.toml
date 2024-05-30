@@ -76,7 +76,7 @@ warn_unused_ignores = true
 disallow_incomplete_defs = false
 disallow_untyped_defs = false
 ignore_missing_imports = true
-module = "tests.*"
+module = ["tests.*", "dace.*", "jax.*", "jaxlib.*"]
 
 # -- pytest  --
 [tool.pytest]
