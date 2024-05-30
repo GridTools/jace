@@ -192,6 +192,8 @@ def test_builder_nested(translation_builder: translator.JaxprTranslationBuilder)
     name_1 = translation_builder.add_array(array1, update_var_mapping=True)
     assert name_1 == "a"
     assert translation_builder.map_jax_var_to_sdfg(array1) == name_1
+    assert translation_builder.sdfg.arrays[name_1] is translation_builder.get_array(array1)
+    assert translation_builder.sdfg.arrays[name_1] is translation_builder.get_array(name_1)
 
     # For the sake of doing it add a new state to the SDFG.
     translation_builder.append_new_state("sake_state")
