@@ -237,14 +237,14 @@ class StageCache(Generic[StageType]):
     """
 
     _memory: collections.OrderedDict[StageTransformationSpec, StageType]
-    _size: int
+    _capacity: int
 
     def __init__(
         self,
-        size: int = 256,
+        capachity: int = 256,
     ) -> None:
         self._memory = collections.OrderedDict()
-        self._size = size
+        self._capacity = capachity
 
     def __contains__(
         self,
@@ -270,7 +270,7 @@ class StageCache(Generic[StageType]):
             self._memory.move_to_end(key, last=True)
             self._memory[key] = res
         else:
-            if len(self._memory) == self._size:
+            if len(self._memory) == self._capacity:
                 self.popitem(None)
             self._memory[key] = res
 
@@ -293,5 +293,16 @@ class StageCache(Generic[StageType]):
     def clear(self) -> None:
         self._memory.clear()
 
+    def __len__(self) -> int:
+        return len(self._memory)
+
+    @property
+    def capacity(self) -> int:
+        return self._capacity
+
+    def front(self) -> tuple[StageTransformationSpec, StageType]:
+        """Returns the front, i.e. newest entry in the cache."""
+        return next(reversed(self._memory.items()))
+
     def __repr__(self) -> str:
-        return f"StageCache({len(self._memory)} / {self._size} || {', '.join( '[' + repr(k) + ']' for k in self._memory)})"
+        return f"StageCache({len(self._memory)} / {self._capacity} || {', '.join( '[' + repr(k) + ']' for k in self._memory)})"

@@ -36,7 +36,7 @@ def _clear_translation_cache():
 
 
 def test_caching_same_sizes() -> None:
-    """The behaviour of the cache if same sizes are used."""
+    """The behaviour of the cache if same sizes are used, in two different functions."""
 
     # Counter for how many time it was lowered.
     lowering_cnt = [0]
@@ -222,6 +222,100 @@ def test_caching_dtype():
 
         assert np.allclose(testee(A), 2 * A)
         assert lowering_cnt[0] == i + 1
+
+
+def test_caching_eviction_simple():
+    """Simple tests for cache eviction."""
+
+    @jace.jit
+    def testee(A: np.ndarray) -> np.ndarray:
+        return A + 1.0
+
+    cache: tcache.StageCache = testee._cache
+
+    first_lowered = testee.lower(np.ones(10))
+    first_key = cache.front()[0]
+    second_lowered = testee.lower(np.ones(11))
+    second_key = cache.front()[0]
+    third_lowered = testee.lower(np.ones(12))
+    third_key = cache.front()[0]
+
+    assert first_key != second_key
+    assert first_key != third_key
+    assert second_key != third_key
+
+    assert first_key in cache
+    assert second_key in cache
+    assert third_key in cache
+    assert cache.front()[0] == third_key
+
+    # We now evict the second key, which should not change anything on the order.
+    cache.popitem(second_key)
+    assert first_key in cache
+    assert second_key not in cache
+    assert third_key in cache
+    assert cache.front()[0] == third_key
+
+    # Now we modify first_key, which moves it to the front.
+    cache[first_key] = first_lowered
+    assert first_key in cache
+    assert second_key not in cache
+    assert third_key in cache
+    assert cache.front()[0] == first_key
+
+    # Now we evict the oldest one, which is third_key
+    cache.popitem(None)
+    assert first_key in cache
+    assert second_key not in cache
+    assert third_key not in cache
+    assert cache.front()[0] == first_key
+
+
+def test_caching_eviction_complex():
+    """Tests if the stuff is properly evicted if the cache is full."""
+
+    @jace.jit
+    def testee(A: np.ndarray) -> np.ndarray:
+        return A + 1.0
+
+    cache: tcache.StageCache = testee._cache
+    capacity = cache.capacity
+    assert len(cache) == 0
+
+    # Lets fill the cache to the brim.
+    for i in range(capacity):
+        A = np.ones(i + 10)
+        lowered = testee.lower(A)
+        assert len(cache) == i + 1
+
+        if i == 0:
+            first_key: tcache.StageTransformationSpec = cache.front()[0]
+            first_lowered = cache[first_key]
+            assert lowered is first_lowered
+        elif i == 1:
+            second_key: tcache.StageTransformationSpec = cache.front()[0]
+            assert second_key != first_key
+            assert cache[second_key] is lowered
+        assert first_key in cache
+
+    assert len(cache) == capacity
+    assert first_key in cache
+    assert second_key in cache
+
+    # Now we will modify the first key, this should make it the newest.
+    assert cache.front()[0] != first_key
+    cache[first_key] = first_lowered
+    assert len(cache) == capacity
+    assert first_key in cache
+    assert second_key in cache
+    assert cache.front()[0] == first_key
+
+    # Now we will add a new entry to the cache, this will evict the second entry.
+    _ = testee.lower(np.ones(capacity + 1000))
+    assert len(cache) == capacity
+    assert cache.front()[0] != first_key
+    assert first_key in cache
+    assert second_key not in cache
 
 
 def test_caching_strides() -> None:
