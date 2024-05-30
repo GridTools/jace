@@ -4,7 +4,7 @@
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
-"""Module collecting all built-in subtranslators."""
+"""Module collecting all built-in primitive translators."""
 
 from __future__ import annotations
 

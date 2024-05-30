@@ -10,13 +10,14 @@
 from __future__ import annotations
 
 from .jaxpr_translator_driver import JaxprTranslationDriver
-from .managing import (
+from .primitive_translator import (
+    PrimitiveTranslator,
+    PrimitiveTranslatorCallable,
     get_regsitered_primitive_translators,
     make_primitive_translator,
     register_primitive_translator,
     set_active_primitive_translators_to,
 )
-from .primitive_translator import PrimitiveTranslator, PrimitiveTranslatorCallable
 from .translated_jaxpr_sdfg import TranslatedJaxprSDFG
 
 

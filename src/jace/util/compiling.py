@@ -17,6 +17,8 @@ import dace
 import numpy as np
 from dace import data as dace_data
 
+from jace import util
+
 
 if TYPE_CHECKING:
     from jace import translator
@@ -95,8 +97,6 @@ def run_jax_sdfg(
         However, if we have symbols or variable sizes, we must ensure that the init function of
         the SDFG is called every time, or ensure that its exit function runs every time.
     """
-    from jace import util
-
     sdfg: dace.SDFG = csdfg.sdfg
 
     if len(ckwargs) != 0:

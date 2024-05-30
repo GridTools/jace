@@ -73,7 +73,7 @@ def jit(
         jace_wrapper = stages.JaceWrapped(
             fun=f,
             primitive_translators=(
-                translator.managing._PRIMITIVE_TRANSLATORS_DICT
+                translator.primitive_translator._PRIMITIVE_TRANSLATORS_REGISTRY
                 if primitive_translators is None
                 else primitive_translators
             ),

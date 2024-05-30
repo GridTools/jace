@@ -104,7 +104,7 @@ def test_subtranslatior_managing_isolation():
     """Tests if `get_regsitered_primitive_translators()` protects the internal registry."""
     assert (
         get_regsitered_primitive_translators()
-        is not translator.managing._PRIMITIVE_TRANSLATORS_DICT
+        is not translator.primitive_translator._PRIMITIVE_TRANSLATORS_REGISTRY
     )
 
     initial_primitives = get_regsitered_primitive_translators()
@@ -138,7 +138,7 @@ def test_subtranslatior_managing_swap():
     # Now change the initial one with the mutated one.
     #  The object is copied but should still have the same structure.
     old_active = set_active_primitive_translators_to(mutated_primitives)
-    assert mutated_primitives is not translator.managing._PRIMITIVE_TRANSLATORS_DICT
+    assert mutated_primitives is not translator.primitive_translator._PRIMITIVE_TRANSLATORS_REGISTRY
     assert same_structure(old_active, initial_primitives)
     assert same_structure(mutated_primitives, get_regsitered_primitive_translators())
 

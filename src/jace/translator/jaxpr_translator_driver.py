@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import copy
 from collections.abc import Mapping, MutableSequence, Sequence
 from typing import TYPE_CHECKING, Any, Literal, cast, overload
 
@@ -44,9 +45,9 @@ class JaxprTranslationDriver:
     exception.
 
     The actual translation of the equation is not handled by the driver. Instead the request is
-    forwarded to a `PrimitiveTranslator` object, known as primitive translator or subtranslator.
-    This is a highly specialized object that is able to handle one kind of primitive. For more
-    information on them see the documentation of `PrimitiveTranslator`.
+    forwarded to a `PrimitiveTranslator` object, known as primitive translator. This is a highly
+    specialized object that is able to handle one kind of primitive. For more information on them
+    see the documentation of `PrimitiveTranslator`.
 
     To start a translation the `translate_jaxpr()` function should be called, if this happens it is
     said that the driver has an ongoing translation. If `translate_jaxpr()` is called on a driver
@@ -58,16 +59,10 @@ class JaxprTranslationDriver:
         primitive_translators:    Primitive to use during the translation.
 
     Notes:
-        The `primitive_translators` that is passed at construction is not copied. The user has
-        to ensure that it does not change.
         After the main translation has been performed the translator object can be used again.
         Currently the driver will generate only Array as SDFG variables, however, this is a
         temporary solution, see `add_array()`.
-
-
     """
-
-    __slots__ = ("_ctx_stack", "_primitive_translators", "_jax_name_map")
 
     _primitive_translators: Mapping[str, translator.PrimitiveTranslatorCallable]
     _jax_name_map: dict[jax_core.Var | util.JaCeVar, str]
@@ -78,7 +73,7 @@ class JaxprTranslationDriver:
         primitive_translators: Mapping[str, translator.PrimitiveTranslatorCallable],
     ) -> None:
         # Maps name of primitives to the associated translator.
-        self._primitive_translators = primitive_translators
+        self._primitive_translators = {**primitive_translators}
 
         # Maps Jax variables to the name of its SDFG equivalent.
         #  Shared between all translation contexts, to ensure consecutive
@@ -481,8 +476,6 @@ class JaxprTranslationDriver:
         The function will create an SDFG variable and add them as constant to the SDFG. Their value
         is deepcopied.
         """
-        from copy import deepcopy
-
         if not self.is_allocated():
             raise RuntimeError("Driver is not allocated, can not create constants.")
         if len(jaxpr.consts) == 0:
@@ -497,7 +490,7 @@ class JaxprTranslationDriver:
         )
         for sdfg_name, const_value in zip(sdfg_const_names, jaxpr.consts, strict=True):
             self._ctx.sdfg.add_constant(
-                sdfg_name, deepcopy(const_value), self._ctx.sdfg.arrays[sdfg_name]
+                sdfg_name, copy.deepcopy(const_value), self._ctx.sdfg.arrays[sdfg_name]
             )
         return sdfg_const_names
 

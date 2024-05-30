@@ -50,7 +50,7 @@ class JaceWrapped(tcache.CachingStage["JaceLowered"]):
 
     Args:
         fun:                    The function that is wrapped.
-        primitive_translators:  The list of subtranslators that that should be used.
+        primitive_translators:  The list of primitive translators that that should be used.
         jit_options:            Options to influence the jit process.
 
     Todo:

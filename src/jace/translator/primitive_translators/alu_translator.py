@@ -26,8 +26,6 @@ class ALUTranslator(translator.PrimitiveTranslator):
     This translator will be reworked soon, it just exists that the initial PR can do anything at all!!
     """
 
-    __slots__ = ("_prim_name", "_prim_tmpl")
-
     def __init__(
         self,
         prim_name: str,
@@ -242,7 +240,7 @@ def _list_to_dict(inp: Sequence[tuple[None | Any, Any]]) -> dict[Any, Any]:
 
 
 # Contains all the templates for ALU operations.
-_ALU_OPS_TMPL: Final[dict[str, str]] = {
+_ALU_OPS_TASKLET_TEMPLATES: Final[dict[str, str]] = {
     # Unary operations
     "pos": "__out0 = +(__in0)",
     "neg": "__out0 = -(__in0)",
@@ -284,7 +282,5 @@ _ALU_OPS_TMPL: Final[dict[str, str]] = {
     "lt": "__out0 = __in0 < __in1",
 }
 
-_ = [
+for prim_name, prim_tmpl in _ALU_OPS_TASKLET_TEMPLATES.items():
     translator.register_primitive_translator(ALUTranslator(prim_name, prim_tmpl))
-    for prim_name, prim_tmpl in _ALU_OPS_TMPL.items()
-]
