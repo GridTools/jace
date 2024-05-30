@@ -38,7 +38,7 @@ class ReshapeTranslator(translator.PrimitiveTranslator):
     @override
     def __call__(
         self,
-        driver: translator.JaxprTranslationDriver,
+        builder: translator.JaxprTranslationBuilder,
         in_var_names: Sequence[str | None],
         out_var_names: MutableSequence[str],
         eqn: jax_core.JaxprEqn,

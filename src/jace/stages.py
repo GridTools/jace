@@ -41,6 +41,15 @@ if TYPE_CHECKING:
     import dace
 
 
+__all__ = [
+    "CompilerOptions",  # export for compatibility with Jax.
+    "JaCeCompiled",
+    "JaCeLowered",
+    "JaCeWrapped",
+    "Stage",
+]
+
+
 class JaCeWrapped(tcache.CachingStage["JaCeLowered"]):
     """A function ready to be specialized, lowered, and compiled.
 
@@ -54,7 +63,7 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"]):
 
     Args:
         fun:                    The function that is wrapped.
-        primitive_translators:  The list of subtranslators that that should be used.
+        primitive_translators:  The list of primitive translators that that should be used.
         jit_options:            Options to influence the jit process.
 
     Todo:
@@ -125,12 +134,19 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"]):
         #  However, in this case we will have problems when we call the SDFG, for some reasons
         #  `CompiledSDFG` does not work in that case correctly, thus we enable it for the tracing.
         with _jax.experimental.enable_x64():
-            driver = translator.JaxprTranslationDriver(
+            builder = translator.JaxprTranslationBuilder(
                 primitive_translators=self._primitive_translators
             )
             jaxpr = _jax.make_jaxpr(self._fun)(*args)
-            tsdfg: translator.TranslatedJaxprSDFG = driver.translate_jaxpr(jaxpr)
-        ptrans.postprocess_jaxpr_sdfg(tsdfg=tsdfg, fun=self.wrapped_fun)
+            trans_ctx: translator.TranslationContext = builder.translate_jaxpr(jaxpr)
+
+        # Perform the post processing and turn it into a `TranslatedJaxprSDFG` that can be
+        #  compiled and called later.
+        # NOTE: `tsdfg` was deepcopied as a side effect of post processing.
+        tsdfg: translator.TranslatedJaxprSDFG = ptrans.postprocess_jaxpr_sdfg(
+            trans_ctx=trans_ctx,
+            fun=self.wrapped_fun,
+        )
 
         return JaCeLowered(tsdfg)
 
@@ -176,8 +192,6 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"]):
         self,
         tsdfg: translator.TranslatedJaxprSDFG,
     ) -> None:
-        if not tsdfg.is_finalized:
-            raise ValueError("The translated SDFG must be finalized.")
         super().__init__()
         self._translated_sdfg = tsdfg
 
@@ -300,12 +314,3 @@ class JaCeCompiled:
 
 #: Known compilation stages in JaCe.
 Stage = JaCeWrapped | JaCeLowered | JaCeCompiled
-
-
-__all__ = [
-    "CompilerOptions",  # export for compatibility with Jax.
-    "JaCeCompiled",
-    "JaCeLowered",
-    "JaCeWrapped",
-    "Stage",
-]

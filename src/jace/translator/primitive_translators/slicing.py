@@ -89,7 +89,7 @@ class DynamicSlicingTranslator(translator.PrimitiveTranslator):
     @override
     def __call__(
         self,
-        driver: translator.JaxprTranslationDriver,
+        builder: translator.JaxprTranslationBuilder,
         in_var_names: Sequence[str | None],
         out_var_names: MutableSequence[str],
         eqn: jax_core.JaxprEqn,
@@ -130,7 +130,7 @@ class DynamicSlicingTranslator(translator.PrimitiveTranslator):
             )
 
             # Intermediate value for the adjusted start index.
-            new_start_idx_var_name = driver.add_array(
+            new_start_idx_var_name = builder.add_array(
                 eqn.invars[dim + 1],
                 name_prefix=f"__jace_adapted_start_idx_{start_index}",
             )

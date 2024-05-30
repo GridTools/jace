@@ -53,12 +53,13 @@ def jace_optimize(
     tsdfg: translator.TranslatedJaxprSDFG,
     **kwargs: Unpack[CompilerOptions],
 ) -> None:
-    """Performs optimization of the `fsdfg` _in place_.
+    """Performs optimization of the `tsdfg` _in place_.
 
     Currently this function only supports simplification.
     Its main job is to exists that we have something that we can call in the tool chain.
 
     Args:
+        tsdfg:          The translated SDFG that should be optimized.
         simplify:       Run the simplification pipeline.
         auto_optimize:  Run the auto optimization pipeline (currently does nothing)
         persistent:     Make the memory allocation persistent, i.e. allocate the transients only
@@ -67,8 +68,6 @@ def jace_optimize(
     Note:
         By default all optimizations are disabled and this function acts as a noops.
     """
-    if not tsdfg.is_finalized:
-        raise ValueError("Can only optimize finalized SDFGs.")
     if not kwargs:
         return
 

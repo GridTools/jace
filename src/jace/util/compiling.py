@@ -18,6 +18,8 @@ import dace
 import numpy as np
 from dace import data as dace_data
 
+from jace import util
+
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -29,12 +31,7 @@ if TYPE_CHECKING:
 def compile_jax_sdfg(
     tsdfg: translator.TranslatedJaxprSDFG,
 ) -> dace_helper.CompiledSDFG:
-    """Compiles the SDFG embedded in `tsdfg` and return the resulting `CompiledSDFG` object.
-
-    The function requires that `tsdfg` is finalized.
-    """
-    if not tsdfg.is_finalized:
-        raise ValueError("Can only compile a finalized SDFG.")
+    """Compiles the SDFG embedded in `tsdfg` and return the resulting `CompiledSDFG` object."""
     if any(  # We do not support the DaCe return mechanism
         arrname.startswith("__return")
         for arrname in tsdfg.sdfg.arrays.keys()  # noqa: SIM118  # we can not use `in` because we are also interested in `__return_`!
@@ -101,8 +98,6 @@ def run_jax_sdfg(
         However, if we have symbols or variable sizes, we must ensure that the init function of
         the SDFG is called every time, or ensure that its exit function runs every time.
     """
-    from jace import util
-
     sdfg: dace.SDFG = csdfg.sdfg
 
     if len(ckwargs) != 0:
