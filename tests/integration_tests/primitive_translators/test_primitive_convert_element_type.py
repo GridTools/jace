@@ -9,7 +9,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Final
+from typing import Final
 
 import jax
 import numpy as np
@@ -18,10 +18,6 @@ from jax import numpy as jnp
 
 import jace
 from jace.util import translation_cache as tcache
-
-
-if TYPE_CHECKING:
-    pass
 
 
 # fmt: off

@@ -131,8 +131,6 @@ def test_caching_different_structure() -> None:
     C = np.full((5, 3), 14, dtype=np.float64)
     D = np.full((6, 3), 14, dtype=np.int64)
 
-    # These are the arrays.
-    args: dict[int, np.ndarray] = {id(x): x for x in [A, B, C, D]}
     # These are the known lowerings.
     lowerings: dict[tuple[int, int], stages.JaCeLowered] = {}
     lowering_ids: set[int] = set()
@@ -243,6 +241,9 @@ def test_caching_eviction_simple():
     assert first_key != second_key
     assert first_key != third_key
     assert second_key != third_key
+    assert cache[first_key] is first_lowered
+    assert cache[second_key] is second_lowered
+    assert cache[third_key] is third_lowered
 
     assert first_key in cache
     assert second_key in cache

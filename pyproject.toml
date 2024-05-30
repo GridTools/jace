@@ -21,13 +21,24 @@ classifiers = [
   "Topic :: Scientific/Engineering",
   "Typing :: Typed"
 ]
-dependencies = []
+dependencies = [
+  "dace>=0.15",
+  "jax[cpu]>=0.4.24",
+  "numpy>=1.26.0"
+]
 description = "JAX jit using DaCe (Data Centric Parallel Programming)"
 name = "JaCe"
 readme = "README.md"
 requires-python = ">=3.10"
 version = "0.1.0"
 license.file = "LICENSE"
+
+[project.optional-dependencies]
+cuda12 = [
+  "cupy-cuda12x>=12.1.0",
+  "jax[cuda12]>=0.4.24",
+  "optuna>=3.4.0"
+]
 
 [project.urls]
 "Bug Tracker" = "https://github.com/GridTools/JaCe/issues"
@@ -65,7 +76,7 @@ warn_unused_ignores = true
 disallow_incomplete_defs = false
 disallow_untyped_defs = false
 ignore_missing_imports = true
-module = ["tests.*"]
+module = ["tests.*", "dace.*", "jax.*", "jaxlib.*"]
 
 # -- pytest  --
 [tool.pytest]
@@ -112,6 +123,7 @@ extend-select = [
   "SIM",  # flake8-simplify # TODO: in evaluation
   "T10",  # flake8-debugger
   "T20",  # flake8-print    # TODO: in evaluation
+  "TCH",  # flake8-type-checking  # TODO: in evaluation
   "NPY"  # NumPy specific rules
 ]
 ignore = [
@@ -119,7 +131,7 @@ ignore = [
   'E501',  # [line-too-long]
   'UP038'  # [non-pep604-isinstance]
 ]
-ignore-init-module-imports = true
+# ignore-init-module-imports = true  # deprecated in preview mode
 unfixable = []
 
 [tool.ruff.lint.isort]
@@ -145,12 +157,10 @@ section-order = [
   'local-folder'
 ]
 
+[tool.ruff.lint.isort.sections]
+tests = ["tests", "unit_tests", "integration_tests"]
+
 [tool.ruff.lint.per-file-ignores]
 "!tests/**.py" = ["PT"]  # Ignore `flake8-pytest-style` everywhere except in `tests/`
 "noxfile.py" = ["T20"]  # Ignore `flake8-print`
-"tests/**" = [
-  "T10",  # Ignore `flake8-debugger`
-  "T20",  # Ignore `flake8-print`
-  "F841",  # Ignore `unused-variable` (inside `with` to test if throws)
-  "ARG001"  # Ignore `unused function argument` (to create simple fake stand ins)
-]
+"tests/**" = ["T10", "T20"]  # Ignore `flake8-debugger` and `flake8-print`

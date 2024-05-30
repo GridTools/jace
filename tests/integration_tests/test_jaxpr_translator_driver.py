@@ -315,6 +315,7 @@ def test_driver_variable_multiple_variables(
     prefix_sdfg_name = translation_driver.add_array(
         array1, update_var_mapping=False, name_prefix=prefix
     )
+    assert prefix_expected_name == prefix_sdfg_name
     assert prefix_expected_name in translation_driver.sdfg.arrays
     assert narray1 == translation_driver.map_jax_var_to_sdfg(array1)
 
@@ -369,13 +370,12 @@ def test_driver_variable_alloc_list_cleaning(
     cause an error because it is proposed to `a`, which is already used.
     """
     var_list = [array1, nscal, scal2]
-    exp_names = ["a", nscal.name, "c"]
 
     with pytest.raises(
         expected_exception=ValueError,
         match=re.escape(f"add_array({scal2}): The proposed name 'a', is used."),
     ):
-        res_names = translation_driver.create_jax_var_list(var_list)
+        _ = translation_driver.create_jax_var_list(var_list)
 
     # This currently fails, because the `create_jax_var_list()` function does not clean up.
     assert len(translation_driver.arrays) == 0
@@ -496,9 +496,7 @@ def test_driver_constants(
     assert np.all(translation_driver.sdfg.constants["__const_a"] == constant)
 
 
-def test_driver_scalar_return_value(
-    translation_driver: translator.JaxprTranslationDriver,
-) -> None:
+def test_driver_scalar_return_value() -> None:
     """Tests if scalars can be returned directly."""
 
     def scalar_ops(A: float) -> float:
@@ -520,9 +518,7 @@ def test_driver_scalar_return_value(
 
 
 @pytest.mark.skip(reason="Currently 'scalar' return values, are actually shape '(1,)' arrays.")
-def test_driver_scalar_return_type(
-    translation_driver: translator.JaxprTranslationDriver,
-) -> None:
+def test_driver_scalar_return_type() -> None:
     """Tests if the type is the same, in case of scalar return."""
 
     @jace.jit
@@ -543,9 +539,7 @@ def test_driver_jace_var() -> None:
             _ = JaCeVar((), dace.int8, name=iname)
 
 
-def test_driver_F_strides(
-    translation_driver: translator.JaxprTranslationDriver,
-) -> None:
+def test_driver_F_strides() -> None:
     """Tests if we can lower without a standard stride.
 
     Notes:
