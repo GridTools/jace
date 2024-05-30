@@ -15,7 +15,7 @@ import dace
 from jax import core as jax_core
 from typing_extensions import override
 
-from jace import translator
+from jace import translator, util
 from jace.translator import mapped_operation_base_translator as mapped_base
 
 
@@ -49,9 +49,9 @@ class ConvertElementTypeTranslator(mapped_base.MappedOperationTranslatorBase):
         if in_var_names[0] is None:
             raise NotImplementedError("'convert_element_type' is not supported for literals.")
 
-        in_dtype = eqn.invars[0].aval.dtype
+        in_dtype = util.get_jax_var_dtype(eqn.invars[0])
         in_dtype_s: str = str(in_dtype)
-        out_dtype = eqn.outvars[0].aval.dtype
+        out_dtype = util.get_jax_var_dtype(eqn.outvars[0])
         out_dtype_s: str = str(out_dtype)
 
         # This is the base of the template that we use for conversion.

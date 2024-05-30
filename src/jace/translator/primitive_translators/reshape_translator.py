@@ -13,7 +13,7 @@ import dace
 from jax import core as jax_core
 from typing_extensions import override
 
-from jace import translator
+from jace import translator, util
 
 
 class ReshapeTranslator(translator.PrimitiveTranslator):
@@ -50,7 +50,7 @@ class ReshapeTranslator(translator.PrimitiveTranslator):
             eqn_state.add_write(out_var_names[0]),
             dace.Memlet(
                 data=in_var_names[0],
-                subset=", ".join(f"0:{size}" for size in eqn.invars[0].aval.shape),
+                subset=", ".join(f"0:{size}" for size in util.get_jax_var_shape(eqn.invars[0])),
                 other_subset=", ".join(f"0:{size}" for size in eqn.params["new_sizes"]),
             ),
         )

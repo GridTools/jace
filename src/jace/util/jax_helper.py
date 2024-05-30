@@ -104,7 +104,9 @@ def get_jax_var_shape(jax_var: jax_core.Atom | JaCeVar) -> tuple[int | dace.symb
     """Returns the shape of `jax_var`."""
     match jax_var:
         case jax_core.Var() | jax_core.Literal():
-            return jax_var.aval.shape  # type: ignore[attr-defined]  # AbstractValue is too abstract.
+            # AbstractValue, does not have a `shape` attribute, but in all cases we care, it will.
+            assert hasattr(jax_var.aval, "shape")
+            return jax_var.aval.shape
         case JaCeVar():
             return jax_var.shape
         case _:
@@ -115,7 +117,9 @@ def get_jax_var_dtype(jax_var: jax_core.Atom | JaCeVar) -> dace.typeclass:
     """Returns the DaCe equivalent of `jax_var`s datatype."""
     match jax_var:
         case jax_core.Var() | jax_core.Literal():
-            return translate_dtype(jax_var.aval.dtype)  # type: ignore[attr-defined]  # AbstractValue is too abstract.
+            # AbstractValue, does not have a `dtype` attribute, but in all cases we care, it will.
+            assert hasattr(jax_var.aval, "dtype")
+            return translate_dtype(jax_var.aval.dtype)
         case JaCeVar():
             return jax_var.dtype
         case _:

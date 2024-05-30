@@ -14,7 +14,7 @@ import dace
 from jax import core as jax_core
 from typing_extensions import override
 
-from jace import translator
+from jace import translator, util
 from jace.translator import mapped_operation_base_translator as mapped_base
 
 
@@ -46,7 +46,7 @@ class SqueezeTranslator(mapped_base.MappedOperationTranslatorBase):
         eqn: jax_core.JaxprEqn,
     ) -> dict[str, dace.Memlet]:
         to_rem: Sequence[str] = eqn.params["dimensions"]
-        in_rank: int = len(eqn.invars[0].aval.shape)
+        in_rank: int = len(util.get_jax_var_shape(eqn.invars[0]))
         cnt = itertools.count(0)
         return {
             "__in0": dace.Memlet.simple(

@@ -91,7 +91,7 @@ class DynamicSlicingTranslator(translator.PrimitiveTranslator):
         eqn_state: dace.SDFGState,
     ) -> None:
         assert in_var_names[0]
-        assert len(in_var_names) == len(eqn.invars[0].aval.shape) + 1
+        assert len(in_var_names) == len(util.get_jax_var_shape(eqn.invars[0])) + 1
 
         # This is the sizes of the slice window.
         window_sizes: Sequence[int] = eqn.params["slice_sizes"]
@@ -112,7 +112,7 @@ class DynamicSlicingTranslator(translator.PrimitiveTranslator):
         #  To do it we will use Tasklets, because otherwise we can not merge the state.
         # TODO(phimuell): Make the Tasklet mapped, that they can be merged.
         for dim, (start_index, dim_size, wsize) in enumerate(
-            zip(start_indices, eqn.invars[0].aval.shape, window_sizes)
+            zip(start_indices, util.get_jax_var_shape(eqn.invars[0]), window_sizes)
         ):
             if start_index is None:
                 continue
@@ -152,7 +152,7 @@ class DynamicSlicingTranslator(translator.PrimitiveTranslator):
             in_access[new_start_idx_var_name] = new_start_idx_acc
 
         tskl_ranges: list[tuple[str, str]] = [
-            (f"__i{dim}", f"0:{N}") for dim, N in enumerate(eqn.outvars[0].aval.shape)
+            (f"__i{dim}", f"0:{N}") for dim, N in enumerate(util.get_jax_var_shape(eqn.outvars[0]))
         ]
 
         # We use dynamic map ranges, thus the map entry has input connectors, that does not start

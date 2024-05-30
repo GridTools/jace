@@ -84,9 +84,10 @@ class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
             For a description of the arguments see `PrimitiveTranslatorCallable`.
         """
         assert len(out_var_names) == 1
-        if eqn.outvars[0].aval.shape != ():
+        if util.get_jax_var_shape(eqn.outvars[0]) != ():
             tskl_ranges: list[tuple[str, str]] = [
-                (f"__i{dim}", f"0:{N}") for dim, N in enumerate(eqn.outvars[0].aval.shape)
+                (f"__i{dim}", f"0:{N}")
+                for dim, N in enumerate(util.get_jax_var_shape(eqn.outvars[0]))
             ]
             tskl_output: dict[str, dace.Memlet] = {
                 "__out": dace.Memlet.simple(
@@ -155,18 +156,18 @@ class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
             in_var_names:   The list of SDFG variables used as input, `None` if literal.
             eqn:            The equation object.
         """
-        out_shp = tuple(eqn.outvars[0].aval.shape)  # Shape of the output
+        out_shp = tuple(util.get_jax_var_shape(eqn.outvars[0]))  # Shape of the output
         out_rank = len(out_shp)
-        if any(len(invar.aval.shape) not in {0, out_rank} for invar in eqn.invars):
+        if any(len(util.get_jax_var_shape(invar)) not in {0, out_rank} for invar in eqn.invars):
             raise NotImplementedError(
                 f"'MappedOperationTranslatorBase' Inputs must have the same rank as the output! "
-                f"Eqn: {eqn} || {tuple(eqn.outvars[0].aval.shape)}"
+                f"Eqn: {eqn} || {tuple(util.get_jax_var_shape(eqn.outvars[0]))}"
             )
 
         # Now we will generate the input Memlets.
         tskl_inputs: dict[str, dace.Memlet] = {}
         for i, (in_var_name, inp_shp) in enumerate(
-            zip(in_var_names, (invar.aval.shape for invar in eqn.invars))
+            zip(in_var_names, (util.get_jax_var_shape(invar) for invar in eqn.invars))
         ):
             if in_var_name is None:  # Input is a literal: No Memlet needed
                 continue
