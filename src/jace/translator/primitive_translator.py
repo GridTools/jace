@@ -43,7 +43,7 @@ class PrimitiveTranslatorCallable(Protocol):
     @abstractmethod
     def __call__(
         self,
-        driver: translator.JaxprTranslationDriver,
+        builder: translator.JaxprTranslationBuilder,
         in_var_names: Sequence[str | None],
         out_var_names: MutableSequence[str],
         eqn: jax_core.JaxprEqn,
@@ -51,35 +51,35 @@ class PrimitiveTranslatorCallable(Protocol):
     ) -> dace.SDFGState | None:
         """Translates the Jax primitive into its SDFG equivalent.
 
-        Before the driver calls this function it will perform the following
+        Before the builder calls this function it will perform the following
         preparatory tasks:
         - It will allocate the SDFG variables that are used as outputs. Their names will be passed
             through the `out_var_names` argument, in the same order as `eqn.outvars`.
         - It will collect the names of the SDFG variables that are used as input and place them in
             `in_var_names`, in the same order as `eqn.invars`. If an input argument refers to a
             literal no SDFG variable is created for it and `None` is passed to indicate this.
-        - The driver will create variables that are used as output. They are passed as
+        - The builder will create variables that are used as output. They are passed as
             `out_var_names`, same order as in the equation.
-        - The driver will create a new terminal state and pass it as `eqn_state` argument. This
+        - The builder will create a new terminal state and pass it as `eqn_state` argument. This
             state is guaranteed to be empty and `translator.terminal_sdfg_state is eqn_state` holds.
 
         Then the primitive translator is called.
         Usually a primitive translator should construct the dataflow graph inside `eqn_state`.
         It is allowed that the primitive translators creates more states if needed, but this
         state machinery has to have a single terminal state, which must be returned and reachable
-        from `eqn_state`. If the function returns `None` the driver will assume that primitive
+        from `eqn_state`. If the function returns `None` the builder will assume that primitive
         translator was able to fully construct the dataflow graph within `eqn_state`.
 
         While a primitive translator is forbidden from meddling with the input variables mentioned
         in `in_var_names` in any way, it is allowed to modify the output variables. For example
         it could create a new SDFG variable, with different strides. But in that case the primitive
-        translator must update the internal mapping of the driver TBA HOW, and modify the names
+        translator must update the internal mapping of the builder TBA HOW, and modify the names
         passed through `out_var_names`. However, the translator is allowed to create internal
         temporary variables. It just have to ensure that no name collision will occur, a way to
         do this is to use a passed variable name as prefix.
 
         Args:
-            driver:         The driver object of the translation.
+            builder:         The builder object of the translation.
             in_var_names:   List of the names of the arrays created inside the
                                 SDFG for the inpts or `None` in case of a literal.
             out_var_names:  List of the names of the arrays created inside the
@@ -100,7 +100,7 @@ class PrimitiveTranslator(PrimitiveTranslatorCallable, Protocol):
 
     Primitive translators are simple, but highly specialized objects that are only able to perform
     the translation of a single primitive. The overall translation process itself is managed by a
-    driver object, which also owns and manage the primitive translators. In the end this implements
+    builder object, which also owns and manage the primitive translators. In the end this implements
     the delegation pattern.
 
     You can use `jace.translator.register_primitive_translator()` to register your translator to JaCe.

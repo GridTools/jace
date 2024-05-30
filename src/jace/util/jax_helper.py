@@ -36,7 +36,7 @@ class JaCeVar:
     class is as an internal representation of values, as they are used in Jax, but without the Jax
     machinery. As abstract values in Jax this class has a datatype, which is a `dace.typeclass`
     instance and a shape. In addition it has an optional name, which allows to create variables
-    with a certain name using `JaxprTranslationDriver.add_array()`.
+    with a certain name using `JaxprTranslationBuilder.add_array()`.
 
     Args:
         shape:      The shape of the variable.

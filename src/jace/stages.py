@@ -125,11 +125,11 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"]):
         #  However, in this case we will have problems when we call the SDFG, for some reasons
         #  `CompiledSDFG` does not work in that case correctly, thus we enable it for the tracing.
         with _jax.experimental.enable_x64():
-            driver = translator.JaxprTranslationDriver(
+            builder = translator.JaxprTranslationBuilder(
                 primitive_translators=self._primitive_translators
             )
             jaxpr = _jax.make_jaxpr(self._fun)(*args)
-            trans_ctx: translator.TranslationContext = driver.translate_jaxpr(jaxpr)
+            trans_ctx: translator.TranslationContext = builder.translate_jaxpr(jaxpr)
 
         # Perform the post processing and turn it into a `TranslatedJaxprSDFG` that can be
         #  compiled and called later.

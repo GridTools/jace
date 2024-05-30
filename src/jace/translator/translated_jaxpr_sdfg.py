@@ -13,10 +13,10 @@ from jace import util
 
 
 class TranslatedJaxprSDFG:
-    """Encapsulates the result of a translation run of the `JaxprTranslationDriver` object.
+    """Encapsulates the result of a translation run of the `JaxprTranslationBuilder` object.
 
     The only valid way to obtain a `TranslatedJaxprSDFG` is by passing a `TranslationContext`,
-    that was in turn constructed by `JaxprTranslationDriver.translate_jaxpr()` to
+    that was in turn constructed by `JaxprTranslationBuilder.translate_jaxpr()` to
     `postprocess_jaxpr_sdfg()`.
     This class encapsulates a translated SDFG as well as the meta data needed to run it.
 

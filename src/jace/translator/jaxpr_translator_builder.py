@@ -22,8 +22,8 @@ if TYPE_CHECKING:
 from jace import util
 
 
-class JaxprTranslationDriver:
-    """Internal driver class for creating an SDFG equivalent of a `Jaxpr` instance.
+class JaxprTranslationBuilder:
+    """Internal builder class for creating an SDFG equivalent of a `Jaxpr` instance.
 
     The SDFG that is created by this class has a very particular form, which we consider canonical.
     The main feature of a canonical SDFG are:
@@ -44,14 +44,14 @@ class JaxprTranslationDriver:
     states. In certain cases it might be that an equation needs more states, but this is an
     exception.
 
-    The actual translation of the equation is not handled by the driver. Instead the request is
+    The actual translation of the equation is not handled by the builder. Instead the request is
     forwarded to a `PrimitiveTranslator` object, known as primitive translator. This is a highly
     specialized object that is able to handle one kind of primitive. For more information on them
     see the documentation of `PrimitiveTranslator`.
 
     To start a translation the `translate_jaxpr()` function should be called, if this happens it is
-    said that the driver has an ongoing translation. If `translate_jaxpr()` is called on a driver
-    that has an ongoing translation, a new translation context will be set up. Thus the driver
+    said that the builder has an ongoing translation. If `translate_jaxpr()` is called on a builder
+    that has an ongoing translation, a new translation context will be set up. Thus the builder
     will then translate the supplied (nested) Jaxpr and return the result. However, this will have
     no influence on the translation process that is already going.
 
@@ -60,7 +60,7 @@ class JaxprTranslationDriver:
 
     Notes:
         After the main translation has been performed the translator object can be used again.
-        Currently the driver will generate only Array as SDFG variables, however, this is a
+        Currently the builder will generate only Array as SDFG variables, however, this is a
         temporary solution, see `add_array()`.
     """
 
@@ -111,7 +111,7 @@ class JaxprTranslationDriver:
 
         # NOTE: If `self` is already allocated, i.e. has an ongoing translation process,
         #       the `_allocate_translation_ctx()` function will start a new context.
-        #       Thus the driver will start to translate a second (nested) SDFG.
+        #       Thus the builder will start to translate a second (nested) SDFG.
         #       Also note that there is no mechanism that forces the integration of the nested
         #       SDFG/Jaxpr, this must be done manually.
         self._allocate_translation_ctx(
@@ -256,14 +256,14 @@ class JaxprTranslationDriver:
         The root translator (context) is the very first translator process that was started.
         """
         if not self.is_allocated():
-            raise RuntimeError("Driver is not allocated.")
+            raise RuntimeError("Builder is not allocated.")
         return len(self._ctx_stack) == 1
 
     def add_jax_name_mapping(
         self,
         jax_var: jax_core.Var | util.JaCeVar,
         sdfg_name: str,
-    ) -> JaxprTranslationDriver:
+    ) -> JaxprTranslationBuilder:
         """Creates a new mapping between `jax_var` to `sdfg_name`.
 
         If the mapping already exists an error will be generated. This function is not able to
@@ -448,7 +448,7 @@ class JaxprTranslationDriver:
             The function will populate the `inp_names` member of the current context.
         """
         if not self.is_allocated():
-            raise RuntimeError("Driver is not allocated, can not create constants.")
+            raise RuntimeError("Builder is not allocated, can not create constants.")
         assert len(self._ctx.inp_names) == 0
 
         # Handle the initial input arguments
@@ -476,7 +476,7 @@ class JaxprTranslationDriver:
         is deepcopied.
         """
         if not self.is_allocated():
-            raise RuntimeError("Driver is not allocated, can not create constants.")
+            raise RuntimeError("Builder is not allocated, can not create constants.")
         if len(jaxpr.consts) == 0:
             return ()
 
@@ -496,11 +496,11 @@ class JaxprTranslationDriver:
     def _allocate_translation_ctx(
         self,
         name: str | None = None,
-    ) -> JaxprTranslationDriver:
+    ) -> JaxprTranslationBuilder:
         """This function allocates and initialize the members of the translation context of `self`.
 
         If this function is called and `self` is already allocated, the function will create a new
-        context, allowing the driver to handle nested Jaxpr.
+        context, allowing the builder to handle nested Jaxpr.
         The first context that is created is known as root translator.
 
         Args:
@@ -530,7 +530,7 @@ class JaxprTranslationDriver:
             return None
 
         if self.is_root_translator():
-            # The translation as a whole has finished, so restore the driver,
+            # The translation as a whole has finished, so restore the builder,
             #  i.e. delete all the shared state.
             self._jax_name_map = {}
 
@@ -584,7 +584,7 @@ class JaxprTranslationDriver:
 
         # Now perform the actual translation of the equation.
         new_sdfg_term_state = ptranslator(
-            driver=self,
+            builder=self,
             in_var_names=in_var_names,
             out_var_names=out_var_names,  # Might be modified by the translator!
             eqn=eqn,
@@ -721,7 +721,7 @@ class JaxprTranslationDriver:
 
 
 class TranslationContext:
-    """Translation context used by the `JaxprTranslationDriver`.
+    """Translation context used by the `JaxprTranslationBuilder`.
 
     Essentially it is a `TranslatedJaxprSDFG` object together with some additional meta data,
     that is needed during translation. It is also returned by the `translate_jaxpr()` function.

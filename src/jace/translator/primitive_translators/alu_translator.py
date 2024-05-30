@@ -46,7 +46,7 @@ class ALUTranslator(translator.PrimitiveTranslator):
     @override
     def __call__(
         self,
-        driver: translator.JaxprTranslationDriver,
+        builder: translator.JaxprTranslationBuilder,
         in_var_names: Sequence[str | None],
         out_var_names: MutableSequence[str],
         eqn: jax_core.JaxprEqn,
@@ -59,7 +59,7 @@ class ALUTranslator(translator.PrimitiveTranslator):
         The function will always perform the translation inside the provided state.
 
         Args:
-            driver:         The driver object of the translation.
+            builder:         The builder object of the translation.
             in_var_names:   List of the names of the arrays created inside the SDFG for the inpts or 'None' in case of a literal.
             out_var_names:  List of the names of the arrays created inside the SDFG for the outputs.
             eqn:            The Jax equation that is translated.
