@@ -330,7 +330,7 @@ def test_builder_variable_invalid_prefix(
     for iprefix in ["0_", "_ja ", "_!"]:
         with pytest.raises(
             expected_exception=ValueError,
-            match=re.escape(f"add_array({array1}): Supplied invalid prefix '{iprefix}'."),
+            match=re.escape(f"add_array({array1}): The proposed name '{iprefix}a', is invalid."),
         ):
             _ = translation_builder.add_array(array1, update_var_mapping=False, name_prefix=iprefix)
         assert len(translation_builder.sdfg.arrays) == 0
@@ -557,6 +557,6 @@ def test_builder_F_strides() -> None:
 
     with pytest.raises(
         expected_exception=NotImplementedError,
-        match=re.escape("Currently can not handle strides beside 'C_CONTIGUOUS'."),
+        match=re.escape("Currently can not yet handle strides beside 'C_CONTIGUOUS'."),
     ):
         _ = testee(F)

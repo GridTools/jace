@@ -38,6 +38,9 @@ class JaCeVar:
     instance and a shape. In addition it has an optional name, which allows to create variables
     with a certain name using `JaxprTranslationBuilder.add_array()`.
 
+    If you are expect to handle both real Jax variables and JaCe variable, you should use the
+    `get_jax_var_*()` functions to access them.
+
     Args:
         shape:      The shape of the variable.
         dtype:      The dace datatype of the variable.
@@ -75,10 +78,7 @@ class JaCeVar:
 
 
 def get_jax_var_name(jax_var: jax_core.Atom | JaCeVar) -> str:
-    """Returns the name of the Jax variable as a string.
-
-    Args:
-        jax_var:     The variable to stringify.
+    """Returns the name of `jax_var` as a string.
 
     Notes:
         If `jax_var` is a `JaCeVar` the function will return, if defined, its `.name` property.
@@ -91,7 +91,7 @@ def get_jax_var_name(jax_var: jax_core.Atom | JaCeVar) -> str:
         case JaCeVar():
             return jax_var.name if jax_var.name else f"jax{id(jax_var)}"
         case jax_core.Var():
-            # This is not how the pretty printer works nor Jax.Var.__repr__,
+            # This is not how the pretty printer works nor `jax.Var.__repr__()`,
             #  but leads to stable and valid names.
             return f"jax{jax_var.count}{jax_var.suffix}"
         case jax_core.Literal():
@@ -136,7 +136,7 @@ def is_tracing_ongoing(
     """Test if tracing is ongoing.
 
     While a return value `True` guarantees that a translation is ongoing, a value of `False`
-    does not guarantees that no tracing is active.
+    does not guarantees that no tracing is ongoing.
     """
     # The current implementation only checks the arguments if it contains tracers.
     if (len(args) == 0) and (len(kwargs) == 0):
@@ -165,9 +165,9 @@ def propose_jax_name(
 
     If `jax_name_map` is `None` the function will fallback to `get_jax_var_name(jax_var)`.
     If `jax_name_map` is supplied the function will:
-    - if `jax_var` is stored inside `jax_name_map` this value will be returned.
-    - if `jax_var` is a `JaCeVar` with a set `.name` property that name will be returned.
-    - otherwise the function will generate a new name in a similar way than pretty printer of Jaxpr.
+    - If `jax_var` is stored inside `jax_name_map`, returns the mapped value.
+    - If `jax_var` is a `JaCeVar` with a set `.name` property that name will be returned.
+    - Otherwise the function will generate a new name in a similar way to the pretty printer of Jaxpr.
 
     Args:
         jax_var:        The variable for which a name to propose.

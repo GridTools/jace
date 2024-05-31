@@ -31,7 +31,12 @@ if TYPE_CHECKING:
 def compile_jax_sdfg(
     tsdfg: translator.TranslatedJaxprSDFG,
 ) -> dace_helper.CompiledSDFG:
-    """Compiles the SDFG embedded in `tsdfg` and return the resulting `CompiledSDFG` object."""
+    """Compiles the SDFG embedded in `tsdfg` and return the resulting `CompiledSDFG` object.
+
+    Note:
+        For calling the returned `CompiledSDFG` object you need the `inp_names` and `out_names`
+        of the input `TranslatedJaxprSDFG`.
+    """
     if any(  # We do not support the DaCe return mechanism
         arrname.startswith("__return")
         for arrname in tsdfg.sdfg.arrays.keys()  # noqa: SIM118  # we can not use `in` because we are also interested in `__return_`!
@@ -78,7 +83,7 @@ def run_jax_sdfg(
 
     The function assumes that the SDFG was finalized and then compiled by `compile_jax_sdfg()`.
     For running the SDFG you also have to pass the input names (`inp_names`) and output names
-    (`out_names`) that where inside the `TranslatedJaxprSDFG` from which `csdfg` was compiled from.
+    (`out_names`) that were inside the `TranslatedJaxprSDFG` from which `csdfg` was compiled from.
 
     Args:
         csdfg:      The `CompiledSDFG` object.
@@ -90,13 +95,14 @@ def run_jax_sdfg(
     Note:
         There is no pytree mechanism jet, thus the return values are returned inside a `tuple`
         or in case of one value, directly, in the order determined by Jax.
-        Currently, this function does not consider strides in the input, all input must be
-        `C_CONTIGUOUS` nor have any undefined symbols.
+        Furthermore, DaCe does not support scalar return values, thus they are silently converted
+        into arrays of length 1, the same holds for inputs.
 
     Todo:
-        Since we do not have symbols and a fixed size this works and there is no problem.
-        However, if we have symbols or variable sizes, we must ensure that the init function of
-        the SDFG is called every time, or ensure that its exit function runs every time.
+        - Since we do not have symbols and a fixed size this works and there is no problem.
+            However, if we have symbols or variable sizes, we must ensure that the init function of
+            the SDFG is called every time, or ensure that its exit function runs every time.
+        - Implement non C strides.
     """
     sdfg: dace.SDFG = csdfg.sdfg
 

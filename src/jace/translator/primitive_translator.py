@@ -6,11 +6,8 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """Interface for all primitive translators and managing of the global translator registry.
 
-The high level idea is that there is a registry of all currently active primitive translators.
-If `primitive_translators` is not given to `jit` it will use this global registry.
-A primitive, i.e. an object that satisfies the `PrimitiveTranslator` interface, can be added
-to the registry by `register_primitive_translator()`. To retrieve the translators that are
-currently active you can use the `get_regsitered_primitive_translators()` function.
+Todo:
+    Implement proper context manager for working with the registry.
 """
 
 from __future__ import annotations
@@ -51,13 +48,12 @@ class PrimitiveTranslatorCallable(Protocol):
     ) -> dace.SDFGState | None:
         """Translates the Jax primitive into its SDFG equivalent.
 
-        Before the builder calls this function it will perform the following
-        preparatory tasks:
+        Before the builder calls this function it will perform the following preparatory tasks:
         - It will allocate the SDFG variables that are used as outputs. Their names will be passed
             through the `out_var_names` argument, in the same order as `eqn.outvars`.
-        - It will collect the names of the SDFG variables that are used as input and place them in
+        - It will collect the names of the SDFG variables that are used as inputs and place them in
             `in_var_names`, in the same order as `eqn.invars`. If an input argument refers to a
-            literal no SDFG variable is created for it and `None` is passed to indicate this.
+            literal no SDFG variable is created for it and `None` is used to indicate this.
         - The builder will create variables that are used as output. They are passed as
             `out_var_names`, same order as in the equation.
         - The builder will create a new terminal state and pass it as `eqn_state` argument. This
@@ -65,21 +61,22 @@ class PrimitiveTranslatorCallable(Protocol):
 
         Then the primitive translator is called.
         Usually a primitive translator should construct the dataflow graph inside `eqn_state`.
-        It is allowed that the primitive translators creates more states if needed, but this
-        state machinery has to have a single terminal state, which must be returned and reachable
-        from `eqn_state`. If the function returns `None` the builder will assume that primitive
-        translator was able to fully construct the dataflow graph within `eqn_state`.
+        However, it is allowed that the primitive translators creates more states if needed, but
+        this state machinery has to have a single terminal state, which must be returned and
+        reachable from `eqn_state`. If the function returns `None` the builder will assume that
+        primitive translator was able to fully construct the dataflow graph within `eqn_state`.
 
         While a primitive translator is forbidden from meddling with the input variables mentioned
         in `in_var_names` in any way, it is allowed to modify the output variables. For example
-        it could create a new SDFG variable, with different strides. But in that case the primitive
-        translator must update the internal mapping of the builder TBA HOW, and modify the names
-        passed through `out_var_names`. However, the translator is allowed to create internal
-        temporary variables. It just have to ensure that no name collision will occur, a way to
-        do this is to use a passed variable name as prefix.
+        a translator could create a new SDFG variable, with different strides. But in that case
+        the primitive translator must update the internal mapping of the builder TBA HOW, and
+        modify the names passed through `out_var_names`. However, the translator is allowed to
+        create internal temporary variables without registering them to the mapping, as long as it
+        uses the supplied variables as final output. To ensure that there are no collision with
+        further variables, the translator should prefix them.
 
         Args:
-            builder:         The builder object of the translation.
+            builder:        The builder object of the translation.
             in_var_names:   List of the names of the arrays created inside the
                                 SDFG for the inpts or `None` in case of a literal.
             out_var_names:  List of the names of the arrays created inside the
@@ -181,6 +178,9 @@ def register_primitive_translator(
 ):
     """Adds a primitive translator to JaCe's global registry.
 
+    The default set of primitives that are used if nothing is specified to to `jace.jit` are stored
+    inside a global registry. To add a translator to this registry this function can be used.
+
     If a translator for `primitive` is already registered an error will be generated. However,
     by specifying `overwrite` `primitive_translator` will replace the current one.
 
@@ -211,8 +211,8 @@ def register_primitive_translator(
 def get_regsitered_primitive_translators() -> dict[str, translator.PrimitiveTranslator]:
     """Returns a copy of the current state of JaCe's global primitive registry.
 
-    The function returns a mapping that maps the name of a primitive to the associated translator.
-    No change to the global registry will affect the return value and vice versa.
+    The state returned by this function is compatible to what `jace.hit`'s `primitive_translators`
+    argument expects. It is important the the returned object is decoupled from the registry.
     """
     return _PRIMITIVE_TRANSLATORS_REGISTRY.copy()
 
@@ -220,9 +220,9 @@ def get_regsitered_primitive_translators() -> dict[str, translator.PrimitiveTran
 def set_active_primitive_translators_to(
     new_translators: Mapping[str, translator.PrimitiveTranslator],
 ) -> MutableMapping[str, translator.PrimitiveTranslator]:
-    """Exchange the global translator registry of JaCe with `new_translators`.
+    """Exchange the global translator registry state of JaCe with `new_translators`.
 
-    The function will return the state of the global translator registry just before this call.
+    The function will return the state of the global translator registry prior to this call.
     Any changes to `new_translators` after calling this function will have no effect on the
     global translator registry and vice versa.
     """

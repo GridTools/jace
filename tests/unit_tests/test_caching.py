@@ -345,7 +345,7 @@ def test_caching_strides() -> None:
     F_res = C_res.copy()  # Remove later
     with pytest.raises(  # noqa: PT012 # Multiple calls
         expected_exception=NotImplementedError,
-        match=re.escape("Currently can not handle strides beside 'C_CONTIGUOUS'."),
+        match=re.escape("Currently can not yet handle strides beside 'C_CONTIGUOUS'."),
     ):
         F_lower = wrapped.lower(F)
         F_res = wrapped(F)

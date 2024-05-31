@@ -5,7 +5,7 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Contains the implementation of the jit functioanlity of JaCe."""
+"""Stand in for the `jax.*` namespace."""
 
 from __future__ import annotations
 
@@ -56,15 +56,15 @@ def jit(
     """JaCe's replacement for `jax.jit` (just-in-time) wrapper.
 
     It works the same way as `jax.jit` does, but instead of using XLA the computation is lowered
-    to DaCe. It supports the same arguments as `jax.jit` (although currently not) does.
-    In addition it accepts some JaCe specific arguments.
+    to DaCe. In addition it accepts some JaCe specific arguments, it accepts the same arguments
+    as `jax.jit` does.
 
     Args:
         primitive_translators:    Use these primitive translators for the lowering to SDFG.
+            If not specified the translators in the global registry are used.
 
     Notes:
-        If no translators are specified, the ones in the global registry are implicitly passed
-        as argument. After constructions any change to `primitive_translators` has no effect.
+        After constructions any change to `primitive_translators` has no effect.
     """
     if kwargs:
         # TODO(phimuell): Add proper name verification and exception type.
