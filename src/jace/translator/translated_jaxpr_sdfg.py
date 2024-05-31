@@ -16,9 +16,9 @@ class TranslatedJaxprSDFG:
     """Encapsulates the result of a translation run of the `JaxprTranslationBuilder` object.
 
     The only valid way to obtain a `TranslatedJaxprSDFG` is by passing a `TranslationContext`,
-    that was in turn constructed by `JaxprTranslationBuilder.translate_jaxpr()` to
-    `postprocess_jaxpr_sdfg()`.
-    This class encapsulates a translated SDFG as well as the meta data needed to run it.
+    that was in turn constructed by `JaxprTranslationBuilder.translate_jaxpr()`, to the
+    `postprocess_jaxpr_sdfg()` function.
+    This class encapsulates a translated SDFG as well as the meta data needed to compile and run it.
 
     Contrary to the SDFG that is encapsulated inside the `TranslationContext` object, `self`
     carries a proper SDFG, however:
@@ -27,10 +27,11 @@ class TranslatedJaxprSDFG:
         are only listed as inputs.
 
     Attributes:
-        sdfg:           The SDFG object that was created.
-        inp_names:      A list of the SDFG variables that are used as input, same order as `Jaxpr.invars`.
-        out_names:      A list of the SDFG variables that are used as output, same order as `Jaxpr.outvars`.
+        sdfg:           The encapsulated SDFG object.
+        inp_names:      A list of the SDFG variables that are used as input
+        out_names:      A list of the SDFG variables that are used as output.
 
+    The `inp_names` and `out_name` are in the same order as in the original Jaxpr object.
     It might happen that a name appears in both the `inp_names` and `out_names` lists. This happens
     if an argument is used both as input and output, and it is not an error. In Jax this is called
     argument donation.

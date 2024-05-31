@@ -7,7 +7,7 @@
 """Reimplementation of the `jax.stages` module.
 
 This module reimplements the public classes of that Jax module.
-However, they are a big different, because JaCe uses DaCe as backend.
+However, they are a bit different, because JaCe uses DaCe as backend.
 
 As in Jax JaCe has different stages, the terminology is taken from
 [Jax' AOT-Tutorial](https://jax.readthedocs.io/en/latest/aot.html).
@@ -20,6 +20,8 @@ As in Jax JaCe has different stages, the terminology is taken from
     This will turn the SDFG into an executable object, see `dace.codegen.CompiledSDFG`.
 - Execution:
     This is the actual running of the computation.
+
+As in Jax the `stages` module give access to the last three stages, but not the first one.
 """
 
 from __future__ import annotations
@@ -40,6 +42,14 @@ if TYPE_CHECKING:
 
     import dace
 
+__all__ = [
+    "CompilerOptions",  # export for compatibility with Jax.
+    "JaCeCompiled",
+    "JaCeLowered",
+    "JaCeWrapped",
+    "Stage",
+]
+
 
 class JaCeWrapped(tcache.CachingStage["JaCeLowered"]):
     """A function ready to be specialized, lowered, and compiled.
@@ -47,10 +57,10 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"]):
     This class represents the output of functions such as `jace.jit()` and is the first stage in
     the translation/compilation chain of JaCe. A user should never create a `JaCeWrapped` object
     directly, instead `jace.jit` should be used for that.
-    While it supports just-in-time lowering and compilation these steps can also be performed
-    explicitly. The lowering performed by this stage is cached, thus if a `JaCeWrapped` object is
-    lowered later, with the same argument the result is taken from the cache.
-    Furthermore, a `JaCeWrapped` object is composable with all Jax transformations.
+    While it supports just-in-time lowering and compilation, by just calling it, these steps can
+    also be performed explicitly. The lowering performed by this stage is cached, thus if a
+    `JaCeWrapped` object is lowered later, with the same argument the result is taken from the
+    cache. Furthermore, a `JaCeWrapped` object is composable with all Jax transformations.
 
     Args:
         fun:                    The function that is wrapped.
@@ -63,7 +73,7 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"]):
 
     Note:
         The tracing of function will always happen with enabled `x64` mode, which is implicitly
-        and temporary activated during tracing.
+        and temporary activated while tracing.
     """
 
     _fun: Callable
@@ -81,6 +91,7 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"]):
         #  This prevents that any modifications affect `self`.
         #  Shallow is enough since the translators themselves are immutable.
         self._primitive_translators = dict(primitive_translators)
+        # TODO(phimuell): Do we need to deepcopy the options?
         self._jit_options = dict(jit_options)
         self._fun = fun
 
@@ -89,7 +100,10 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"]):
         *args: Any,
         **kwargs: Any,
     ) -> Any:
-        """Executes the wrapped function, lowering and compiling as needed in one step."""
+        """Executes the wrapped function, lowering and compiling as needed in one step.
+
+        The arguments passed to this function are the same as the wrapped function uses.
+        """
 
         # If we are inside a traced context, then we forward the call to the wrapped function.
         #  This ensures that JaCe is composable with Jax.
@@ -108,17 +122,23 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"]):
     ) -> JaCeLowered:
         """Lower this function explicitly for the given arguments.
 
-        Performs the first two steps of the AOT steps described above, i.e. stage out to Jaxpr
-        and then translate to SDFG. The result is encapsulated and returned into a `Lowered` object.
+        Performs the first two steps of the AOT steps described above, i.e. trace the wrapped
+        function with the given arguments and stage it out to a Jaxpr. Then translate it to SDFG.
+        The result is encapsulated inside a `JaCeLowered` object which can later be compiled.
+
+        Note:
+            The call to the function is cached. As key an abstract description of the call,
+            similar to the tracers used by Jax, is used.
+            The tracing is always done with activated `x64` mode.
         """
         if len(kwargs) != 0:
             raise NotImplementedError("Currently only positional arguments are supported.")
 
         # TODO(phimuell): Currently the SDFG that we build only supports `C_CONTIGUOUS` memory
-        #  order. Since we support the paradigm that "everything passed to `lower` should also
+        #  order. Since we support the paradigm that "everything passed to `lower()` should also
         #  be accepted as argument to call the result", we forbid other memory orders here.
         if not all((not util.is_array(arg)) or arg.flags["C_CONTIGUOUS"] for arg in args):
-            raise NotImplementedError("Currently can not handle strides beside 'C_CONTIGUOUS'.")
+            raise NotImplementedError("Currently can not yet handle strides beside 'C_CONTIGUOUS'.")
 
         # In Jax `float32` is the main datatype, and they go to great lengths to avoid some
         #  aggressive [type promotion](https://jax.readthedocs.io/en/latest/type_promotion.html).
@@ -150,10 +170,13 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"]):
         self,
         *args: Any,
     ) -> tcache.StageTransformationSpec:
-        """This function computes the key for the `JaCeWrapped.lower()` call to cache it.
+        """This function computes the key for the `JaCeWrapped.lower()` call inside the cache.
 
-        The function will compute a full abstract description on its argument. Currently it is
-        only able to handle positional argument and does not support static arguments.
+        The function will compute a full abstract description on its argument.
+
+        Todo:
+            - Support keyword arguments and default values of the wrapped function.
+            - Support static arguments.
         """
         call_args = tuple(tcache._AbstractCallArgument.from_value(x) for x in args)
         return tcache.StageTransformationSpec(stage_id=id(self), call_args=call_args)
@@ -162,13 +185,16 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"]):
 class JaCeLowered(tcache.CachingStage["JaCeCompiled"]):
     """Represents the original computation as an SDFG.
 
-    It represents the computation wrapped by a `JaCeWrapped` translated and lowered to SDFG.
-    It is followed by the `JaCeCompiled` stage.
-    Although, `JaCeWrapped` is composable with Jax transformations `JaCeLowered` is not.
-    A user should never create such an object, instead `JaCeWrapped.lower()` should be used.
+    This class represents the output of `JaCeWrapped.lower()` and represents the originally wrapped
+    computation as an SDFG. This stage is followed by the `JaCeCompiled` stage.
+
+    Args:
+        tsdfg:      The translated SDFG object representing the computation.
 
     Note:
         `self` will manage the passed `tsdfg` object. Modifying it results in undefined behavior.
+        Although, `JaCeWrapped` is composable with Jax transformations `JaCeLowered` is not.
+        A user should never create such an object, instead `JaCeWrapped.lower()` should be used.
 
     Todo:
         - Handle pytrees.
@@ -212,8 +238,8 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"]):
     def compiler_ir(self, dialect: str | None = None) -> translator.TranslatedJaxprSDFG:
         """Returns the internal SDFG.
 
-        The function returns a `TranslatedJaxprSDFG` object.
-        It is important that modifying this object in any way is undefined behavior.
+        The function returns a `TranslatedJaxprSDFG` object. It is important that modifying this
+        object in any way is undefined behavior.
         """
         if (dialect is None) or (dialect.upper() == "SDFG"):
             return self._translated_sdfg
@@ -234,11 +260,10 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"]):
         self,
         compiler_options: CompilerOptions | None = None,
     ) -> tcache.StageTransformationSpec:
-        """This function computes the key for the `self.compile()` call to cache it.
+        """This function computes the key for the `self.compile()` call inside the cache.
 
         The key that is computed by this function is based on the concrete values of the passed
-        compiler options. This is different from the key computed by `JaCeWrapped` which is an
-        abstract description.
+        compiler options.
         """
         options = self._make_compiler_options(compiler_options)
         call_args = tuple(sorted(options.items(), key=lambda X: X[0]))
@@ -290,7 +315,11 @@ class JaCeCompiled:
         *args: Any,
         **kwargs: Any,
     ) -> Any:
-        """Calls the embedded computation."""
+        """Calls the embedded computation.
+
+        The arguments must be the same as for the wrapped function, but with all static arguments
+        removed.
+        """
         return util.run_jax_sdfg(
             self._csdfg,
             self._inp_names,
@@ -302,12 +331,3 @@ class JaCeCompiled:
 
 #: Known compilation stages in JaCe.
 Stage = JaCeWrapped | JaCeLowered | JaCeCompiled
-
-
-__all__ = [
-    "CompilerOptions",  # export for compatibility with Jax.
-    "JaCeCompiled",
-    "JaCeLowered",
-    "JaCeWrapped",
-    "Stage",
-]

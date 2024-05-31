@@ -62,6 +62,9 @@ class CachingStage(Generic[NextStage]):
 
     Notes:
         The `__init__()` function must explicitly be called to fully setup `self`.
+
+    Todo:
+        - Handle eviction from the cache due to collecting of unused predecessor stages.
     """
 
     _cache: StageCache[NextStage]
@@ -79,7 +82,7 @@ class CachingStage(Generic[NextStage]):
         ...
 
 
-# Type annotation of the caching Stuff.
+# Type annotation for the caching.
 P = ParamSpec("P")
 TransitionFunction = Callable[Concatenate[CachingStage[NextStage], P], NextStage]
 CachingStageType = TypeVar("CachingStageType", bound=CachingStage)
@@ -92,6 +95,9 @@ def cached_transition(
 
     In order to work, the stage must be derived from `CachingStage`. For computing the key of a
     call the function will use the `_make_call_description()` function of the cache.
+
+    Todo:
+        - Implement a way to temporary disable the cache.
     """
 
     @functools.wraps(transition)
@@ -130,8 +136,8 @@ def get_cache(
 class _AbstractCallArgument:
     """Class to represent a single argument to the transition function in an abstract way.
 
-    As noted in `StageTransformationSpec` there are two ways to describe an argument,
-    either using its concrete value or an abstract description, which is similar to tracers in Jax.
+    As noted in `StageTransformationSpec` there are two ways to describe an argument, either by
+    using its concrete value or an abstract description, which is similar to tracers in Jax.
     This class represents the second way.
     To create an instance you should use `_AbstractCallArgument.from_value()`.
 
@@ -201,8 +207,8 @@ class StageTransformationSpec:
     """Represents the entire call to a state transformation function of a stage.
 
     State transition functions are annotated with `@cached_transition` and their result may be
-    cached. They key to locate them inside the cache is represented by this class.
-    The cache will call the `CachingStage._make_call_description()` function to get a key.
+    cached. They key to locate them inside the cache is represented by this class and computed by
+    the `CachingStage._make_call_description()` function.
     The actual key is consists of two parts, `stage_id` and `call_args`.
 
     Args:

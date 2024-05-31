@@ -5,9 +5,9 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Module that will host all optimization functions specific to JaCe.
+"""JaCe specific optimizations.
 
-Currently just a dummy existing for the sake of providing some callable function.
+Currently just a dummy exists for the sake of providing a callable function.
 """
 
 from __future__ import annotations
@@ -22,13 +22,16 @@ if TYPE_CHECKING:
 
 
 class CompilerOptions(TypedDict, total=False):
-    """All known compiler options known to `JaCeLowered.compile()`.
+    """All known compiler options to `JaCeLowered.compile()`.
 
     See `jace_optimize()` for a description of the different options.
 
     There are some predefined option sets in `jace.jax.stages`:
-    - `DEFAULT_COMPILER_OPTIONS`
+    - `DEFAULT_OPTIONS`
     - `NO_OPTIMIZATIONS`
+
+    Todo:
+        - Implement a context manager to dynamically change the default.
     """
 
     auto_optimize: bool
@@ -50,10 +53,10 @@ def jace_optimize(
     tsdfg: translator.TranslatedJaxprSDFG,
     **kwargs: Unpack[CompilerOptions],
 ) -> None:
-    """Performs optimization of the `tsdfg` _in place_.
+    """Performs optimization of the translated SDFG _in place_.
 
-    Currently this function only supports simplification.
-    Its main job is to exists that we have something that we can call in the tool chain.
+    It is recommended to use the `CompilerOptions` `TypedDict` to pass options to the function.
+    However, any option that is not specified will be interpreted as to be disabled.
 
     Args:
         tsdfg:          The translated SDFG that should be optimized.
@@ -61,7 +64,7 @@ def jace_optimize(
         auto_optimize:  Run the auto optimization pipeline (currently does nothing)
 
     Note:
-        By default all optimizations are disabled and this function acts as a noops.
+        Its main job is to exists that we have something that we can call in the tool chain.
     """
     if not kwargs:
         return

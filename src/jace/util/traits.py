@@ -24,22 +24,12 @@ from jace import stages
 def is_jaceified(obj: Any) -> TypeGuard[stages.JaCeWrapped]:
     """Tests if `obj` is decorated by JaCe.
 
-    Similar to `is_jaxified`, but for JaCe object.
+    Similar to `is_jaxified` but for JaCe objects.
     """
 
     if util.is_jaxified(obj):
         return False
     return isinstance(obj, stages.JaCeWrapped)
-
-
-def is_drop_var(jax_var: jax_core.Atom | util.JaCeVar) -> TypeGuard[jax_core.DropVar]:
-    """Tests if `jax_var` is a drop variable, i.e. a variable that is not read from in a Jaxpr."""
-
-    if isinstance(jax_var, jax_core.DropVar):
-        return True
-    if isinstance(jax_var, util.JaCeVar):
-        return jax_var.name == "_" if jax_var.name else False
-    return False
 
 
 def is_jaxified(
@@ -60,13 +50,23 @@ def is_jaxified(
     return isinstance(obj, jaxifyed_types)
 
 
+def is_drop_var(jax_var: jax_core.Atom | util.JaCeVar) -> TypeGuard[jax_core.DropVar]:
+    """Tests if `jax_var` is a drop variable, i.e. a variable that is not read from in a Jaxpr."""
+
+    if isinstance(jax_var, jax_core.DropVar):
+        return True
+    if isinstance(jax_var, util.JaCeVar):
+        return jax_var.name == "_" if jax_var.name else False
+    return False
+
+
 def is_jax_array(
     obj: Any,
 ) -> TypeGuard[jax.Array]:
-    """Tests if `obj` is a jax array.
+    """Tests if `obj` is a Jax array.
 
-    Notes jax array are special as you can not write to them directly.
-    Furthermore, they always allocate also on GPU, beside the CPU allocation.
+    Notes Jax array are special as you can not write to them directly.
+    Furthermore, they always allocate on the CPU and if present, also on the GPU.
     """
     return isinstance(obj, jax.Array)
 
@@ -116,7 +116,7 @@ def is_on_device(
     """Tests if `obj` is on a device.
 
     Jax arrays are always on the CPU and GPU (if there is one). Thus for Jax arrays this
-    function is more of a test, if there is a GPU or not.
+    function is more of a test, if there is a GPU at all.
     """
     if is_jax_array(obj):
         return hasattr(obj, "__cuda_array_interface__")
