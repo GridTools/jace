@@ -13,10 +13,12 @@ Todo:
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, cast
 
 import jax
 import numpy as np
+import pytest
 from jax import numpy as jnp
 
 import jace
@@ -26,6 +28,26 @@ from tests import util as testutil
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+
+@pytest.fixture(
+    params=[
+        (jnp.logical_and, 2, np.bool_),
+        (jnp.logical_or, 2, np.bool_),
+        (jnp.logical_xor, 2, np.bool_),
+        (jnp.logical_not, 1, np.bool_),
+        (jnp.bitwise_and, 2, np.int64),
+        (jnp.bitwise_or, 2, np.int64),
+        (jnp.bitwise_xor, 2, np.int64),
+        (jnp.bitwise_not, 1, np.int64),
+    ]
+)
+def logical_ops(request) -> tuple[Callable, tuple[np.ndarray, ...]]:
+    """Returns a logical operation function and inputs."""
+    return (
+        request.param[0],
+        tuple(testutil.mkarray((2, 2), request.param[2]) for _ in range(request.param[1])),
+    )
 
 
 def _perform_alu_test(testee: Callable, *args: Any) -> None:
@@ -191,3 +213,15 @@ def test_alu_binary_broadcast_3():
     B = testutil.mkarray((5, 1, 3, 1, 2))
     _perform_alu_test(testee, A, B)
     _perform_alu_test(testee, B, A)
+
+
+def test_alu_logical_bitwise_operation(
+    logical_ops: tuple[Callable, tuple[np.ndarray, ...]],
+):
+    """Tests if the logical and bitwise operations works as they do in Jax."""
+    inputs: tuple[np.ndarray, ...] = logical_ops[1]
+
+    def testee(*args: np.ndarray) -> np.ndarray:
+        return logical_ops[0](*args)
+
+    _perform_alu_test(testee, *inputs)

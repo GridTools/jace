@@ -39,4 +39,7 @@ def mkarray(
     if isinstance(shape, int):
         shape = (shape,)
     assert shape
+
+    if dtype == np.bool_:
+        return mkarray(shape, np.float32) > 0.5
     return np.array(np.random.random(shape), dtype=dtype)  # noqa: NPY002
