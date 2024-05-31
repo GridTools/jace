@@ -29,8 +29,6 @@ class SqueezeTranslator(mapped_base.MappedOperationTranslatorBase):
     Essentially equivalent to `np.squeeze` and the inverse to `np.expand_dims()`.
     """
 
-    __slots__ = ()
-
     def __init__(self) -> None:
         super().__init__(primitive_name="squeeze")
 

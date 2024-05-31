@@ -39,8 +39,6 @@ class SelectNTranslator(mapped_base.MappedOperationTranslatorBase):
         `__in{i}`, starting with zero.
     """
 
-    __slots__ = ()
-
     def __init__(self) -> None:
         super().__init__(primitive_name="select_n")
 

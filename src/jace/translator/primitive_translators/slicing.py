@@ -31,8 +31,6 @@ class SlicingTranslator(mapped_base.MappedOperationTranslatorBase):
     Note that there is also `dynamic_slice`.
     """
 
-    __slots__ = ()
-
     def __init__(self) -> None:
         super().__init__(primitive_name="slice")
 
@@ -73,14 +71,12 @@ class DynamicSlicingTranslator(translator.PrimitiveTranslator):
 
     The [dynamic slicing](https://jax.readthedocs.io/en/latest/_autosummary/jax.lax.dynamic_slice.html)
     performs a slicing of a _fixed_ window, however, the starting indexes are not fix, but are
-    variables that can come from the outside.
-    For this it uses symbols that, but since it uses the "Dynamic Map Ranges" no additional state
-    is needed.
+    variables that can come from the outside. Thus, the translator uses "Dynamic Map Ranges".
+    Furthermore, Jax guarantees that if the window overruns the start indexes are adjusted.
 
-    Unlike the normal slicing primitive, it is not derived from `MappedOperationTranslatorBase`.
+    Note:
+        Unlike the normal slicing primitive, it is not derived from `MappedOperationTranslatorBase`.
     """
-
-    __slots__ = ()
 
     @property
     def primitive(self) -> str:
@@ -102,20 +98,19 @@ class DynamicSlicingTranslator(translator.PrimitiveTranslator):
         window_sizes: Sequence[int] = eqn.params["slice_sizes"]
 
         # The first input to the primitive is the array we slice from, the others are the start
-        #  indices of the slice window, each is a scalar, maybe literals, we might adapt them later.
+        #  indices of the slice window, each is a scalar, maybe literals.
         in_var_name: str = in_var_names[0]
         start_indices: list[str | None] = list(in_var_names[1:])
 
         # For storing the adapted start index, we have to create access nodes, to store them.
-        #  However, to ensure a total order of execution, once we added them as dynamic map ranges
-        #  to the map, we must use the same access nodes.
+        #  To ensure a total order of execution we have to use the same access nodes that are
+        #  used to store the adjusted start index and to feed them into the map.
         in_access: dict[str, dace.nodes.AccessNode] = {}
 
         # Jax will adjust the start indexes if the window will overrun.
         #  The adjustment is based on the formula $min(s + w, N) - w$, where $s$ is the start
-        #  index, $w$ the window size and $N$ the length in a particular dimension.
+        #  index, $w$ the window size and $N$ the length of a particular dimension.
         #  To do it we will use Tasklets, because otherwise we can not merge the state.
-        # TODO(phimuell): Make the Tasklet mapped, that they can be merged.
         for dim, (start_index, dim_size, wsize) in enumerate(
             zip(start_indices, util.get_jax_var_shape(eqn.invars[0]), window_sizes)
         ):
@@ -129,7 +124,7 @@ class DynamicSlicingTranslator(translator.PrimitiveTranslator):
                 code=f"adjusted_start_idx = min(unadjusted_start_idx + {wsize}, {dim_size}) - {wsize}",
             )
 
-            # Intermediate value for the adjusted start index.
+            # Intermediate value to storing the adjusted start index.
             new_start_idx_var_name = builder.add_array(
                 eqn.invars[dim + 1],
                 name_prefix=f"__jace_adapted_start_idx_{start_index}",
@@ -151,8 +146,6 @@ class DynamicSlicingTranslator(translator.PrimitiveTranslator):
                 None,
                 dace.Memlet.simple(new_start_idx_var_name, "0"),
             )
-
-            # Now store the result
             start_indices[dim] = new_start_idx_var_name
             in_access[new_start_idx_var_name] = new_start_idx_acc
 
@@ -162,14 +155,14 @@ class DynamicSlicingTranslator(translator.PrimitiveTranslator):
 
         # We use dynamic map ranges, thus the map entry has input connectors, that does not start
         #  with `IN_*`, instead the connector name defines a symbol within the map scope. This
-        #  `dict` maps the symbol name to the name of the input variable, that defines the symbol.
-        #  If the input is a literal, than it has no correspondence and the constant is substituted.
+        #  `dict` maps the symbol name to the name of the input variable, that has the value of the
+        #  symbol. Literal substitution is done later.
         dynamic_map_ranges: dict[str, str] = {}
         memlet_accesses: list[str] = []
 
-        for i, ((it_var, _), start_index) in enumerate(zip(tskl_ranges, start_indices)):
+        for i, ((it_var, _), start_index) in enumerate(zip(tskl_ranges, start_indices), 1):
             if start_index is None:
-                offset = str(util.get_jax_literal_value(eqn.invars[i + 1]))
+                offset = str(util.get_jax_literal_value(eqn.invars[i]))
             else:
                 # Because of [issue 1579](https://github.com/spcl/dace/issues/1579) we have to use
                 #  the same name as the data container for the symbol and can not mangle it.

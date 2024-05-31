@@ -30,7 +30,7 @@ class ALUTranslator(mapped_base.MappedOperationTranslatorBase):
     Its `write_tasklet_code()` function will perform replace all literals.
     """
 
-    __slots__ = "_tskl_tmpl"
+    __slots__ = ("_tskl_tmpl",)
 
     def __init__(
         self,

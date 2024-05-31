@@ -30,8 +30,6 @@ class IotaTranslator(mapped_base.MappedOperationTranslatorBase):
     Essentially a very general `jnp.arange()` function.
     """
 
-    __slots__ = ()
-
     def __init__(self) -> None:
         super().__init__(primitive_name="iota")
 

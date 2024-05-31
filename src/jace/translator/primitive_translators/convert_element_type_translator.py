@@ -39,8 +39,6 @@ class ConvertElementTypeTranslator(mapped_base.MappedOperationTranslatorBase):
             handled by a Memlet.
     """
 
-    __slots__ = ()
-
     def __init__(self) -> None:
         super().__init__(primitive_name="convert_element_type")
 
@@ -66,18 +64,16 @@ class ConvertElementTypeTranslator(mapped_base.MappedOperationTranslatorBase):
 
         # Handle special cases
         if in_dtype == out_dtype:
-            # This happens and previously there was a warning here, but that thing got so annoying
-            #  We handle it explicitly because otherwise, DaCe could not remove the Tasklet.
-            #  inside the tests that it was removed, see the `tests/test_sub_translators_convert_element_type.py::test_convert_element_type_useless_cast`
-            #  for more.
+            # This happens and previously there was a warning here, but that thing has become
+            #  so annoying, that it was removed. However, we still handle the case explicitly to
+            #  guarantee that the Tasklet is trivial.
             # TODO(phimuell): Make this into a pure Memlet.
             return f"__out = {conv_code}"
-        if in_dtype_s.startswith("bool") and out_dtype_s.startswith("int"):
-            # Interestingly `__out = int(__in0)` will at some DaCe processing stage.
+        if in_dtype_s.startswith("bool"):
+            # Interestingly `__out = int(__in0)` will not work at some DaCe processing stage.
             #  See commit `f5aabc` of the prototype.
-            return f"__out = (1 if {conv_code} else 0)"
+            conv_code = f"(1 if {conv_code} else 0)"
 
-        # The general case
         if out_dtype_s == "bool":
             conv_code = f"dace.bool_({conv_code})"
         elif hasattr(dace.dtypes, out_dtype_s):

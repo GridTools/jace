@@ -26,8 +26,6 @@ if TYPE_CHECKING:
 class CopyTranslator(mapped_base.MappedOperationTranslatorBase):
     """Copy operations are implemented as a map to ensure that they can be fused with other maps."""
 
-    __slots__ = ()
-
     def __init__(self) -> None:
         super().__init__(primitive_name="copy")
 
@@ -52,8 +50,6 @@ class DevicePutTranslator(mapped_base.MappedOperationTranslatorBase):
     Todo:
         - Make into a Memlet because only the Memlet can handle copying between devices.
     """
-
-    __slots__ = ()
 
     def __init__(self) -> None:
         super().__init__(primitive_name="device_put")

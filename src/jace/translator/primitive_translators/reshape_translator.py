@@ -29,8 +29,6 @@ class ReshapeTranslator(translator.PrimitiveTranslator):
         - Find a way to make it as a Map.
     """
 
-    __slots__ = ()
-
     @property
     def primitive(self) -> str:
         return "reshape"
