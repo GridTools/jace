@@ -18,32 +18,12 @@ from jax import numpy as jnp
 
 import jace
 
-
-@pytest.fixture(autouse=True)
-def _disable_jit():
-    """Decorator that ensures that `select_n` is not put in an implicit `jit`.
-
-    The reason we do this is because we can currently not handle this nested jits.
-    It is important that it also disabled explicit usage of `jax.jit`.
-    However, since JaCe does not honor this flag we it does not affect us.
-
-    Todo:
-        Remove as soon as we can handle nested `jit`.
-    """
-    with jax.disable_jit(disable=True):
-        yield
-
-
-@pytest.fixture(autouse=True)
-def _enable_x64_mode_in_jax():
-    """Ensures that x64 mode in Jax ins enabled."""
-    with jax.experimental.enable_x64():
-        yield
+from tests import util as testutil
 
 
 @pytest.fixture()
 def Pred() -> np.ndarray:
-    return np.random.random((10, 10)) > 0.5  # noqa: NPY002
+    return testutil.mkarray((10, 10)) > 0.5
 
 
 @pytest.fixture()

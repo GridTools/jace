@@ -25,20 +25,23 @@ from jace.translator import (
 )
 
 
-@pytest.fixture(autouse=True)
-def _conserve_builtin_translators():
-    """Restores the set of registered subtranslators after a test."""
-    initial_translators = get_regsitered_primitive_translators()
-    yield
-    set_active_primitive_translators_to(initial_translators)
-
-
 @pytest.fixture()
 def no_builtin_translators():  # noqa: PT004  # This is how you should do it: https://docs.pytest.org/en/7.1.x/how-to/fixtures.html#use-fixtures-in-classes-and-modules-with-usefixtures
     """This fixture can be used if the test does not want any builtin translators."""
     initial_translators = translator.set_active_primitive_translators_to({})
     yield
     translator.set_active_primitive_translators_to(initial_translators)
+
+
+@pytest.fixture(autouse=True)
+def _conserve_builtin_translators():
+    """Restores the state of the global registry.
+
+    Needed to revert the modifications some tests do to the global registry state.
+    """
+    initial_translators = get_regsitered_primitive_translators()
+    yield
+    set_active_primitive_translators_to(initial_translators)
 
 
 # These are definitions of some Subtranslators that can be used to test things.
@@ -196,7 +199,7 @@ def test_subtranslatior_managing_overwriting_2():
         return
 
     @jace.jit
-    def foo(A):
+    def foo(A: int) -> int:
         B = A + 1
         C = B + 1
         D = C + 1
@@ -214,7 +217,7 @@ def test_subtranslatior_managing_decoupling():
 
     # This will use the translators that are currently installed.
     @jace.jit
-    def foo(A):
+    def foo(A: int) -> int:
         B = A + 1
         C = B + 1
         D = C + 1
@@ -224,6 +227,8 @@ def test_subtranslatior_managing_decoupling():
     @make_primitive_translator("add")
     def useless_add_translator(*args: Any, **kwargs: Any) -> None:  # noqa: ARG001
         raise NotImplementedError("The 'useless_add_translator' was called as expected.")
+
+    assert get_regsitered_primitive_translators()["add"] is useless_add_translator
 
     # Since `foo` was already constructed, a new registering can not change anything.
     A = np.zeros((10, 10))

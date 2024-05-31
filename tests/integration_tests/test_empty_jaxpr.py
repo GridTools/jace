@@ -43,9 +43,42 @@ def test_empty_scalar():
 @pytest.mark.skip(reason="Nested Jaxpr are not handled.")
 def test_empty_nested():
     @jace.jit
-    def testee3(A: float) -> float:
+    def testee(A: float) -> float:
         return jax.jit(lambda A: A)(A)
 
     A = np.pi
 
-    assert np.all(testee3(A) == A)
+    assert np.all(testee(A) == A)
+
+
+def test_empty_with_drop_vars():
+    """Tests if we can handle an empty input = output case, with present drop variables."""
+
+    @jace.jit
+    @jace.grad
+    def testee(A: float) -> float:
+        return A * A
+
+    A = np.pi
+
+    assert np.all(testee(A) == 2.0 * A)
+
+
+@pytest.mark.skip(reason="Literal return value is not implemented.")
+def test_empty_literal_return():
+    """Tests if we can handle a literal return value.
+
+    Note:
+        Using this test function serves another purpose. Since Jax includes the original
+        computation in the Jaxpr coming from a `grad` annotated function, the result will have
+        only drop variables.
+    """
+
+    @jace.jit
+    @jace.grad
+    def testee(A: float) -> float:
+        return A + A + A
+
+    A = np.e
+
+    assert np.all(testee(A) == 3.0)

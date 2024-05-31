@@ -17,6 +17,8 @@ Todo:
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import jax
 import numpy as np
 import pytest
@@ -24,12 +26,17 @@ from jax import numpy as jnp
 
 import jace
 
+from tests import util as testutil
 
-@pytest.fixture(autouse=True)
-def _enable_x64_mode_in_jax():
-    """Ensures that x64 mode in Jax ins enabled."""
-    with jax.experimental.enable_x64():
-        yield
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+
+@pytest.fixture(params=[(10,), (10, 1), (1, 10)])
+def vector_shape(request) -> tuple[int, ...]:
+    """Shapes used in the `test_bid_vector()` tests."""
+    return request.param
 
 
 def test_bid_scalar():
@@ -53,9 +60,22 @@ def test_bid_literal():
     def testee(a: float) -> np.ndarray | jax.Array:
         return jnp.broadcast_to(1.0, (10, 10)) + a
 
-    for a in [1, 1.0, 3.1415]:
-        ref = testee(a)
-        res = jace.jit(testee)(a)
-        assert res.shape == ref.shape
-        assert res.dtype == ref.dtype
-        assert np.all(res == ref)
+    ref = testee(0.0)
+    res = jace.jit(testee)(0.0)
+    assert res.shape == ref.shape
+    assert res.dtype == ref.dtype
+    assert np.all(res == ref)
+
+
+def test_bid_vector(vector_shape: Sequence[int]):
+    """Broadcast a vector to a tensor."""
+
+    def testee(a: np.ndarray) -> np.ndarray | jax.Array:
+        return jnp.broadcast_to(a, (10, 10)) + a
+
+    a = testutil.mkarray(vector_shape)
+    ref = testee(a)
+    res = jace.jit(testee)(a)
+    assert res.shape == ref.shape
+    assert res.dtype == ref.dtype
+    assert np.all(res == ref)

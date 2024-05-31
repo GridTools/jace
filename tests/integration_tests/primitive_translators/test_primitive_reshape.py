@@ -18,6 +18,8 @@ from jax import numpy as jnp
 
 import jace
 
+from tests import util as testutil
+
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -29,7 +31,7 @@ def _test_impl_reshaping(
     order: str = "C",
 ) -> None:
     """Performs a reshaping from `src_shape` to `dst_shape`."""
-    A = np.random.random(src_shape)  # noqa: NPY002
+    A = testutil.mkarray(src_shape)
     A = np.array(A, order=order)  # type: ignore[call-overload]  # MyPy wants a literal as order.
 
     def testee(A: np.ndarray) -> jax.Array:

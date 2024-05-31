@@ -7,8 +7,9 @@
 
 """Implements tests for the squeeze translator.
 
-For several reasons parts of the tests related to broadcasting, especially the ones in which a single dimension is added, are also here.
-This is because of the inverse relationship between `expand_dims` and `squeeze`.
+For several reasons parts of the tests related to broadcasting, especially the ones in which
+a single dimension is added, are also here. This is because of the inverse relationship between
+`expand_dims` and `squeeze`.
 """
 
 from __future__ import annotations
@@ -21,6 +22,8 @@ import pytest
 from jax import numpy as jnp
 
 import jace
+
+from tests import util as testutil
 
 
 if TYPE_CHECKING:
@@ -39,7 +42,7 @@ def _roundtrip_implementation(
         shape:  Shape of the input array.
         axes:   A series of axis that should be tried.
     """
-    A = np.random.random(shape)  # noqa: NPY002
+    A = testutil.mkarray(shape)
     A_org = A.copy()
 
     for ops in [jnp.expand_dims, jnp.squeeze]:

@@ -13,14 +13,16 @@ from jax import numpy as jnp
 
 import jace
 
+from tests import util as testutil
+
 
 def test_copy():
     @jace.jit
     def testee(A: np.ndarray) -> jax.Array:
         return jnp.copy(A)
 
-    A = np.random.random((10, 10, 10))  # noqa: NPY002
-    ref = np.copy(A)
+    A = testutil.mkarray((10, 10, 10))
     res = testee(A)
-    assert ref.dtype == res.dtype
-    assert np.all(ref == res)
+    assert A.dtype == res.dtype
+    assert A.shape == res.shape
+    assert np.all(res == A)

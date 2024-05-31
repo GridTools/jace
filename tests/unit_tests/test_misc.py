@@ -14,14 +14,16 @@ import pytest
 
 import jace
 
+from tests import util as testutil
+
 
 @pytest.mark.skip("Possible bug in DaCe.")
 def test_mismatch_in_datatyte_calling():
     """Tests compilation and calling with different types.
 
-    Note that this more or less tests the calling implementation of the `CompiledSDFG` class in DaCe.
-    As I understand the `CompiledSDFG::_construct_args()` function this should be detected.
-    However, as evidently it does not do this.
+    Note that this more or less a test for the calling implementation of the `CompiledSDFG`
+    class in DaCe. As I understand the `CompiledSDFG::_construct_args()` function this should be
+    detected. However, as evidently it does not do this.
     """
 
     @jace.jit
@@ -29,8 +31,8 @@ def test_mismatch_in_datatyte_calling():
         return -A
 
     # Different types.
-    A1 = np.arange(12, dtype=np.float32).reshape((4, 3))
-    A2 = np.arange(12, dtype=np.int64).reshape((4, 3))
+    A1 = testutil.mkarray((4, 3), dtype=np.float32)
+    A2 = testutil.mkarray((4, 3), dtype=np.int64)
 
     # Lower and compilation for first type
     callee = testee.lower(A1).compile()

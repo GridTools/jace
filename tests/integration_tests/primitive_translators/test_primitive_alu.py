@@ -5,7 +5,11 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Implements tests for the ALU translator."""
+"""Implements tests for the ALU translator.
+
+Todo:
+    - Add all supported primitives, to see if the template is valid.
+"""
 
 from __future__ import annotations
 
@@ -17,12 +21,14 @@ from jax import numpy as jnp
 
 import jace
 
+from tests import util as testutil
+
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Sequence
+    from collections.abc import Callable
 
 
-def _perform_test(testee: Callable, *args: Any) -> None:
+def _perform_alu_test(testee: Callable, *args: Any) -> None:
     """General function that just performs the test."""
     wrapped = jace.jit(testee)
 
@@ -31,20 +37,13 @@ def _perform_test(testee: Callable, *args: Any) -> None:
     assert np.allclose(ref, res), f"Expected '{ref.tolist()}' got '{res.tolist()}'"
 
 
-def mkarr(
-    shape: Sequence[int],
-    dtype=np.float64,
-) -> np.ndarray:
-    return np.array(np.random.random(shape), dtype=dtype)  # noqa: NPY002
-
-
 def test_alu_unary_scalar():
     """Test unary ALU translator in the scalar case."""
 
     def testee(A: float) -> float | jax.Array:
         return jnp.cos(A)
 
-    _perform_test(testee, 1.0)
+    _perform_alu_test(testee, 1.0)
 
 
 def test_alu_unary_array():
@@ -53,9 +52,9 @@ def test_alu_unary_array():
     def testee(A: np.ndarray) -> jax.Array:
         return jnp.sin(A)
 
-    A = mkarr((100, 10, 3))
+    A = testutil.mkarray((100, 10, 3))
 
-    _perform_test(testee, A)
+    _perform_alu_test(testee, A)
 
 
 def test_alu_unary_scalar_literal():
@@ -64,7 +63,7 @@ def test_alu_unary_scalar_literal():
     def testee(A: float) -> float | jax.Array:
         return jnp.sin(1.98) + A
 
-    _perform_test(testee, 10.0)
+    _perform_alu_test(testee, 10.0)
 
 
 def test_alu_unary_integer_power():
@@ -74,8 +73,8 @@ def test_alu_unary_integer_power():
         def testee(A: np.ndarray) -> np.ndarray:
             return A ** int(exp)  # noqa: B023 # `exp` is not used in the body
 
-        A = mkarr((10, 2 + exp, 3))
-        _perform_test(testee, A)
+        A = testutil.mkarray((10, 2 + exp, 3))
+        _perform_alu_test(testee, A)
 
 
 def test_alu_binary_scalar():
@@ -84,7 +83,7 @@ def test_alu_binary_scalar():
     def testee(A: float, B: float) -> float:
         return A * B
 
-    _perform_test(testee, 1.0, 2.0)
+    _perform_alu_test(testee, 1.0, 2.0)
 
 
 def test_alu_binary_scalar_literal():
@@ -93,7 +92,7 @@ def test_alu_binary_scalar_literal():
     def testee(A: float) -> float:
         return A * 2.03
 
-    _perform_test(testee, 7.0)
+    _perform_alu_test(testee, 7.0)
 
 
 def test_alu_binary_scalar_literal_2():
@@ -102,7 +101,7 @@ def test_alu_binary_scalar_literal_2():
     def testee(A: float) -> float:
         return 2.03 * A
 
-    _perform_test(testee, 7.0)
+    _perform_alu_test(testee, 7.0)
 
 
 def test_alu_binary_array():
@@ -111,9 +110,9 @@ def test_alu_binary_array():
     def testee(A: np.ndarray, B: np.ndarray) -> np.ndarray:
         return A + B
 
-    A = mkarr((100, 10, 3))
-    B = mkarr((100, 10, 3))
-    _perform_test(testee, A, B)
+    A = testutil.mkarray((100, 10, 3))
+    B = testutil.mkarray((100, 10, 3))
+    _perform_alu_test(testee, A, B)
 
 
 def test_alu_binary_array_scalar():
@@ -122,10 +121,10 @@ def test_alu_binary_array_scalar():
     def testee(A: np.ndarray | float, B: float | np.ndarray) -> np.ndarray:
         return cast(np.ndarray, A + B)
 
-    A = mkarr((100, 22))
+    A = testutil.mkarray((100, 22))
     B = np.float64(1.34)
-    _perform_test(testee, A, B)
-    _perform_test(testee, B, A)
+    _perform_alu_test(testee, A, B)
+    _perform_alu_test(testee, B, A)
 
 
 def test_alu_binary_array_literal():
@@ -134,8 +133,8 @@ def test_alu_binary_array_literal():
     def testee(A: np.ndarray) -> np.ndarray:
         return A + 1.52
 
-    A = mkarr((100, 22))
-    _perform_test(testee, A)
+    A = testutil.mkarray((100, 22))
+    _perform_alu_test(testee, A)
 
 
 def test_alu_binary_array_literal_2():
@@ -144,8 +143,8 @@ def test_alu_binary_array_literal_2():
     def testee(A: np.ndarray) -> np.ndarray:
         return 1.52 + A
 
-    A = mkarr((100, 22))
-    _perform_test(testee, A)
+    A = testutil.mkarray((100, 22))
+    _perform_alu_test(testee, A)
 
 
 def test_alu_binary_array_constants():
@@ -154,8 +153,8 @@ def test_alu_binary_array_constants():
     def testee(A: np.ndarray) -> np.ndarray:
         return A + jnp.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]])
 
-    A = mkarr((3, 3))
-    _perform_test(testee, A)
+    A = testutil.mkarray((3, 3))
+    _perform_alu_test(testee, A)
 
 
 def test_alu_binary_broadcast_1():
@@ -164,10 +163,10 @@ def test_alu_binary_broadcast_1():
     def testee(A: np.ndarray, B: np.ndarray) -> np.ndarray:
         return A + B
 
-    A = mkarr((100, 1, 3))
-    B = mkarr((100, 1, 1))
-    _perform_test(testee, A, B)
-    _perform_test(testee, B, A)
+    A = testutil.mkarray((100, 1, 3))
+    B = testutil.mkarray((100, 1, 1))
+    _perform_alu_test(testee, A, B)
+    _perform_alu_test(testee, B, A)
 
 
 def test_alu_binary_broadcast_2():
@@ -176,10 +175,10 @@ def test_alu_binary_broadcast_2():
     def testee(A: np.ndarray, B: np.ndarray) -> np.ndarray:
         return A + B
 
-    A = mkarr((100, 1))
-    B = mkarr((100, 10))
-    _perform_test(testee, A, B)
-    _perform_test(testee, B, A)
+    A = testutil.mkarray((100, 1))
+    B = testutil.mkarray((100, 10))
+    _perform_alu_test(testee, A, B)
+    _perform_alu_test(testee, B, A)
 
 
 def test_alu_binary_broadcast_3():
@@ -188,7 +187,7 @@ def test_alu_binary_broadcast_3():
     def testee(A: np.ndarray, B: np.ndarray) -> np.ndarray:
         return A + B
 
-    A = mkarr((5, 1, 3, 4, 1))
-    B = mkarr((5, 1, 3, 1, 2))
-    _perform_test(testee, A, B)
-    _perform_test(testee, B, A)
+    A = testutil.mkarray((5, 1, 3, 4, 1))
+    B = testutil.mkarray((5, 1, 3, 1, 2))
+    _perform_alu_test(testee, A, B)
+    _perform_alu_test(testee, B, A)

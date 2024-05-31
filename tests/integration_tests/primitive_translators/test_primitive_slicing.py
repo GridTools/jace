@@ -15,30 +15,25 @@ import pytest
 
 import jace
 
-
-@pytest.fixture(autouse=True)
-def _enable_x64_mode_in_jax():
-    """Ensures that x64 mode in Jax ins enabled."""
-    with jax.experimental.enable_x64():
-        yield
+from tests import util as testutil
 
 
 @pytest.fixture()
 def A_4x4():
-    return np.arange(16).reshape((4, 4))
+    return testutil.mkarray((4, 4))
 
 
 @pytest.fixture()
 def A_4x4x4x4():
-    return np.arange(4**4).reshape((4, 4, 4, 4))
+    return testutil.mkarray((4, 4, 4, 4))
 
 
 @pytest.fixture(
     params=[
         (1, 2, 1, 2),
         (0, 0, 0, 0),
-        (3, 3, 3, 3),  # Will lead to readjustment.
-        (3, 1, 3, 0),  # Will lead to readjustment.
+        (3, 3, 3, 3),  # Will lead to readjustment of the start index.
+        (3, 1, 3, 0),  # Will lead to readjustment of the start index.
     ]
 )
 def full_dynamic_start_idx(request):

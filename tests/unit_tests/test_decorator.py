@@ -13,25 +13,10 @@ Also see the `test_jax_api.py` test file, that tests composability.
 from __future__ import annotations
 
 import numpy as np
-import pytest
 
 import jace
 
-
-@pytest.fixture(autouse=True)
-def _clear_translation_cache():
-    """Decorator that clears the translation cache.
-
-    Ensures that a function finds an empty cache and clears up afterwards.
-
-    Todo:
-        Should be used _everywhere_.
-    """
-    from jace.util import translation_cache as tcache
-
-    tcache.clear_translation_cache()
-    yield
-    tcache.clear_translation_cache()
+from tests import util as testutil
 
 
 def test_decorator_individually():
@@ -47,8 +32,8 @@ def test_decorator_individually():
         lowering_cnt[0] += 1
         return testee_(A, B)
 
-    A = np.arange(12, dtype=np.float64).reshape((4, 3))
-    B = np.full((4, 3), 10, dtype=np.float64)
+    A = testutil.mkarray((4, 3))
+    B = testutil.mkarray((4, 3))
 
     lowered = testee.lower(A, B)
     compiled = lowered.compile()
@@ -73,8 +58,8 @@ def test_decorator_one_go():
         lowering_cnt[0] += 1
         return testee_(A, B)
 
-    A = np.arange(12, dtype=np.float64).reshape((4, 3))
-    B = np.full((4, 3), 10, dtype=np.float64)
+    A = testutil.mkarray((4, 3))
+    B = testutil.mkarray((4, 3))
 
     ref = testee_(A, B)
     res = testee(A, B)

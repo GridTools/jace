@@ -17,8 +17,7 @@ from jax import numpy as jnp
 import jace
 from jace import util as jutil
 
-
-np.random.seed(42)  # noqa: NPY002  # random generator
+from tests import util as testutil
 
 
 def test_jit():
@@ -27,8 +26,8 @@ def test_jit():
     def testee(A: np.ndarray, B: np.ndarray) -> np.ndarray:
         return A + B
 
-    A = np.arange(12, dtype=np.float64).reshape((4, 3))
-    B = np.full((4, 3), 10, dtype=np.float64)
+    A = testutil.mkarray((4, 3))
+    B = testutil.mkarray((4, 3))
 
     jax_testee = jax.jit(testee)
     jace_testee = jace.jit(testee)
@@ -95,7 +94,7 @@ def test_composition_with_jax():
     def jax_fun(A, B, C):
         return jace.jit(base_fun)(A, B, C)
 
-    A, B, C = (np.random.random((10, 3, 50)) for _ in range(3))  # noqa: NPY002  # random generator
+    A, B, C = (testutil.mkarray((10, 3, 50)) for _ in range(3))
 
     assert np.allclose(jace_fun(A, B, C), jax_fun(A, B, C))
 
@@ -128,7 +127,7 @@ def test_composition_with_jax_2():
 
     assert jutil.is_jaceified(f3_jace)
 
-    A, B, C, D = (np.random.random((10, 3, 50)) for _ in range(4))  # noqa: NPY002  # random generator
+    A, B, C, D = (testutil.mkarray((10, 3, 50)) for _ in range(4))
 
     ref = ((A + B) - C) * D
 
@@ -154,7 +153,7 @@ def test_grad_annotation_direct():
         return jace.grad(jace.grad(f))(x)
 
     # These are the random numbers where we test
-    Xs = (np.random.random(10) - 0.5) * 10  # noqa: NPY002  # Random number generator
+    Xs = (testutil.mkarray(10) - 0.5) * 10
 
     for i in range(Xs.shape[0]):
         x = Xs[i]
@@ -198,7 +197,7 @@ def test_disabled_x64():
     def testee(A: np.ndarray, B: np.float64) -> np.ndarray:
         return A + B
 
-    A = np.arange(12, dtype=np.float64).reshape((4, 3))
+    A = testutil.mkarray((4, 3))
     B = np.float64(10.0)
 
     # Run them with disabled x64 support

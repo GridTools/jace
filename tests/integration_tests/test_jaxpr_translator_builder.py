@@ -20,6 +20,8 @@ import jace
 from jace import translator, util
 from jace.util import JaCeVar
 
+from tests import util as testutil
+
 
 # These are some JaCe variables that we use inside the tests
 #  Unnamed arrays
@@ -93,7 +95,8 @@ def test_builder_variable_alloc_mixed_naming(
 ) -> None:
     """Tests the naming in a mixed setting.
 
-    If `update_var_mapping=True` is given, then the naming will skip variables, see also `test_builder_variable_alloc_mixed_naming2()`.
+    If `update_var_mapping=True` is given, then the naming will skip variables,
+    see also `test_builder_variable_alloc_mixed_naming2()`.
     """
     #                        *       b       c       d      *      f      g
     for i, var in enumerate([narray, array1, array2, scal1, nscal, scal2, scal3]):
@@ -113,8 +116,8 @@ def test_builder_variable_alloc_mixed_naming2(
 ) -> None:
     """Tests the naming in a mixed setting.
 
-    This time we do not use `update_var_mapping=True`, instead it now depends on the name.
-    This means that automatic naming will now again include all, letters, but not in a linear order.
+    This time we do not use `update_var_mapping=True`, instead it now depends on the name. This
+    means that automatic naming will now again include all, letters, but not in a linear order.
     """
     letoff = 0
     #             *      a        b       c      *      d     e
@@ -272,7 +275,8 @@ def test_builder_append_state(translation_builder: translator.JaxprTranslationBu
     assert next(iter(sdfg.edges())).src is sdfg.start_block
     assert next(iter(sdfg.edges())).dst is terminal_state_1
 
-    # Specifying an explicit append state that is the terminal should also update the terminal state of the builder.
+    # Specifying an explicit append state that is the terminal should also update the terminal
+    #  state of the builder.
     terminal_state_2: dace.SDFGState = translation_builder.append_new_state(
         "terminal_state_2", prev_state=terminal_state_1
     )
@@ -511,7 +515,7 @@ def test_builder_scalar_return_value() -> None:
         lower_cnt[0] += 1
         return scalar_ops(A)
 
-    vals = np.random.random(100)  # noqa: NPY002
+    vals = testutil.mkarray(100)
     for i in range(vals.size):
         res = wrapped(vals[i])
         ref = scalar_ops(vals[i])

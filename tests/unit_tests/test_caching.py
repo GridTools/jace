@@ -12,27 +12,19 @@ from __future__ import annotations
 
 import itertools as it
 import re
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
 
 import jace
 from jace import optimization, stages
-from jace.util import translation_cache as tcache
+
+from tests import util as testutil
 
 
-@pytest.fixture(autouse=True)
-def _clear_translation_cache():
-    """Decorator that clears the translation cache.
-
-    Ensures that a function finds an empty cache and clears up afterwards.
-
-    Todo:
-        Ask Enrique how I can make that fixture apply everywhere not just in the file but the whole test suite.
-    """
-    tcache.clear_translation_cache()
-    yield
-    tcache.clear_translation_cache()
+if TYPE_CHECKING:
+    from jace.util import translation_cache as tcache
 
 
 def test_caching_same_sizes() -> None:
@@ -52,8 +44,8 @@ def test_caching_same_sizes() -> None:
         return testee(A, B)
 
     # First batch of arguments.
-    A = np.arange(12, dtype=np.float64).reshape((4, 3))
-    B = np.full((4, 3), 10, dtype=np.float64)
+    A = testutil.mkarray((4, 3))
+    B = testutil.mkarray((4, 3))
 
     # The second batch of argument, it is the same size (structurally) but different values.
     AA = A + 1.0362
@@ -91,12 +83,12 @@ def test_caching_different_sizes():
         return A * B
 
     # First size of arguments
-    A = np.arange(12, dtype=np.float64).reshape((4, 3))
-    B = np.full((4, 3), 10, dtype=np.float64)
+    A = testutil.mkarray((4, 3))
+    B = testutil.mkarray((4, 3))
 
     # Second size of arguments
-    C = np.arange(16, dtype=np.float64).reshape((4, 4))
-    D = np.full((4, 4), 10, dtype=np.float64)
+    C = testutil.mkarray((4, 4))
+    D = testutil.mkarray((4, 4))
 
     # Now lower the function once for each.
     lowered1 = wrapped.lower(A, B)
@@ -126,10 +118,10 @@ def test_caching_different_structure() -> None:
         lowering_cnt[0] += 1
         return A * 4.0, B + 2.0
 
-    A = np.full((4, 30), 10, dtype=np.float64)
-    B = np.full((4, 3), 10, dtype=np.float64)
-    C = np.full((5, 3), 14, dtype=np.float64)
-    D = np.full((6, 3), 14, dtype=np.int64)
+    A = testutil.mkarray((4, 30), dtype=np.float64)
+    B = testutil.mkarray((4, 3), dtype=np.float64)
+    C = testutil.mkarray((4, 3), dtype=np.int64)
+    D = testutil.mkarray((6, 3), dtype=np.int64)
 
     # These are the known lowerings.
     lowerings: dict[tuple[int, int], stages.JaCeLowered] = {}
@@ -163,7 +155,10 @@ def test_caching_different_structure() -> None:
 
 
 def test_caching_compilation() -> None:
-    """Tests the compilation cache, this is just very simple, since it uses the same code paths as lowering."""
+    """Tests the compilation cache.
+
+    The actual implementation is simple, because it uses the same code paths as lowering.
+    """
 
     @jace.jit
     def jaceWrapped(A: np.ndarray, B: np.ndarray) -> np.ndarray:
@@ -173,8 +168,8 @@ def test_caching_compilation() -> None:
         return A + B + C + D + E
 
     # These are the argument
-    A = np.arange(12, dtype=np.float64).reshape((4, 3))
-    B = np.full((4, 3), 10, dtype=np.float64)
+    A = testutil.mkarray((4, 3))
+    B = testutil.mkarray((4, 3))
 
     # Now we lower it.
     jaceLowered = jaceWrapped.lower(A, B)
@@ -212,12 +207,14 @@ def test_caching_dtype():
     shape = (10, 10)
 
     for i, dtype in enumerate(dtypes):
-        A = np.array((np.random.random(shape) - 0.5) * 10, dtype=dtype)  # noqa: NPY002
+        A = testutil.mkarray(shape, dtype=dtype)
 
+        # First lowering
         assert lowering_cnt[0] == i
         _ = testee(A)
         assert lowering_cnt[0] == i + 1
 
+        # Second, implicit, lowering, which must be cached.
         assert np.allclose(testee(A), 2 * A)
         assert lowering_cnt[0] == i + 1
 
@@ -272,7 +269,7 @@ def test_caching_eviction_simple():
     assert cache.front()[0] == first_key
 
 
-def test_caching_eviction_complex():
+def test_caching_eviction_complex() -> None:
     """Tests if the stuff is properly evicted if the cache is full."""
 
     @jace.jit
@@ -328,7 +325,7 @@ def test_caching_strides() -> None:
 
     shape = (10, 100, 1000)
     C = np.array(
-        (np.random.random(shape) - 0.5) * 10,  # noqa: NPY002
+        (testutil.mkarray(shape) - 0.5) * 10,
         order="C",
         dtype=np.float64,
     )

@@ -17,7 +17,8 @@ import pytest
 from jax import numpy as jnp
 
 import jace
-from jace.util import translation_cache as tcache
+
+from tests import util as testutil
 
 
 # fmt: off
@@ -30,20 +31,6 @@ _DACE_COMPLEX_TYPES: Final[list[type]] = [
         np.complex128, np.complex64, np.complex128,
 ]
 # fmt: on
-
-
-@pytest.fixture(autouse=True)
-def _clear_translation_cache():
-    """Decorator that clears the translation cache.
-
-    Ensures that a function finds an empty cache and clears up afterwards.
-
-    Todo:
-        Ask Enrique how I can make that fixture apply everywhere not just in the file but the whole test suite.
-    """
-    tcache.clear_translation_cache()
-    yield
-    tcache.clear_translation_cache()
 
 
 @pytest.fixture(params=_DACE_REAL_TYPES)
@@ -68,10 +55,8 @@ def _convert_element_type_impl(
 ) -> bool:
     """Implementation of the tests of the convert element types primitive."""
     lowering_cnt = [0]
-    A: np.ndarray = np.array(np.random.random((10, 10)), dtype=input_type)  # noqa: NPY002
-    assert A.dtype == input_type
+    A: np.ndarray = testutil.mkarray((10, 10), input_type)
     ref: np.ndarray = np.array(A, copy=True, dtype=output_type)
-    assert ref.dtype == output_type
 
     @jace.jit
     def converter(A: np.ndarray) -> jax.Array:
@@ -101,28 +86,3 @@ def test_convert_element_type_from_bool(src_type):
 @pytest.mark.skip(reason="This test is too long, only do it on certain conditions.")
 def test_convert_element_type_to_bool(dst_type):
     _convert_element_type_impl(dst_type, np.bool_)
-
-
-@pytest.mark.skip(reason="The warning was disabled, so the test is at the moment useless.")
-def test_convert_element_type_useless_cast():
-    """Shows that under some conditions there is really a casting from one type to the same.
-
-    In certain cases, also in some slicing tests, this useless cast is inserted by Jax.
-    This test was originally here to show this. However, that thing got so annoying that it was
-    removed. The test is kept here to serve as some kind of a reference.
-    """
-
-    def testee(a: float) -> np.ndarray:
-        # For it to work we have to use `numpy` instead of the Jax substitute.
-        return np.broadcast_to(1.0, (10, 10)) + a
-
-    with pytest.warns(
-        expected_warning=UserWarning,
-        match=r"convert_element_type\(.*\): is useless, input and output have same type\.",
-    ):
-        res = jace.jit(testee)(1.0)
-
-    ref = testee(1.0)
-    assert res.shape == ref.shape
-    assert res.dtype == ref.dtype
-    assert np.all(res == ref)
