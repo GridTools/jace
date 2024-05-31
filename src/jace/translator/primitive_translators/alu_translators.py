@@ -63,28 +63,47 @@ class ALUTranslator(mapped_base.MappedOperationTranslatorBase):
 # Contains all the templates for ALU operations.
 #  TODO(phimuell): Import them also from `frontend/python/replacements.py`, however, the names
 #   do not fully matches the Jax names, `grep -P '^[a-zA-Z0-9_]+_p[[:space:]]+' -r -o -h | sort -u`
+# NOTES:
+#   - Jax does not seem to have a mod, `%? , operation, instead a nested computation is done.
+#   - Jax has multiple shift operations, only one is implemented.
+#   - The logical operations, i.e. `and`, `xor`, `or` and `not` are bitwise, in Jax.
 # fmt: off
 _ALU_OPS_TMPL: Final[dict[str, str]] = {
     # Unary operations
     "pos": "__out = +(__in0)",
     "neg": "__out = -(__in0)",
-    "not": "__out = not (__in0)",
+
     "floor": "__out = floor(__in0)",
     "ceil": "__out = ceil(__in0)",
     "round": "__out = round(__in0)",
+
     "abs": "__out = abs(__in0)",
     "sign": "__out = sign(__in0)",
-    "sqrt": "__out = sqrt(__in0)",
-    "log": "__out = log(__in0)",
     "exp": "__out = exp(__in0)",
+    "exp2": "__out = exp2(__in0)",
+    "expm1": "__out = expm1(__in0)",
+    "log": "__out = log(__in0)",
+    "log1p": "__out = log1p(__in0)",
+    "conj": "__out = conj(__in0)",
+    "sqrt": "__out = sqrt(__in0)",
+    "cbrt": "__out = cbrt(__in0)",
+
     "integer_pow": "__out = (__in0)**({y})",  # 'y' is a parameter of the primitive
+    "is_finite": "__out = isfinite(__in0)",
+
     "sin": "__out = sin(__in0)",
     "asin": "__out = asin(__in0)",
     "cos": "__out = cos(__in0)",
     "acos": "__out = acos(__in0)",
     "tan": "__out = tan(__in0)",
     "atan": "__out = atan(__in0)",
+
+    "sinh": "__out = sinh(__in0)",
+    "asinh": "__out = asinh(__in0)",
+    "cosh": "__out = cosh(__in0)",
+    "acosh": "__out = acosh(__in0)",
     "tanh": "__out = tanh(__in0)",
+    "atanh": "__out = atanh(__in0)",
 
     # Binary operations
     "add": "__out = (__in0)+(__in1)",
@@ -93,18 +112,30 @@ _ALU_OPS_TMPL: Final[dict[str, str]] = {
     "mul": "__out = (__in0)*(__in1)",
     "div": "__out = (__in0)/(__in1)",
     "rem": "__out = (__in0)%(__in1)",
-    "and": "__out = (__in0) and (__in1)",
-    "or": "__out = (__in0) or  (__in1)",
     "pow": "__out = (__in0)**(__in1)",
-    "ipow": "__out = (__in0)**(int(__in1))",
-    "min": "__out = min(__in0, __in1)",
-    "max": "__out = max(__in0, __in1)",
-    "eq": "__out = __in0 == __in1",
-    "ne": "__out = __in0 != __in1",
-    "ge": "__out = __in0 >= __in1",
-    "gt": "__out = __in0 > __in1",
-    "le": "__out = __in0 <= __in1",
-    "lt": "__out = __in0 < __in1",
+    "min": "__out = min((__in0), (__in1))",
+    "max": "__out = max((__in0), (__in1))",
+
+    "eq": "__out = (__in0) == (__in1)",
+    "ne": "__out = (__in0) != (__in1)",
+    "ge": "__out = (__in0) >= (__in1)",
+    "gt": "__out = (__in0) > (__in1)",
+    "le": "__out = (__in0) <= (__in1)",
+    "lt": "__out = (__in0) < (__in1)",
+
+    "atan2": "__out = atan2((__in0), (__in1))",
+
+    "left_shift": "__out = (__in0) << (__in1)",
+    "right_shift": "__out = (__in0) >> (__in1)",
+    "nextafter": "__out = nextafter((__in0), (__in1))",
+
+    # Logical operations
+    #  Note in Jax all logical operations are bitwise; for "logical" operations they are first
+    #  turned into "bools" by `ne a 0`.
+    "or": "__out = (__in0) | (__in1)",
+    "not": "__out = ~(__in0)",
+    "and": "__out = (__in0) & (__in1)",
+    "xor": "__out = (__in0) ^ (__in1)",
 }
 
 # Create the ALU translators

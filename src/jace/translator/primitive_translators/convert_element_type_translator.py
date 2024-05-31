@@ -63,15 +63,24 @@ class ConvertElementTypeTranslator(mapped_base.MappedOperationTranslatorBase):
         conv_code = "__in0"
 
         # Handle special cases
-        if in_dtype == out_dtype:
-            # This happens and previously there was a warning here, but that thing has become
-            #  so annoying, that it was removed. However, we still handle the case explicitly to
-            #  guarantee that the Tasklet is trivial.
-            # TODO(phimuell): Make this into a pure Memlet.
+        if in_dtype_s.startswith("bool") and in_dtype == out_dtype:
+            #  Second and more importantly, in Jax the casting from bool to bool has a special
+            #  meaning, because in Jax all logical operations are bitwise. If a logical operation
+            #  is used, then Jax first makes it a bool by running `a != 0`.
+            #  Jax does this to ensure that it has either `0` or a `1`, I assume that is because
+            #  XLA does not have a native bool, similar as C.
+            #  However, in C++, that has a native bool, this operation is kind of useless.
+            #  But we keep it as special case to serve as a documentation.
             return f"__out = {conv_code}"
+        if in_dtype == out_dtype:
+            # For some odd reason, this conversion also happens if with other types as bool,
+            #  see above. For that reason we also keep it as special case.
+            #  In previous versions we generated a warning here, but it had become so annoying
+            #  that it was removed.
+            return f"__out = {conv_code}"
+
         if in_dtype_s.startswith("bool"):
-            # Interestingly `__out = int(__in0)` will not work at some DaCe processing stage.
-            #  See commit `f5aabc` of the prototype.
+            # Interestingly `__out = int(__in0)` will not work, see commit `f5aabc` of the prototype.
             conv_code = f"(1 if {conv_code} else 0)"
 
         if out_dtype_s == "bool":
