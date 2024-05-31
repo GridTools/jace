@@ -254,6 +254,6 @@ def test_caching_strides() -> None:
         F_lower = wrapped.lower(F)
         F_res = wrapped(F)
     assert F_lower is None  # Remove later.
-    assert C_res is not F_res  # type: ignore[unreachable]
+    assert C_res is not F_res
     assert np.allclose(F_res, C_res)
     assert F_lower is not C_lower
