@@ -39,10 +39,14 @@ def mkarray(
     Todo:
         - Also support integers.
     """
+
+    if shape == ():
+        return mkarray((1,), dtype)[0]
     if isinstance(shape, int):
         shape = (shape,)
-    assert shape
 
     if dtype == np.bool_:
-        return mkarray(shape, np.float32) > 0.5
+        return np.random.random(shape) > 0.5  # noqa: NPY002
+    if np.issubdtype(dtype, np.integer):
+        return np.random.randint(low=-2**30, high=2**30, size=shape, dtype=dtype)  # noqa: NPY002
     return np.array(np.random.random(shape), dtype=dtype)  # noqa: NPY002
