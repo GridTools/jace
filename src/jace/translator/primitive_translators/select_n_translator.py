@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 import dace
 from typing_extensions import override
 
-from jace import translator
+from jace import translator, util
 from jace.translator import mapped_operation_base_translator as mapped_base
 
 
@@ -50,10 +50,7 @@ class SelectNTranslator(mapped_base.MappedOperationTranslatorBase):
         eqn: jax_core.JaxprEqn,
     ) -> str:
         """Writes the selection code.
-
-        Literal substitution is deferred to the base.
         """
-
         if len(in_var_names) == 3:
             # This order is correct, since `False` is interpreted as `0`, which means the first
             #  case. DaCe seems to have some problems with bools and integer casting around,
@@ -73,7 +70,6 @@ class SelectNTranslator(mapped_base.MappedOperationTranslatorBase):
         eqn: jax_core.JaxprEqn,
     ) -> dict[str, dace.Memlet]:
         """We have to add the offsets to the Memlet accesses."""
-        assert all(in_var_names)
         return {
             f"__in{i-1}" if i else "__cond": dace.Memlet.simple(
                 in_var_name,
@@ -82,6 +78,22 @@ class SelectNTranslator(mapped_base.MappedOperationTranslatorBase):
             for i, in_var_name in enumerate(in_var_names)
             if in_var_name
         }
+
+
+    def literal_substitution(
+        self,
+        tskl_code: str,
+        in_var_names: Sequence[str | None],
+        eqn: jax_core.JaxprEqn,
+    ) -> str:
+        """Can not be done by the base because of the renaming.
+        """
+        for i, in_var_name in enumerate(in_var_names[1:]):
+            if in_var_name is not None:
+                continue
+            t_val = util.get_jax_literal_value(eqn.invars[i + 1])
+            tskl_code = tskl_code.replace(f"__in{i}", str(t_val))
+        return tskl_code
 
 
 translator.register_primitive_translator(SelectNTranslator())

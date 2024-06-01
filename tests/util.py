@@ -35,6 +35,9 @@ def mkarray(
     Args:
         shape:      The shape to use.
         dtype:      The data type to use.
+
+    Todo:
+        - Also support integers.
     """
     if isinstance(shape, int):
         shape = (shape,)
