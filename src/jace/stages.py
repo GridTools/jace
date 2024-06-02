@@ -157,6 +157,8 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"]):
         tsdfg: translator.TranslatedJaxprSDFG = ptrans.postprocess_jaxpr_sdfg(
             trans_ctx=trans_ctx,
             fun=self.wrapped_fun,
+            call_args=args,  # Already linearised, since we only accept positional args.
+            intree=None,  # Not yet implemented.
         )
 
         return JaCeLowered(tsdfg)
