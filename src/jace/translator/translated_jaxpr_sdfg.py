@@ -12,7 +12,7 @@ import dataclasses
 import dace
 
 
-@dataclasses.dataclass(kw_only=True)
+@dataclasses.dataclass(kw_only=True, frozen=True)
 class TranslatedJaxprSDFG:
     """Encapsulates the translated SDFG together with the metadata that is needed to run it.
 
@@ -43,21 +43,9 @@ class TranslatedJaxprSDFG:
 
     def validate(self) -> bool:
         """Validate the underlying SDFG."""
-        if not self.inp_names:
-            raise dace.sdfg.InvalidSDFGError(
-                "There are no input arguments.",
-                self.sdfg,
-                self.sdfg.node_id(self.sdfg.start_state),
-            )
         if any(self.sdfg.arrays[inp].transient for inp in self.inp_names):
             raise dace.sdfg.InvalidSDFGError(
                 f"Found transient inputs: {(inp for inp in self.inp_names if self.sdfg.arrays[inp].transient)}",
-                self.sdfg,
-                self.sdfg.node_id(self.sdfg.start_state),
-            )
-        if not self.out_names:
-            raise dace.sdfg.InvalidSDFGError(
-                "There are no output arguments.",
                 self.sdfg,
                 self.sdfg.node_id(self.sdfg.start_state),
             )

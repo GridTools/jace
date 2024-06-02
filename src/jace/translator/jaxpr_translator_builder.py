@@ -460,7 +460,7 @@ class JaxprTranslationBuilder:
         """
         if not self.is_allocated():
             raise RuntimeError("Builder is not allocated, can not create constants.")
-        assert len(self._ctx.jsdfg.inp_names) == 0
+        assert self._ctx.inp_names is None
 
         # Handle the initial input arguments
         init_in_var_names: Sequence[str] = self.create_jax_var_list(
@@ -473,7 +473,7 @@ class JaxprTranslationBuilder:
         self.sdfg.arg_names = []
 
         # The output list is populated by `self._translate_jaxpr_internal()`
-        self._ctx.jsdfg.inp_names = tuple(init_in_var_names)
+        self._ctx.inp_names = tuple(init_in_var_names)
 
         return init_in_var_names
 
@@ -650,7 +650,7 @@ class JaxprTranslationBuilder:
         if nb_translated_eqn == 0:
             out_var_names = self._handle_null_jaxpr(jaxpr)
 
-        self._ctx.jsdfg.out_names = tuple(out_var_names)
+        self._ctx.out_names = tuple(out_var_names)
 
         return cast(TranslationContext, self._clear_translation_ctx())
 
@@ -671,10 +671,13 @@ class JaxprTranslationBuilder:
 
         Todo:
             - Handle the case if if the output is a literal.
+
+        Note:
+            The function will _not_ update the `out_names` field of the current context.
         """
         assert self._ctx.terminal_state is self._ctx.start_state
-        assert len(self._ctx.jsdfg.inp_names) > 0
-        assert len(self._ctx.jsdfg.out_names) == 0
+        assert self._ctx.inp_names
+        assert self._ctx.out_names is None
 
         # There is not output so we do not have to copy anything around.
         if len(jaxpr.out_avals) == 0:
@@ -732,23 +735,30 @@ class JaxprTranslationBuilder:
 class TranslationContext:
     """Translation context used by the `JaxprTranslationBuilder`.
 
-    Essentially it is a `TranslatedJaxprSDFG` object together with some additional meta data,
-    that is needed during translation. It is also returned by the `translate_jaxpr()` function.
-    It is important that the SDFG it encapsulates is not directly usable and must be passed to the
-    `finalize_translation_context()` function, before it can be passed to the optimization stage.
-    However, it is recommended to pass it to the `postprocess_jaxpr_sdfg()` instead.
+    Internal representation of the builder of an SDFG under construction together with the needed
+    metadata. Essentially it is an extended version of the `TranslatedJaxprSDFG`, but carrying
+    an unfinished canonical SDFG.
+    A user should consider this class as an opaque object, that represents an invalid
+    `TranslatedJaxprSDFG` object, and the only valid operation a user can do with it is passing it
+    either to `finalize_translation_context()` or the `postprocess_jaxpr_sdfg()` function.
 
     Attributes:
-        jsdfg:          The wrapped `TranslatedJaxprSDFG` object that stores the SDFG under
-            construction.
-        start_state:    The first state in the SDFG state machine.
-        terminal_state: The (currently) last state in the state machine.
+        sdfg:              The encapsulated SDFG object.
+        inp_names:         A list of the SDFG variables that are used as input
+        out_names:         A list of the SDFG variables that are used as output.
+        start_state:       The first state in the SDFG state machine.
+        terminal_state:    The (currently) last state in the state machine.
 
     Args:
         name:       The name of the SDFG, will be forwarded to the encapsulated `TranslatedJaxprSDFG`.
+
+    Note:
+        Access of any attribute of this class by an outside user is considered undefined behaviour.
     """
 
-    jsdfg: translator.TranslatedJaxprSDFG
+    sdfg: dace.SDFG
+    inp_names: tuple[str, ...] | None
+    out_names: tuple[str, ...] | None
     start_state: dace.SDFGState
     terminal_state: dace.SDFGState
 
@@ -756,29 +766,20 @@ class TranslationContext:
         self,
         name: str | None = None,
     ) -> None:
-        from jace import translator  # Cyclic import
-
         if isinstance(name, str) and not util.VALID_SDFG_OBJ_NAME.fullmatch(name):
             raise ValueError(f"'{name}' is not a valid SDFG name.")
 
-        self.jsdfg = translator.TranslatedJaxprSDFG(
-            sdfg=dace.SDFG(name=(name or f"unnamed_SDFG_{id(self)}")),
-            inp_names=(),
-            out_names=(),
-        )
+        self.sdfg = dace.SDFG(name=(name or f"unnamed_SDFG_{id(self)}"))
+        self.inp_names = None
+        self.out_names = None
         self.start_state = self.sdfg.add_state(label="initial_state", is_start_block=True)
         self.terminal_state = self.start_state
-
-    @property
-    def sdfg(self) -> dace.SDFG:
-        return self.jsdfg.sdfg
 
     def validate(self) -> bool:
         """Validate internal state of `self`.
 
-        Note:
-            The it is not possible to call the validation function of the embedded
-            `TranslatedJaxprSDFG` because the SDFG is still under construction`.
+        Since the SDFG is under construction it will not be validated, instead the meta data
+        will be validated.
         """
         if self.start_state is not self.sdfg.start_block:
             raise dace.sdfg.InvalidSDFGError(

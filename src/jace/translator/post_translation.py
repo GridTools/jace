@@ -17,11 +17,11 @@ from __future__ import annotations
 import copy
 from typing import TYPE_CHECKING, Any
 
+from jace import translator
+
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
-
-    from jace import translator
 
 
 def postprocess_jaxpr_sdfg(
@@ -76,13 +76,17 @@ def finalize_translation_context(
         validate:       Call the validate function after the finalizing.
     """
     trans_ctx.validate()
-    if not trans_ctx.jsdfg.inp_names:
+    if trans_ctx.inp_names is None:
         raise ValueError("Input names are not specified.")
-    if not trans_ctx.jsdfg.out_names:
+    if trans_ctx.out_names is None:
         raise ValueError("Output names are not specified.")
 
     # We guarantee decoupling
-    tsdfg: translator.TranslatedJaxprSDFG = copy.deepcopy(trans_ctx.jsdfg)
+    tsdfg = translator.TranslatedJaxprSDFG(
+        sdfg=copy.deepcopy(trans_ctx.sdfg),
+        inp_names=trans_ctx.inp_names,
+        out_names=trans_ctx.out_names,
+    )
 
     # Make inputs and outputs to globals.
     sdfg_arg_names: list[str] = []
