@@ -460,7 +460,7 @@ class JaxprTranslationBuilder:
         """
         if not self.is_allocated():
             raise RuntimeError("Builder is not allocated, can not create constants.")
-        assert len(self._ctx.inp_names) == 0
+        assert self._ctx.inp_names is None
 
         # Handle the initial input arguments
         init_in_var_names: Sequence[str] = self.create_jax_var_list(
@@ -671,10 +671,13 @@ class JaxprTranslationBuilder:
 
         Todo:
             - Handle the case if if the output is a literal.
+
+        Note:
+            The function will _not_ update the `out_names` field of the current context.
         """
         assert self._ctx.terminal_state is self._ctx.start_state
-        assert len(self._ctx.inp_names) > 0
-        assert len(self._ctx.out_names) == 0
+        assert self._ctx.inp_names
+        assert self._ctx.out_names is None
 
         # There is not output so we do not have to copy anything around.
         if len(jaxpr.out_avals) == 0:
@@ -732,23 +735,30 @@ class JaxprTranslationBuilder:
 class TranslationContext:
     """Translation context used by the `JaxprTranslationBuilder`.
 
-    Essentially it is a `TranslatedJaxprSDFG` object together with some additional meta data,
-    that is needed during translation. It is also returned by the `translate_jaxpr()` function.
-    It is important that the SDFG it encapsulates is not directly usable and should be passed
-    to the post processing stage, i.e. `postprocess_jaxpr_sdfg()`, which will turn a context into
-    a `TranslatedJaxprSDFG` object.
+    Internal representation of the builder of an SDFG under construction together with the needed
+    metadata. Essentially it is an extended version of the `TranslatedJaxprSDFG`, but carrying
+    an unfinished canonical SDFG.
+    A user should consider this class as an opaque object, that represents an invalid
+    `TranslatedJaxprSDFG` object, and the only valid operation a user can do with it is passing it
+    either to `finalize_translation_context()` or the `postprocess_jaxpr_sdfg()` function.
 
     Attributes:
-        jsdfg:          The wrapped `TranslatedJaxprSDFG` object that stores the SDFG under
-            construction. `self` adds access properties to all attributes of the `TranslatedJaxprSDFG`.
-        start_state:    The first state in the SDFG state machine.
-        terminal_state: The (currently) last state in the state machine.
+        sdfg:              The encapsulated SDFG object.
+        inp_names:         A list of the SDFG variables that are used as input
+        out_names:         A list of the SDFG variables that are used as output.
+        start_state:       The first state in the SDFG state machine.
+        terminal_state:    The (currently) last state in the state machine.
 
     Args:
         name:       The name of the SDFG, will be forwarded to the encapsulated `TranslatedJaxprSDFG`.
+
+    Note:
+        Access of any attribute of this class by an outside user is considered undefined behaviour.
     """
 
-    jsdfg: translator.TranslatedJaxprSDFG
+    sdfg: dace.SDFG
+    inp_names: tuple[str, ...] | None
+    out_names: tuple[str, ...] | None
     start_state: dace.SDFGState
     terminal_state: dace.SDFGState
 
@@ -756,72 +766,32 @@ class TranslationContext:
         self,
         name: str | None = None,
     ) -> None:
-        from jace import translator  # Cyclic import
+        if isinstance(name, str) and not util.VALID_SDFG_OBJ_NAME.fullmatch(name):
+            raise ValueError(f"'{name}' is not a valid SDFG name.")
 
-        self.jsdfg = translator.TranslatedJaxprSDFG(name=name)
+        self.sdfg = dace.SDFG(name=(name or f"unnamed_SDFG_{id(self)}"))
+        self.inp_names = None
+        self.out_names = None
         self.start_state = self.sdfg.add_state(label="initial_state", is_start_block=True)
         self.terminal_state = self.start_state
-
-    @property
-    def sdfg(self) -> dace.SDFG:
-        return self.jsdfg.sdfg
-
-    @property
-    def inp_names(self) -> tuple[str, ...]:
-        return self.jsdfg.inp_names
-
-    @inp_names.setter
-    def inp_names(self, inp_names: tuple[str, ...]) -> None:
-        if len(inp_names) == 0:
-            raise dace.sdfg.InvalidSDFGError(
-                "There are no input arguments.",
-                self.sdfg,
-                self.sdfg.node_id(self.sdfg.start_state),
-            )
-        if any(inp not in self.sdfg.arrays for inp in inp_names):
-            raise dace.sdfg.InvalidSDFGError(
-                f"Expected to find: {(inp for inp in inp_names if inp not in self.sdfg.arrays)}",
-                self.sdfg,
-                self.sdfg.node_id(self.start_state),
-            )
-        self.jsdfg.inp_names = inp_names
-
-    @property
-    def out_names(self) -> tuple[str, ...]:
-        return self.jsdfg.out_names
-
-    @out_names.setter
-    def out_names(self, out_names: tuple[str, ...]) -> None:
-        if len(out_names) == 0:
-            raise dace.sdfg.InvalidSDFGError(
-                "There are no output arguments.",
-                self.sdfg,
-                self.sdfg.node_id(self.start_state),
-            )
-        if any(out not in self.sdfg.arrays for out in out_names):
-            raise dace.sdfg.InvalidSDFGError(
-                f"Expected to find: {(out for out in out_names if out not in self.sdfg.arrays)}",
-                self.sdfg,
-                self.sdfg.node_id(self.start_state),
-            )
-        self.jsdfg.out_names = out_names
 
     def validate(self) -> bool:
         """Validate internal state of `self`.
 
-        This function will not check the embedded SDFG.
+        Since the SDFG is under construction it will not be validated, instead the meta data
+        will be validated.
         """
-        if self.start_state and (self.start_state is not self.sdfg.start_block):
+        if self.start_state is not self.sdfg.start_block:
             raise dace.sdfg.InvalidSDFGError(
-                f"Expected to find '{self.start_state}' ({self.sdfg.node_id(self.start_state)}),"
-                f" instead found '{self.sdfg.start_block} ({self.sdfg.node_id(self.sdfg.start_block)}).",
+                f"Expected to find '{self.start_state}' as start state,"
+                f" but instead found '{self.sdfg.start_block}'.",
                 self.sdfg,
                 self.sdfg.node_id(self.start_state),
             )
-        if self.start_state and ({self.terminal_state} != set(self.sdfg.sink_nodes())):
+        if {self.terminal_state} != set(self.sdfg.sink_nodes()):
             raise dace.sdfg.InvalidSDFGError(
-                f"Expected to find '{self.terminal_state}' ({self.sdfg.node_id(self.terminal_state)}),"
-                f" instead found '{self.sdfg.sink_nodes()}.",
+                f"Expected to find as terminal state '{self.terminal_state}',"
+                f" but instead found '{self.sdfg.sink_nodes()}'.",
                 self.sdfg,
                 self.sdfg.node_id(self.terminal_state),
             )

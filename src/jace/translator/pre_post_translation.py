@@ -15,62 +15,83 @@ Currently they mostly exist for the sake of existing.
 from __future__ import annotations
 
 import copy
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
+
+from jace import translator
 
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-
-    from jace import translator
+    from collections.abc import Callable, Sequence
 
 
 def postprocess_jaxpr_sdfg(
     trans_ctx: translator.TranslationContext,
     fun: Callable,  # noqa: ARG001  # Currently unused
+    call_args: Sequence[Any],  # noqa: ARG001  # Currently unused
+    intree: None,  # noqa: ARG001  # Currently unused
 ) -> translator.TranslatedJaxprSDFG:
-    """Perform the final post processing steps on the `TranslationContext`.
+    """Perform the final post processing steps on the `TranslationContext` _in place_.
 
-    Returns:
-        The function returns a valid `TranslationContext` that is decoupled from the one
-        that was originally part of `trans_ctx`.
+    The function will perform post processing stages on the context in place.
+    However, the function will return a decoupled `TranslatedJaxprSDFG` object.
 
     Args:
         trans_ctx:  The `TranslationContext` obtained from the `translate_jaxpr()` function.
         fun:        The original function that was translated.
+        call_args:  The linearized input arguments.
+        intree:     The pytree describing the inputs.
 
     Todo:
         - Setting correct input names (layer that does not depend on JAX).
-        - Setting the correct strides & Storage properties.
+        - Setting the correct strides & storage properties.
+        - Fixing the scalar input problem on GPU.
     """
     # Currently we do nothing except finalizing.
     trans_ctx.validate()
-    tsdfg: translator.TranslatedJaxprSDFG = copy.deepcopy(trans_ctx.jsdfg)
 
-    finalize_jaxpr_sdfg(tsdfg)
+    #
+    # Assume some post processing here.
+    #
 
-    tsdfg.validate()
-    return tsdfg
+    return finalize_translation_context(trans_ctx, validate=True)
 
 
-def finalize_jaxpr_sdfg(
-    tsdfg: translator.TranslatedJaxprSDFG,
-) -> None:
-    """Finalizes the supplied `tsdfg` object in place.
+def finalize_translation_context(
+    trans_ctx: translator.TranslationContext,
+    validate: bool = True,
+) -> translator.TranslatedJaxprSDFG:
+    """Finalizes the supplied translation context `trans_ctx`.
 
-    This function will turn a non finalized, i.e. canonical, SDFG into a finalized one,
-    The function will:
-    - mark all input and output variables, i.e. listed in `tsdfg.{inp, out}_names`, as globals,
-    - set the `arg_names` property of the SDFG,
+    The function will process the SDFG that is encapsulated inside the context, i.e. a canonical
+    one, into a proper SDFG, as it is described in `TranslatedJaxprSDFG`.
+    It is important to realize that this function does not perform any optimization of the
+    underlying SDFG itself, instead it prepares an SDFG such that it can be passed to the
+    optimization pipeline.
+
+    The function will not mutate the passed translation context and the output is always decoupled
+    from its output.
+
+    Args:
+        trans_ctx:      The context that should be finalized.
+        validate:       Call the validate function after the finalizing.
     """
-    if not tsdfg.inp_names:
+    trans_ctx.validate()
+    if trans_ctx.inp_names is None:
         raise ValueError("Input names are not specified.")
-    if not tsdfg.out_names:
+    if trans_ctx.out_names is None:
         raise ValueError("Output names are not specified.")
 
-    # Canonical SDFGs do not have global memory, so we must transform it
+    # We guarantee decoupling
+    tsdfg = translator.TranslatedJaxprSDFG(
+        sdfg=copy.deepcopy(trans_ctx.sdfg),
+        inp_names=trans_ctx.inp_names,
+        out_names=trans_ctx.out_names,
+    )
+
+    # Make inputs and outputs to globals.
     sdfg_arg_names: list[str] = []
     for glob_name in tsdfg.inp_names + tsdfg.out_names:
-        if glob_name in sdfg_arg_names:  # Donated arguments
+        if glob_name in sdfg_arg_names:
             continue
         tsdfg.sdfg.arrays[glob_name].transient = False
         sdfg_arg_names.append(glob_name)
@@ -78,3 +99,8 @@ def finalize_jaxpr_sdfg(
     # This forces the signature of the SDFG to include all arguments in order they appear.
     #  If an argument is used as input and output then it is only listed as input.
     tsdfg.sdfg.arg_names = sdfg_arg_names
+
+    if validate:
+        tsdfg.validate()
+
+    return tsdfg
