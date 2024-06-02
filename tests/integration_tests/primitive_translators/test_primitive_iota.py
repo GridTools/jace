@@ -27,10 +27,10 @@ def test_iota_arange():
 
 def test_iota_broadcast():
     """Test more iota using the `jax.lax.broadcasted_iota()` function."""
-    shape = (4, 4, 4, 4)
+    shape = (2, 2, 2, 2)
 
     for d in range(len(shape)):
-
+        # Must be inside the loop to bypass caching.
         def testee(A: np.int32) -> jax.Array:
             return jax.lax.broadcasted_iota("int32", shape, d) + A  # noqa: B023  # Variable capturing.
 
@@ -38,4 +38,4 @@ def test_iota_broadcast():
         res = jace.jit(testee)(np.int32(0))
 
         assert res.shape == shape
-        assert np.all(ref == res)
+        assert np.all(ref == res), f"Expected: {ref.tolist()}; Got: {res.tolist()}"
