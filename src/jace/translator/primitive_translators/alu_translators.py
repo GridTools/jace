@@ -5,15 +5,20 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Module containing all translators related to arithmetic logical operations."""
+"""Module containing all translators related to arithmetic and logical operations.
+
+Todo:
+    - Hijack Jax to inject a proper modulo operation.
+"""
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Final
 
+import dace
 from typing_extensions import override
 
-from jace import translator
+from jace import translator, util
 from jace.translator import mapped_operation_base_translator as mapped_base
 
 
@@ -23,26 +28,28 @@ if TYPE_CHECKING:
     from jax import core as jax_core
 
 
-class ALUTranslator(mapped_base.MappedOperationTranslatorBase):
-    """Translator for all arithmetic and logical operations.
+class ArithmeticOperationTranslator(mapped_base.MappedOperationTranslatorBase):
+    """Translator for all arithmetic operations.
 
-    The class uses `MappedOperationBaseTranslator` for generating the maps.
-    Its `write_tasklet_code()` function will perform replace all literals.
+    The class makes use of the `MappedOperationTranslatorBase`. It only implements the
+    `write_tasklet_code()` to generate the code for a Tasklet from a template.
+
+    Args:
+        prim_name:      The name of the primitive that should be handled.
+        tskl_tmpl:      Template used for generating the Tasklet code.
+
+    Note:
+        - It does not implement the logical operations, they are implemented by the
+            `LogicalOperationTranslator` class.
+        - It does not implement `mod` nor `fmod` as they are translated to some nested `pjit`
+            implementation by Jax for unknown reasons.
     """
-
-    __slots__ = ("_tskl_tmpl",)
 
     def __init__(
         self,
         prim_name: str,
         tskl_tmpl: str,
     ) -> None:
-        """Initialize a base translator for primitive `prim_name` with template `tskl_tmpl`.
-
-        Args:
-            prim_name:      The name of the primitive that should be handled.
-            tskl_tmpl:      Template used for generating the Tasklet code.
-        """
         super().__init__(primitive_name=prim_name)
         self._tskl_tmpl = tskl_tmpl
 
@@ -60,15 +67,61 @@ class ALUTranslator(mapped_base.MappedOperationTranslatorBase):
         return tskl_code
 
 
-# Contains all the templates for ALU operations.
-#  TODO(phimuell): Import them also from `frontend/python/replacements.py`, however, the names
-#   do not fully matches the Jax names, `grep -P '^[a-zA-Z0-9_]+_p[[:space:]]+' -r -o -h | sort -u`
-# NOTES:
-#   - Jax does not seem to have a mod, `%? , operation, instead a nested computation is done.
-#   - Jax has multiple shift operations, only one is implemented.
-#   - The logical operations, i.e. `and`, `xor`, `or` and `not` are bitwise, in Jax.
+class LogicalOperationTranslator(mapped_base.MappedOperationTranslatorBase):
+    """Translator for all logical operations.
+
+    The reason why the logical operations are separated from the arithmetic operation is quite
+    complicated, and in fact the whole thing is harder than it should be.
+    NumPy has two kinds of these operations, i.e. `logical_{and, or, xor, not}()` and
+    `bitwise_{and, or, xor, not}()`, but Jax has only a single kind of logical operations, that
+    operate in bitwise mode.
+    The first idea would be to use `ArithmeticOperationTranslator` with a template such as
+    `__out = __in0 & __in1` or `__out = ~__in0`. Since DaCe eventually generates C++ code and C++
+    has a native bool type, and `true` is guaranteed to be `1` and `false` equals `0`, this works
+    for all operations except `not`, as `~true` in C++ is again `true`. Thus the `not` primitive
+    must be handled separately, however, it does not make sense to split the logical operations,
+    thus all of them are handled by this class.
+    I think that in XLA, Jax target language, a bool is either a single bit or either all bits are
+    one or zero.
+
+    The solution to the problem is, to introduce two templates, one used for the bool context
+    and one used in the integer context. This works because depending if the `logical_*()` or
+    `bitwise_*()` functions are used the input is either of type bool or an integer.
+
+    Args:
+        prim_name:      The name of the primitive that should be handled.
+        int_tmpl:       The template used for the integer case.
+        bool_tmpl:      The template used for the bool case.
+
+    Notes:
+        This class does not do parameter substitution as the `ArithmeticOperationTranslator` does.
+    """
+
+    def __init__(
+        self,
+        prim_name: str,
+        int_tmpl: str,
+        bool_tmpl: str,
+    ) -> None:
+        super().__init__(primitive_name=prim_name)
+        self._int_tmpl = int_tmpl
+        self._bool_tmpl = bool_tmpl
+
+    @override
+    def write_tasklet_code(
+        self,
+        tskl_ranges: Sequence[tuple[str, str]],
+        in_var_names: Sequence[str | None],
+        eqn: jax_core.JaxprEqn,
+    ) -> str:
+        if all(util.get_jax_var_dtype(invar) is dace.bool_ for invar in eqn.invars):
+            return self._bool_tmpl
+        return self._int_tmpl
+
+
+# Contains the code templates for all supported arithmetic operations.
 # fmt: off
-_ALU_OPS_TMPL: Final[dict[str, str]] = {
+_ARITMETIC_OPERATION_TEMPLATES: Final[dict[str, str]] = {
     # Unary operations
     "pos": "__out = +(__in0)",
     "neg": "__out = -(__in0)",
@@ -129,15 +182,24 @@ _ALU_OPS_TMPL: Final[dict[str, str]] = {
     "right_shift": "__out = (__in0) >> (__in1)",
     "nextafter": "__out = nextafter((__in0), (__in1))",
 
-    # Logical operations
-    #  Note in Jax all logical operations are bitwise; for "logical" operations they are first
-    #  turned into "bools" by `ne a 0`.
-    "or": "__out = (__in0) | (__in1)",
-    "not": "__out = ~(__in0)",
-    "and": "__out = (__in0) & (__in1)",
-    "xor": "__out = (__in0) ^ (__in1)",
 }
 
-# Create the ALU translators
-for pname, ptmpl in _ALU_OPS_TMPL.items():
-    translator.register_primitive_translator(ALUTranslator(pname, ptmpl))
+
+# Contains the code templates for all logical operations.
+#  The first one is for the integer case, the second for the bool case.
+_LOGICAL_OPERATION_TEMPLATES: Final[dict[str, tuple[str, str]]] = {
+    "or": ("__out = (__in0) | (__in1)",  "__out = (__in0) or (__in1)"),
+    "not": ("__out = ~(__in0)", "__out = not (__in0)"),
+    "and": ("__out = (__in0) & (__in1)", "__out = (__in0) and (__in1)"),
+    "xor": ("__out = (__in0) ^ (__in1)", "__out = (__in0) != (__in1)"),
+}
+
+
+
+# Create the arithmetic translators
+for pname, ptmpl in _ARITMETIC_OPERATION_TEMPLATES.items():
+    translator.register_primitive_translator(ArithmeticOperationTranslator(pname, ptmpl))
+
+# create the logical translators.
+for pname, (itmpl, btmpl) in _LOGICAL_OPERATION_TEMPLATES.items():
+    translator.register_primitive_translator(LogicalOperationTranslator(pname, itmpl, btmpl))

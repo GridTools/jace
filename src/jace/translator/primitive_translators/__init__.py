@@ -8,7 +8,7 @@
 
 from __future__ import annotations
 
-from .alu_translators import ALUTranslator
+from .alu_translators import ArithmeticOperationTranslator
 from .broadcast_in_dim_translator import BroadcastInDimTranslator
 from .convert_element_type_translator import ConvertElementTypeTranslator
 from .copy_translator import CopyTranslator, DevicePutTranslator
@@ -20,7 +20,7 @@ from .squeeze_translator import SqueezeTranslator
 
 
 __all__ = [
-    "ALUTranslator",
+    "ArithmeticOperationTranslator",
     "BroadcastInDimTranslator",
     "ConvertElementTypeTranslator",
     "CopyTranslator",

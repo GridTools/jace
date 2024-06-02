@@ -54,8 +54,6 @@ class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
         This class will always generate a mapped Tasklet, even if a scalar is handled.
     """
 
-    __slots__ = ("_prim_name",)
-
     def __init__(
         self,
         primitive_name: str,
