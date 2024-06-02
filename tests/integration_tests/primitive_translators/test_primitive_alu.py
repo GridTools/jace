@@ -5,7 +5,9 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Implements tests for the ALU translator.
+"""Implements tests for the ALU and the `MappedOperationTranslatorBase` translator.
+
+The function mostly tests the `MappedOperationTranslatorBase` class by performing additions.
 
 Todo:
     - Add all supported primitives, to see if the template is valid.
@@ -14,7 +16,7 @@ Todo:
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 import jax
 import numpy as np
@@ -28,6 +30,33 @@ from tests import util as testutil
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+
+@pytest.fixture(autouse=True)
+def _only_alu_translators():
+    """Removes all non arithmetic/logical translator from the registry.
+
+    This ensures that Jax is not doing some stuff that is supposed to be handled by the
+    test class, such as broadcasting. It makes writing tests a bit harder, but it is worth.
+    """
+    from jace.translator.primitive_translators.alu_translators import (
+        _ARITMETIC_OPERATION_TEMPLATES,
+        _LOGICAL_OPERATION_TEMPLATES,
+    )
+
+    # Remove all non ALU translators from the registry
+    all_translators = jace.translator.get_regsitered_primitive_translators()
+    alu_translators_names = (
+        _LOGICAL_OPERATION_TEMPLATES.keys() | _ARITMETIC_OPERATION_TEMPLATES.keys()
+    )
+    jace.translator.set_active_primitive_translators_to(
+        {p: t for p, t in all_translators.items() if p in alu_translators_names}
+    )
+
+    yield
+
+    # Restore the initial state
+    jace.translator.set_active_primitive_translators_to(all_translators)
 
 
 @pytest.fixture(
@@ -56,16 +85,25 @@ def _perform_alu_test(testee: Callable, *args: Any) -> None:
 
     ref = testee(*args)
     res = wrapped(*args)
+
+    if jace.util.is_scalar(ref):
+        # Builder hack, only arrays are generated.
+        assert res.shape == (1,)
+    elif ref.shape == ():  # TODO: Investigate
+        assert res.shape == (1,)
+    else:
+        assert ref.shape == res.shape
+    assert ref.dtype == res.dtype
     assert np.allclose(ref, res), f"Expected '{ref.tolist()}' got '{res.tolist()}'"
 
 
 def test_alu_unary_scalar():
     """Test unary ALU translator in the scalar case."""
 
-    def testee(A: float) -> float | jax.Array:
+    def testee(A: np.float64) -> np.float64 | jax.Array:
         return jnp.cos(A)
 
-    _perform_alu_test(testee, 1.0)
+    _perform_alu_test(testee, np.float64(1.0))
 
 
 def test_alu_unary_array():
@@ -90,40 +128,47 @@ def test_alu_unary_scalar_literal():
 
 def test_alu_unary_integer_power():
     """Tests the integer power, which has a parameter."""
-    for exp in [0, 1, 2, 10]:
 
-        def testee(A: np.ndarray) -> np.ndarray:
-            return A ** int(exp)  # noqa: B023 # `exp` is not used in the body
+    def testee(A: np.ndarray) -> np.ndarray:
+        return A**3
 
-        A = testutil.mkarray((10, 2 + exp, 3))
-        _perform_alu_test(testee, A)
+    A = testutil.mkarray((10, 2, 3))
+    _perform_alu_test(testee, A)
+
+
+def test_alu_unary_regular_power():
+    """Tests the "normal" power operator, i.e. not with a known integer power."""
+
+    for exp in [3, np.float64(3.1415)]:
+
+        def testee(A: np.ndarray, exp: int | float) -> np.ndarray:
+            return A**exp
+
+        A = testutil.mkarray((10, 2, 3))
+        _perform_alu_test(testee, A, exp)
 
 
 def test_alu_binary_scalar():
     """Scalar binary operation."""
 
-    def testee(A: float, B: float) -> float:
+    def testee(A: np.float64, B: np.float64) -> np.float64:
         return A * B
 
-    _perform_alu_test(testee, 1.0, 2.0)
+    _perform_alu_test(testee, np.float64(1.0), np.float64(2.0))
 
 
 def test_alu_binary_scalar_literal():
     """Scalar binary operation, with a literal."""
 
-    def testee(A: float) -> float:
+    def testeeR(A: np.float64) -> np.float64:
         return A * 2.03
 
-    _perform_alu_test(testee, 7.0)
-
-
-def test_alu_binary_scalar_literal_2():
-    """Scalar binary operation, with a literal."""
-
-    def testee(A: float) -> float:
+    def testeeL(A: np.float64) -> np.float64:
         return 2.03 * A
 
-    _perform_alu_test(testee, 7.0)
+    A = np.float64(7.0)
+    _perform_alu_test(testeeR, A)
+    _perform_alu_test(testeeL, A)
 
 
 def test_alu_binary_array():
@@ -140,8 +185,8 @@ def test_alu_binary_array():
 def test_alu_binary_array_scalar():
     """Test binary of array with scalar."""
 
-    def testee(A: np.ndarray | float, B: float | np.ndarray) -> np.ndarray:
-        return cast(np.ndarray, A + B)
+    def testee(A: np.ndarray | np.float64, B: np.float64 | np.ndarray) -> np.ndarray:
+        return A + B  # type: ignore[return-value]  # It is always an array.
 
     A = testutil.mkarray((100, 22))
     B = np.float64(1.34)
@@ -152,21 +197,15 @@ def test_alu_binary_array_scalar():
 def test_alu_binary_array_literal():
     """Test binary of array with literal"""
 
-    def testee(A: np.ndarray) -> np.ndarray:
+    def testeeR(A: np.ndarray) -> np.ndarray:
         return A + 1.52
 
-    A = testutil.mkarray((100, 22))
-    _perform_alu_test(testee, A)
-
-
-def test_alu_binary_array_literal_2():
-    """Test binary of array with literal"""
-
-    def testee(A: np.ndarray) -> np.ndarray:
+    def testeeL(A: np.ndarray) -> np.ndarray:
         return 1.52 + A
 
     A = testutil.mkarray((100, 22))
-    _perform_alu_test(testee, A)
+    _perform_alu_test(testeeR, A)
+    _perform_alu_test(testeeL, A)
 
 
 def test_alu_binary_array_constants():
@@ -209,15 +248,15 @@ def test_alu_binary_broadcast_3():
     def testee(A: np.ndarray, B: np.ndarray) -> np.ndarray:
         return A + B
 
-    A = testutil.mkarray((5, 1, 3, 4, 1))
-    B = testutil.mkarray((5, 1, 3, 1, 2))
+    A = testutil.mkarray((5, 1, 3, 4, 1, 5))
+    B = testutil.mkarray((5, 1, 3, 1, 2, 5))
     _perform_alu_test(testee, A, B)
     _perform_alu_test(testee, B, A)
 
 
 def test_alu_logical_bitwise_operation(
     logical_ops: tuple[Callable, tuple[np.ndarray, ...]],
-):
+) -> None:
     """Tests if the logical and bitwise operations works as they do in Jax."""
     inputs: tuple[np.ndarray, ...] = logical_ops[1]
 
