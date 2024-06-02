@@ -9,6 +9,7 @@
 
 Todo:
     - Implement some fixture that allows to force validation.
+    - Implement fixture to disable and enable optimisation, i.e. doing it twice.
 """
 
 from __future__ import annotations
