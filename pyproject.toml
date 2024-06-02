@@ -46,33 +46,36 @@ Changelog = "https://github.com/GridTools/JaCe/releases"
 Discussions = "https://github.com/GridTools/JaCe/discussions"
 Homepage = "https://github.com/GridTools/JaCe"
 
-[tool.coverage.run]
-branch = true
-source = ["jace"]
+[tool.coverage]
+
+[tool.coverage.html]
+show_contexts = true
 
 [tool.coverage.report]
 # Regexes for lines to exclude from consideration
 exclude_also = [
   # Don't complain about missing debug-only code:
   'def __repr__',
-
   # Don't complain about typechecker includes
   'if typing.TYPE_CHECKING:',
   '\.\.\.',
   '@overload',
-
   # Don't complain if tests don't hit defensive assertion code:
   'raise AssertionError',
   'raise NotImplementedError',
-
   # Don't complain if non-runnable code isn't run:
   'if 0:',
   'if __name__ == .__main__.:',
-
-  # Don't complain about abstract methods, they aren't run:
+  # Don't complain about abstract methods and interfaces.
   '@(abc\\.)?abstractmethod',
   '@(abc\\.)?abstract',
-  ]
+  'class .*\bProtocol\):'
+]
+
+[tool.coverage.run]
+branch = true
+dynamic_context = "test_function"
+source = ["jace"]
 
 # -- mypy  --
 [tool.mypy]
