@@ -110,8 +110,6 @@ def run_jax_sdfg(
         raise NotImplementedError("No kwargs are supported yet.")
     if len(inp_names) != len(cargs):
         raise RuntimeError("Wrong number of arguments.")
-    if len(set(inp_names).intersection(out_names)) != 0:
-        raise NotImplementedError("Using an input also for output is not yet supported.")
     if len(sdfg.free_symbols) != 0:  # This is a simplification that makes our life simple.
         raise NotImplementedError(
             f"No externally defined symbols are allowed, found: {sdfg.free_symbols}"
@@ -126,9 +124,12 @@ def run_jax_sdfg(
         call_args[in_name] = in_val
 
     for out_name, sarray in ((name, sdfg.arrays[name]) for name in out_names):
-        assert not (out_name in call_args and util.is_jax_array(call_args[out_name]))
-        assert isinstance(sarray, dace_data.Array)
-        call_args[out_name] = dace_data.make_array_from_descriptor(sarray)
+        if out_name in call_args:
+            if util.is_jax_array(call_args[out_name]):
+                # Jax arrays are immutable, so they can not be return values too.
+                raise ValueError("Passed a Jax array as output.")
+        else:
+            call_args[out_name] = dace_data.make_array_from_descriptor(sarray)
 
     assert len(call_args) == len(csdfg.argnames), (
         "Failed to construct the call arguments,"
