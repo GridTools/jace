@@ -546,7 +546,7 @@ class JaxprTranslationBuilder:
     def _translate_single_eqn(
         self,
         eqn: jax_core.JaxprEqn,
-    ) -> tuple[Sequence[str | None], Sequence[str]]:
+    ) -> None:
         """Translate `eqn` into its SDFG equivalent.
 
         To do this the function will perform the following steps:
@@ -554,10 +554,6 @@ class JaxprTranslationBuilder:
         - Select the appropriate primitive translator to use.
         - Create a new empty state terminal state.
         - Call the primitive translator to perform the translation inside the new state.
-
-        Returns:
-            The SDFG names that were used as inputs and outputs. The inputs might contain `None`
-            which indicates that this particular input was a literal.
         """
         if len(eqn.effects) != 0:
             raise NotImplementedError(f"Equation '{eqn}' has side effects.")
@@ -619,8 +615,6 @@ class JaxprTranslationBuilder:
         # Modify terminal root state of 'self'
         self._ctx.terminal_state = new_sdfg_term_state
 
-        return (in_var_names, out_var_names)
-
     def _translate_jaxpr_internal(
         self,
         jaxpr: jax_core.ClosedJaxpr,
@@ -643,12 +637,18 @@ class JaxprTranslationBuilder:
             if any(util.is_drop_var(outVar) for outVar in eqn.outvars):
                 assert all(util.is_drop_var(outVar) for outVar in eqn.outvars)
                 continue
-            _, out_var_names = self._translate_single_eqn(eqn=eqn)
+            self._translate_single_eqn(eqn=eqn)
             nb_translated_eqn += 1
 
-        # There were no (useful) equations; thus the Jaxpr was empty.
+        # Handle the output or the case of an empty Jaxpr
         if nb_translated_eqn == 0:
             out_var_names = self._handle_null_jaxpr(jaxpr)
+        else:
+            out_var_names = self.create_jax_var_list(
+                jaxpr.jaxpr.outvars,
+                prevent_creation=True,
+                handle_literals=False,
+            )
 
         self._ctx.out_names = tuple(out_var_names)
 
