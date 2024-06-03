@@ -565,9 +565,14 @@ def test_builder_multiple_return_values() -> None:
     assert np.allclose(ref, res)
 
 
-@pytest.mark.skip(reason="The input is not copied in the output.")
 def test_builder_direct_return() -> None:
-    """Tests the case, when an input value is returned as output."""
+    """Tests the case, when an input value is returned as output.
+
+    Note:
+        The test function below will not return a reference to its input, but perform an actual
+        copy. This behaviour does look strange from a Python point of view, however, it is (at the
+        time of writing) consistent with what Jax does, even when passing Jax arrays directly.
+    """
 
     @jace.jit
     def wrapped(A: np.ndarray, B: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:

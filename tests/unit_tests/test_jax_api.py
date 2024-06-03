@@ -15,7 +15,8 @@ import pytest
 from jax import numpy as jnp
 
 import jace
-from jace import util as jutil
+from jace import translator, util
+from jace.translator import pre_post_translation as ptrans
 
 from tests import util as testutil
 
@@ -32,10 +33,10 @@ def test_jit():
     jax_testee = jax.jit(testee)
     jace_testee = jace.jit(testee)
 
-    assert jutil.is_jaxified(jax_testee)
-    assert not jutil.is_jaxified(jace_testee)
-    assert not jutil.is_jaceified(jax_testee)
-    assert jutil.is_jaceified(jace_testee)
+    assert util.is_jaxified(jax_testee)
+    assert not util.is_jaxified(jace_testee)
+    assert not util.is_jaceified(jax_testee)
+    assert util.is_jaceified(jace_testee)
 
     ref = jax_testee(A, B)
     res = jace_testee(A, B)
@@ -71,7 +72,7 @@ def test_composition_itself():
     def ddf(x):
         return df(x)
 
-    assert all(jutil.is_jaceified(x) for x in [f, df, ddf])
+    assert all(util.is_jaceified(x) for x in [f, df, ddf])
 
     x = 1.0
     for fun, fref in zip([f, df, ddf], [f_ref, df_ref, ddf_ref]):
@@ -107,25 +108,25 @@ def test_composition_with_jax_2():
     def f1_jax(A, B):
         return A + B
 
-    assert jutil.is_jaxified(f1_jax)
+    assert util.is_jaxified(f1_jax)
 
     @jace.jit
     def f2_jace(A, B, C):
         return f1_jax(A, B) - C
 
-    assert jutil.is_jaceified(f2_jace)
+    assert util.is_jaceified(f2_jace)
 
     @jax.jit
     def f3_jax(A, B, C, D):
         return f2_jace(A, B, C) * D
 
-    assert jutil.is_jaxified(f3_jax)
+    assert util.is_jaxified(f3_jax)
 
     @jace.jit
     def f3_jace(A, B, C, D):
         return f3_jax(A, B, C, D)
 
-    assert jutil.is_jaceified(f3_jace)
+    assert util.is_jaceified(f3_jace)
 
     A, B, C, D = (testutil.mkarray((10, 3, 50)) for _ in range(4))
 
@@ -186,11 +187,11 @@ def test_grad_control_flow():
     assert df(x2) == df_x2, f"Failed upper branch, expected '{df_x2}', got '{res_2}'."
 
 
-@pytest.mark.skip(reason="Running JaCe with disabled 'x64' support does not work.")
 def test_disabled_x64():
-    """Tests the behaviour of the tool chain if we explicitly disable x64 support in Jax.
+    """Tests the behaviour of the tool chain if x64 support is disabled.
 
-    If you want to test, if this restriction still applies, you can enable the test.
+    Notes:
+        Once the x64 issue is resolved make this test a bit more useful.
     """
     from jax.experimental import disable_x64
 
@@ -201,15 +202,25 @@ def test_disabled_x64():
     B = np.float64(10.0)
 
     # Run them with disabled x64 support
+    #  This is basically a reimplementation of the `JaCeWrapped.lower()` function.
+    #  but we have to do it this way to disable the x64 mode in translation.
     with disable_x64():
-        # JaCe
-        jace_testee = jace.jit(testee)
-        jace_lowered = jace_testee.lower(A, B)
-        jace_comp = jace_lowered.compile()
-        res = jace_comp(A, B)
+        jaxpr = jax.make_jaxpr(testee)(A, B)
 
-        # Jax
-        jax_testee = jax.jit(testee)
-        ref = jax_testee(A, B)
+    builder = translator.JaxprTranslationBuilder(
+        primitive_translators=translator.get_regsitered_primitive_translators(),
+    )
+    trans_ctx: translator.TranslationContext = builder.translate_jaxpr(jaxpr)
 
-    assert np.allclose(ref, res), "Expected that: {ref.tolist()}, but got {res.tolist()}."
+    tsdfg: translator.TranslatedJaxprSDFG = ptrans.postprocess_jaxpr_sdfg(
+        trans_ctx=trans_ctx,
+        fun=testee,
+        call_args=(A, B),  # Already linearised, since we only accept positional args.
+        intree=None,  # Not yet implemented.
+    )
+
+    # Because x64 is disabled Jax traces the input as float32, even if we have passed
+    #  float64 as input! Calling the resulting SDFG with the arguments we used for lowering
+    #  will result in an error, because of the situation, `sizeof(float32) < sizeof(float64)`,
+    #  no out of bound error would result, but the values are garbage.
+    assert tsdfg.sdfg.arrays[tsdfg.inp_names[0]].dtype.as_numpy_dtype().type is np.float32
