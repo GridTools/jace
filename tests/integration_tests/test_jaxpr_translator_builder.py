@@ -532,7 +532,101 @@ def test_builder_scalar_return_type() -> None:
         return A + A - A * A
 
     A = np.float64(1.0)
-    assert type(A) is np.float64, f"Expected type 'np.float64', but got '{type(A).__name__}'."
+    res = wrapped(A)
+    assert type(res) is np.float64, f"Expected type 'np.float64', but got '{type(res).__name__}'."
+    assert res == np.float64(0.0)
+
+
+def test_builder_multiple_return_values() -> None:
+    """Tests the case that we return multiple value.
+
+    Currently this is always a tuple.
+    """
+
+    @jace.jit
+    def wrapped(A: np.ndarray, B: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        return A + B, A - B
+
+    A = testutil.mkarray((2, 2))
+    B = testutil.mkarray((2, 2))
+
+    lowered = wrapped.lower(A, B)
+    compiled = lowered.compile()
+
+    ref = (A + B, A - B)
+    res = compiled(A, B)
+
+    assert len(lowered._translated_sdfg.inp_names) == 2
+    assert len(compiled._inp_names) == 2
+    assert len(lowered._translated_sdfg.out_names) == 2
+    assert len(compiled._out_names) == 2
+    assert isinstance(res, tuple), f"Expected 'tuple', but got '{type(res).__name__}'."
+    assert len(res) == 2
+    assert np.allclose(ref, res)
+
+
+@pytest.mark.skip(reason="The input is not copied in the output.")
+def test_builder_direct_return() -> None:
+    """Tests the case, when an input value is returned as output."""
+
+    @jace.jit
+    def wrapped(A: np.ndarray, B: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        return A + B, B, A
+
+    A = testutil.mkarray((2, 2))
+    B = testutil.mkarray((2, 2))
+
+    ref0 = A + B
+    res = wrapped(A, B)
+
+    assert isinstance(res, tuple)
+    assert len(res) == 3
+    assert np.allclose(ref0, res[0])
+    assert np.all(res[2] == A)
+    assert res[2].__array_interface__["data"][0] != A.__array_interface__["data"][0]
+    assert np.all(res[1] == B)
+    assert res[1].__array_interface__["data"][0] != B.__array_interface__["data"][0]
+
+
+@pytest.mark.skip(reason="Literal return values are not supported.")
+def test_builder_literal_return_value() -> None:
+    """Tests if there can be literals in the return values."""
+
+    def testee(A: np.ndarray) -> tuple[np.ndarray, np.float64, np.ndarray]:
+        return (A + 1.0, np.float64(1.0), A - 1.0)
+
+    A = testutil.mkarray((2, 2))
+    ref = testee(A)
+    res = jace.jit(testee)(A)
+
+    assert isinstance(res, tuple)
+    assert len(res) == 3
+    assert res[1].dtype is np.float64
+    assert all(np.allclose(ref[i], res[i]) for i in range(3))
+
+
+def test_builder_unused_arg() -> None:
+    """Tests if there is an unused argument."""
+
+    def testee(A: np.ndarray, B: np.ndarray) -> np.ndarray:  # noqa: ARG001  # Explicitly unused.
+        return A + 3.0
+
+    A = testutil.mkarray((10, 10))
+    B = testutil.mkarray((11, 11))
+    C = testutil.mkarray((20, 20))
+
+    wrapped = jace.jit(testee)
+    lowered = wrapped.lower(A, B)
+    compiled = lowered.compile()
+
+    ref = testee(A, B)
+    res1 = compiled(A, B)  # Correct call
+    res2 = compiled(A, C)  # wrong call to show that nothing is affected.
+
+    assert len(lowered._translated_sdfg.inp_names) == 2
+    assert len(compiled._inp_names) == 2
+    assert np.all(res1 == res2)
+    assert np.allclose(ref, res1)
 
 
 def test_builder_jace_var() -> None:
