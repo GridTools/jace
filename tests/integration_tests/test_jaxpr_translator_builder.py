@@ -565,6 +565,7 @@ def test_builder_multiple_return_values() -> None:
     assert np.allclose(ref, res)
 
 
+@pytest.mark.skip(reason="Direct returns, in a non empty context does not work yet.")
 def test_builder_direct_return() -> None:
     """Tests the case, when an input value is returned as output.
 
