@@ -5,12 +5,12 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Stand in for the `jax.*` namespace."""
+"""Implementation of the `jax.*` namespace."""
 
 from __future__ import annotations
 
 import functools
-from typing import TYPE_CHECKING, Any, Literal, cast, overload
+from typing import TYPE_CHECKING, Any, Literal, overload
 
 from jax import grad, jacfwd, jacrev
 
@@ -73,6 +73,7 @@ def jit(
         )
 
     def wrapper(f: Callable) -> stages.JaCeWrapped:
+        # TODO: Improve typing, such that signature is attached to the `JaCeWrapped`.
         jace_wrapper = stages.JaCeWrapped(
             fun=f,
             primitive_translators=(
@@ -82,6 +83,7 @@ def jit(
             ),
             jit_options=kwargs,
         )
-        return cast(stages.JaCeWrapped, functools.update_wrapper(jace_wrapper, f))
+        functools.update_wrapper(jace_wrapper, f)
+        return jace_wrapper
 
     return wrapper if fun is None else wrapper(fun)

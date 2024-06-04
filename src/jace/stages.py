@@ -90,9 +90,9 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"]):
         # We have to shallow copy both the translator and the jit options.
         #  This prevents that any modifications affect `self`.
         #  Shallow is enough since the translators themselves are immutable.
-        self._primitive_translators = dict(primitive_translators)
+        self._primitive_translators = {**primitive_translators}
         # TODO(phimuell): Do we need to deepcopy the options?
-        self._jit_options = dict(jit_options)
+        self._jit_options = {**jit_options}
         self._fun = fun
 
     def __call__(
@@ -195,7 +195,7 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"]):
 
     Note:
         `self` will manage the passed `tsdfg` object. Modifying it results in undefined behavior.
-        Although, `JaCeWrapped` is composable with Jax transformations `JaCeLowered` is not.
+        Although `JaCeWrapped` is composable with Jax transformations `JaCeLowered` is not.
         A user should never create such an object, instead `JaCeWrapped.lower()` should be used.
 
     Todo:
@@ -227,7 +227,7 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"]):
             the default arguments.
         """
         # We **must** deepcopy before we do any optimization, because all optimizations are in
-        #  place, however, to properly cache stages, they have to be immutable.
+        #  place, however, to properly cache stages, stages needs to be immutable.
         tsdfg: translator.TranslatedJaxprSDFG = copy.deepcopy(self._translated_sdfg)
         optimization.jace_optimize(tsdfg=tsdfg, **self._make_compiler_options(compiler_options))
 
@@ -240,8 +240,8 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"]):
     def compiler_ir(self, dialect: str | None = None) -> translator.TranslatedJaxprSDFG:
         """Returns the internal SDFG.
 
-        The function returns a `TranslatedJaxprSDFG` object. It is important that modifying this
-        object in any way is undefined behavior.
+        The function returns a `TranslatedJaxprSDFG` object. Direct modification of the returned
+        object is forbidden and will cause undefined behaviour.
         """
         if (dialect is None) or (dialect.upper() == "SDFG"):
             return self._translated_sdfg
@@ -268,7 +268,7 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"]):
         compiler options.
         """
         options = self._make_compiler_options(compiler_options)
-        call_args = tuple(sorted(options.items(), key=lambda X: X[0]))
+        call_args = tuple(sorted(options.items(), key=lambda x: x[0]))
         return tcache.StageTransformationSpec(stage_id=id(self), call_args=call_args)
 
     def _make_compiler_options(
@@ -296,9 +296,9 @@ class JaCeCompiled:
         - Handle pytrees.
     """
 
-    _csdfg: dace_helper.CompiledSDFG  # The compiled SDFG object.
-    _inp_names: tuple[str, ...]  # Name of all input arguments.
-    _out_names: tuple[str, ...]  # Name of all output arguments.
+    _csdfg: dace_helper.CompiledSDFG
+    _inp_names: tuple[str, ...]
+    _out_names: tuple[str, ...]
 
     def __init__(
         self,

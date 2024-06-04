@@ -20,7 +20,7 @@ from jace import translator, util
 
 
 if TYPE_CHECKING:
-    from collections.abc import MutableSequence, Sequence
+    from collections.abc import Sequence
 
 
 class ALUTranslator(translator.PrimitiveTranslator):
@@ -48,7 +48,7 @@ class ALUTranslator(translator.PrimitiveTranslator):
         self,
         builder: translator.JaxprTranslationBuilder,
         in_var_names: Sequence[str | None],
-        out_var_names: MutableSequence[str],
+        out_var_names: Sequence[str],
         eqn: jax_core.JaxprEqn,
         eqn_state: dace.SDFGState,
     ) -> None:
