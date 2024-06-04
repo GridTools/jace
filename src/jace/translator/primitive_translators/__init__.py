@@ -8,7 +8,10 @@
 
 from __future__ import annotations
 
-from .alu_translators import ArithmeticOperationTranslator
+from .arithmetic_logical_translators import (
+    ArithmeticOperationTranslator,
+    LogicalOperationTranslator,
+)
 from .broadcast_in_dim_translator import BroadcastInDimTranslator
 from .convert_element_type_translator import ConvertElementTypeTranslator
 from .copy_translator import CopyTranslator, DevicePutTranslator
@@ -26,6 +29,7 @@ __all__ = [
     "CopyTranslator",
     "DevicePutTranslator",
     "IotaTranslator",
+    "LogicalOperationTranslator",
     "ReshapeTranslator",
     "SelectNTranslator",
     "SlicingTranslator",

@@ -49,8 +49,7 @@ class SelectNTranslator(mapped_base.MappedOperationTranslatorBase):
         in_var_names: Sequence[str | None],
         eqn: jax_core.JaxprEqn,
     ) -> str:
-        """Writes the selection code.
-        """
+        """Writes the selection code."""
         if len(in_var_names) == 3:
             # This order is correct, since `False` is interpreted as `0`, which means the first
             #  case. DaCe seems to have some problems with bools and integer casting around,
@@ -79,15 +78,13 @@ class SelectNTranslator(mapped_base.MappedOperationTranslatorBase):
             if in_var_name
         }
 
-
     def literal_substitution(
         self,
         tskl_code: str,
         in_var_names: Sequence[str | None],
         eqn: jax_core.JaxprEqn,
     ) -> str:
-        """Can not be done by the base because of the renaming.
-        """
+        """Can not be done by the base because of the renaming."""
         for i, in_var_name in enumerate(in_var_names[1:]):
             if in_var_name is not None:
                 continue

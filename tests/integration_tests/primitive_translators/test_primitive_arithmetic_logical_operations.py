@@ -39,7 +39,7 @@ def _only_alu_translators():
     This ensures that Jax is not doing some stuff that is supposed to be handled by the
     test class, such as broadcasting. It makes writing tests a bit harder, but it is worth.
     """
-    from jace.translator.primitive_translators.alu_translators import (
+    from jace.translator.primitive_translators.arithmetic_logical_translators import (
         _ARITMETIC_OPERATION_TEMPLATES,
         _LOGICAL_OPERATION_TEMPLATES,
     )

@@ -9,11 +9,10 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any
 
 import jax
 import numpy as np
-import pytest
 from jax import numpy as jnp
 
 import jace
@@ -21,8 +20,11 @@ import jace
 from tests import util as testutil
 
 
-def _perform_test(testee: Callable, *args: Any):
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
+
+def _perform_test(testee: Callable, *args: Any):
     res = testee(*args)
     ref = jace.jit(testee)(*args)
     assert np.all(res == ref)
@@ -42,8 +44,7 @@ def test_select_n_where():
 
 
 def test_select_n_where_literal():
-    """`np.where` where one of the input is a literal.
-    """
+    """`np.where` where one of the input is a literal."""
 
     def testee1(P: Any, F: Any) -> Any:
         return jnp.where(P, 2, F)

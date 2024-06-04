@@ -187,7 +187,7 @@ def test_grad_control_flow():
     assert df(x2) == df_x2, f"Failed upper branch, expected '{df_x2}', got '{res_2}'."
 
 
-def test_disabled_x64():
+def test_disabled_x64() -> None:
     """Tests the behaviour of the tool chain if x64 support is disabled.
 
     Notes:
