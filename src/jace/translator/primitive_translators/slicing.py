@@ -19,7 +19,7 @@ from jace.translator import mapped_operation_base_translator as mapped_base
 
 
 if TYPE_CHECKING:
-    from collections.abc import MutableSequence, Sequence
+    from collections.abc import Sequence
 
     from jax import core as jax_core
 
@@ -87,7 +87,7 @@ class DynamicSlicingTranslator(translator.PrimitiveTranslator):
         self,
         builder: translator.JaxprTranslationBuilder,
         in_var_names: Sequence[str | None],
-        out_var_names: MutableSequence[str],
+        out_var_names: Sequence[str],
         eqn: jax_core.JaxprEqn,
         eqn_state: dace.SDFGState,
     ) -> None:

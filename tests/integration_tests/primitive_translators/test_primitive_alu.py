@@ -45,7 +45,7 @@ def _only_alu_translators():
     )
 
     # Remove all non ALU translators from the registry
-    all_translators = jace.translator.get_regsitered_primitive_translators()
+    all_translators = jace.translator.get_registered_primitive_translators()
     alu_translators_names = (
         _LOGICAL_OPERATION_TEMPLATES.keys() | _ARITMETIC_OPERATION_TEMPLATES.keys()
     )

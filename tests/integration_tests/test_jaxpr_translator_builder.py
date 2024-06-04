@@ -44,7 +44,7 @@ def translation_builder():
     """Returns an allocated builder instance."""
     name = "fixture_builder"
     builder = translator.JaxprTranslationBuilder(
-        primitive_translators=translator.get_regsitered_primitive_translators()
+        primitive_translators=translator.get_registered_primitive_translators()
     )
     builder._allocate_translation_ctx(name=name)
     return builder
@@ -56,7 +56,7 @@ def test_builder_alloc() -> None:
     Does not use the fixture because it does it on its own.
     """
     builder = translator.JaxprTranslationBuilder(
-        primitive_translators=translator.get_regsitered_primitive_translators()
+        primitive_translators=translator.get_registered_primitive_translators()
     )
     assert not builder.is_allocated(), "Builder was created allocated."
     assert len(builder._ctx_stack) == 0

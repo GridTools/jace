@@ -208,7 +208,7 @@ def test_disabled_x64():
         jaxpr = jax.make_jaxpr(testee)(A, B)
 
     builder = translator.JaxprTranslationBuilder(
-        primitive_translators=translator.get_regsitered_primitive_translators(),
+        primitive_translators=translator.get_registered_primitive_translators(),
     )
     trans_ctx: translator.TranslationContext = builder.translate_jaxpr(jaxpr)
 

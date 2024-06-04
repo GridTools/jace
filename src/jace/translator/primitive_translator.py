@@ -12,12 +12,12 @@ Todo:
 
 from __future__ import annotations
 
-from abc import abstractmethod
+import abc
 from typing import TYPE_CHECKING, Literal, Protocol, cast, overload, runtime_checkable
 
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Mapping, MutableMapping, MutableSequence, Sequence
+    from collections.abc import Callable, Mapping, MutableMapping, Sequence
 
     import dace
     from jax import core as jax_core
@@ -32,17 +32,17 @@ _PRIMITIVE_TRANSLATORS_REGISTRY: dict[str, translator.PrimitiveTranslator] = {}
 class PrimitiveTranslatorCallable(Protocol):
     """Callable version of the primitive translators.
 
-    Used for type annotation purposes, classes should be derived from `PrimitiveTranslator` instead.
+    Used for type annotation purposes, the proper public interface is `PrimitiveTranslator`.
     You can use `jace.translator.make_primitive_translator()` to add a `primitive` property to
     a callable.
     """
 
-    @abstractmethod
+    @abc.abstractmethod
     def __call__(
         self,
         builder: translator.JaxprTranslationBuilder,
         in_var_names: Sequence[str | None],
-        out_var_names: MutableSequence[str],
+        out_var_names: Sequence[str],
         eqn: jax_core.JaxprEqn,
         eqn_state: dace.SDFGState,
     ) -> dace.SDFGState | None:
@@ -66,14 +66,11 @@ class PrimitiveTranslatorCallable(Protocol):
         reachable from `eqn_state`. If the function returns `None` the builder will assume that
         primitive translator was able to fully construct the dataflow graph within `eqn_state`.
 
-        While a primitive translator is forbidden from meddling with the input variables mentioned
-        in `in_var_names` in any way, it is allowed to modify the output variables. For example
-        a translator could create a new SDFG variable, with different strides. But in that case
-        the primitive translator must update the internal mapping of the builder TBA HOW, and
-        modify the names passed through `out_var_names`. However, the translator is allowed to
-        create internal temporary variables without registering them to the mapping, as long as it
-        uses the supplied variables as final output. To ensure that there are no collision with
-        further variables, the translator should prefix them.
+        A primitive translator has to use the passed input variables, `in_var_names` and must write
+        its output into the variables indicated by `out_var_names`.
+        But it is allowed that a primitive translator creates intermediate values as needed.
+        To ensure that there are no collision with further variables, the translator should prefix
+        them, see the `name_prefix` argument of `JaxprTranslationBuilder.add_array()`.
 
         Args:
             builder:        The builder object of the translation.
@@ -105,7 +102,7 @@ class PrimitiveTranslator(PrimitiveTranslatorCallable, Protocol):
     """
 
     @property
-    @abstractmethod
+    @abc.abstractmethod
     def primitive(self) -> str:
         """Returns the name of the Jax primitive that `self` is able to handle."""
         ...
@@ -208,7 +205,7 @@ def register_primitive_translator(
     return wrapper if primitive_translator is None else wrapper(primitive_translator)
 
 
-def get_regsitered_primitive_translators() -> dict[str, translator.PrimitiveTranslator]:
+def get_registered_primitive_translators() -> dict[str, translator.PrimitiveTranslator]:
     """Returns a copy of the current state of JaCe's global primitive registry.
 
     The state returned by this function is compatible to what `jace.hit`'s `primitive_translators`

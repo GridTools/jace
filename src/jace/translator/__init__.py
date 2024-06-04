@@ -17,7 +17,7 @@ from .jaxpr_translator_builder import JaxprTranslationBuilder, TranslationContex
 from .primitive_translator import (
     PrimitiveTranslator,
     PrimitiveTranslatorCallable,
-    get_regsitered_primitive_translators,
+    get_registered_primitive_translators,
     make_primitive_translator,
     register_primitive_translator,
     set_active_primitive_translators_to,
@@ -31,7 +31,7 @@ __all__ = [
     "PrimitiveTranslatorCallable",
     "TranslatedJaxprSDFG",
     "TranslationContext",
-    "get_regsitered_primitive_translators",
+    "get_registered_primitive_translators",
     "make_primitive_translator",
     "register_primitive_translator",
     "set_active_primitive_translators_to",

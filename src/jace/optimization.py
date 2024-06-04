@@ -29,9 +29,6 @@ class CompilerOptions(TypedDict, total=False):
     There are some predefined option sets in `jace.jax.stages`:
     - `DEFAULT_OPTIONS`
     - `NO_OPTIMIZATIONS`
-
-    Todo:
-        - Implement a context manager to dynamically change the default.
     """
 
     auto_optimize: bool
@@ -39,6 +36,7 @@ class CompilerOptions(TypedDict, total=False):
     persistent: bool
 
 
+# TODO(phimuell): Add a context manager to modify the default.
 DEFAULT_OPTIMIZATIONS: Final[CompilerOptions] = {
     "auto_optimize": True,
     "simplify": True,
@@ -71,10 +69,8 @@ def jace_optimize(
     Note:
         Its main job is to exists that we have something that we can call in the tool chain.
     """
-    if not kwargs:
-        return
+    # Currently this function exists primarily for the same of existing.
 
-    # Unpack the arguments, defaults are such that no optimization is done.
     simplify = kwargs.get("simplify", False)
     auto_optimize = kwargs.get("auto_optimize", False)
 

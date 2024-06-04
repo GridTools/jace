@@ -18,11 +18,19 @@ import pytest
 import jace
 from jace import translator
 from jace.translator import (
-    get_regsitered_primitive_translators,
+    get_registered_primitive_translators,
     make_primitive_translator,
     register_primitive_translator,
     set_active_primitive_translators_to,
 )
+
+
+@pytest.fixture(autouse=True)
+def _conserve_builtin_translators():
+    """Restores the set of registered subtranslators after a test."""
+    initial_translators = get_registered_primitive_translators()
+    yield
+    set_active_primitive_translators_to(initial_translators)
 
 
 @pytest.fixture()
@@ -31,17 +39,6 @@ def no_builtin_translators():  # noqa: PT004  # This is how you should do it: ht
     initial_translators = translator.set_active_primitive_translators_to({})
     yield
     translator.set_active_primitive_translators_to(initial_translators)
-
-
-@pytest.fixture(autouse=True)
-def _conserve_builtin_translators():
-    """Restores the state of the global registry.
-
-    Needed to revert the modifications some tests do to the global registry state.
-    """
-    initial_translators = get_regsitered_primitive_translators()
-    yield
-    set_active_primitive_translators_to(initial_translators)
 
 
 # These are definitions of some Subtranslators that can be used to test things.
@@ -76,13 +73,13 @@ def fake_add_translator(*args: Any, **kwargs: Any) -> None:  # noqa: ARG001
 def test_are_subtranslators_imported():
     """Tests if something is inside the list of subtranslators."""
     # Must be adapted if new primitives are implemented.
-    assert len(get_regsitered_primitive_translators()) == 62
+    assert len(get_registered_primitive_translators()) == 37
 
 
 @pytest.mark.usefixtures("no_builtin_translators")
 def test_subtranslatior_managing():
     """Basic functionality of the subtranslators."""
-    original_active_subtrans = get_regsitered_primitive_translators()
+    original_active_subtrans = get_registered_primitive_translators()
     assert len(original_active_subtrans) == 0
 
     # Create the classes.
@@ -97,27 +94,27 @@ def test_subtranslatior_managing():
         assert register_primitive_translator(sub) is sub
 
     # Tests if they were correctly registered
-    active_subtrans = get_regsitered_primitive_translators()
+    active_subtrans = get_registered_primitive_translators()
     for expected in prim_translators:
         assert active_subtrans[expected.primitive] is expected
     assert len(active_subtrans) == 3
 
 
 def test_subtranslatior_managing_isolation():
-    """Tests if `get_regsitered_primitive_translators()` protects the internal registry."""
+    """Tests if `get_registered_primitive_translators()` protects the internal registry."""
     assert (
-        get_regsitered_primitive_translators()
+        get_registered_primitive_translators()
         is not translator.primitive_translator._PRIMITIVE_TRANSLATORS_REGISTRY
     )
 
-    initial_primitives = get_regsitered_primitive_translators()
-    assert get_regsitered_primitive_translators() is not initial_primitives
+    initial_primitives = get_registered_primitive_translators()
+    assert get_registered_primitive_translators() is not initial_primitives
     assert "add" in initial_primitives, "For this test the 'add' primitive must be registered."
     org_add_prim = initial_primitives["add"]
 
     initial_primitives["add"] = fake_add_translator
     assert org_add_prim is not fake_add_translator
-    assert get_regsitered_primitive_translators()["add"] is org_add_prim
+    assert get_registered_primitive_translators()["add"] is org_add_prim
 
 
 def test_subtranslatior_managing_swap():
@@ -127,23 +124,23 @@ def test_subtranslatior_managing_swap():
     def same_structure(d1: dict, d2: dict) -> bool:
         return d1.keys() == d2.keys() and all(id(d2[k]) == id(d1[k]) for k in d1)
 
-    initial_primitives = get_regsitered_primitive_translators()
+    initial_primitives = get_registered_primitive_translators()
     assert "add" in initial_primitives
 
     # Now mutate the dict a little bit, shallow copy it first.
     mutated_primitives = initial_primitives.copy()
     mutated_primitives["add"] = fake_add_translator
     assert mutated_primitives.keys() == initial_primitives.keys()
-    assert same_structure(initial_primitives, get_regsitered_primitive_translators())
+    assert same_structure(initial_primitives, get_registered_primitive_translators())
     assert not same_structure(mutated_primitives, initial_primitives)
-    assert not same_structure(mutated_primitives, get_regsitered_primitive_translators())
+    assert not same_structure(mutated_primitives, get_registered_primitive_translators())
 
     # Now change the initial one with the mutated one.
     #  The object is copied but should still have the same structure.
     old_active = set_active_primitive_translators_to(mutated_primitives)
     assert mutated_primitives is not translator.primitive_translator._PRIMITIVE_TRANSLATORS_REGISTRY
     assert same_structure(old_active, initial_primitives)
-    assert same_structure(mutated_primitives, get_regsitered_primitive_translators())
+    assert same_structure(mutated_primitives, get_registered_primitive_translators())
 
 
 @pytest.mark.usefixtures("no_builtin_translators")
@@ -158,12 +155,12 @@ def test_subtranslatior_managing_callable_annotation():
 
     assert hasattr(non_existing_translator, "primitive")
     assert non_existing_translator.primitive == prim_name
-    assert len(get_regsitered_primitive_translators()) == 0
+    assert len(get_registered_primitive_translators()) == 0
 
 
 def test_subtranslatior_managing_overwriting():
     """Tests if we are able to overwrite something."""
-    current_add_translator = get_regsitered_primitive_translators()["add"]
+    current_add_translator = get_registered_primitive_translators()["add"]
 
     @make_primitive_translator("add")
     def useless_add_translator(*args: Any, **kwargs: Any) -> None:  # noqa: ARG001
@@ -177,13 +174,13 @@ def test_subtranslatior_managing_overwriting():
         ),
     ):
         register_primitive_translator(useless_add_translator)
-    assert current_add_translator is get_regsitered_primitive_translators()["add"]
+    assert current_add_translator is get_registered_primitive_translators()["add"]
 
     # Now we use overwrite, thus it will now work.
     assert useless_add_translator is register_primitive_translator(
         useless_add_translator, overwrite=True
     )
-    assert useless_add_translator is get_regsitered_primitive_translators()["add"]
+    assert useless_add_translator is get_registered_primitive_translators()["add"]
 
 
 @pytest.mark.usefixtures("no_builtin_translators")
@@ -228,7 +225,7 @@ def test_subtranslatior_managing_decoupling():
     def useless_add_translator(*args: Any, **kwargs: Any) -> None:  # noqa: ARG001
         raise NotImplementedError("The 'useless_add_translator' was called as expected.")
 
-    assert get_regsitered_primitive_translators()["add"] is useless_add_translator
+    assert get_registered_primitive_translators()["add"] is useless_add_translator
 
     # Since `foo` was already constructed, a new registering can not change anything.
     A = np.zeros((10, 10))
