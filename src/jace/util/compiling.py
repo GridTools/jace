@@ -121,12 +121,16 @@ def run_jax_sdfg(
         if util.is_scalar(in_val):
             # Currently the translator makes scalar into arrays, this has to be reflected here
             in_val = np.array([in_val])
+        elif util.is_jax_array(in_val):
+            # TODO(phimuell): Add test for this.
+            if not util.is_fully_addressable(in_val):
+                raise ValueError(f"Passed a not fully addressable Jax array as '{in_name}'")
+            in_val = in_val.__array__()
         call_args[in_name] = in_val
 
     for out_name, sarray in ((name, sdfg.arrays[name]) for name in out_names):
         if out_name in call_args:
             if util.is_jax_array(call_args[out_name]):
-                # Jax arrays are immutable, so they can not be return values too.
                 raise ValueError("Passed a Jax array as output.")
         else:
             call_args[out_name] = dace_data.make_array_from_descriptor(sarray)
