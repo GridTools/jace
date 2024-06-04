@@ -36,8 +36,9 @@ def mkarray(
         shape:      The shape to use.
         dtype:      The data type to use.
 
-    Todo:
-        - Also support integers.
+    Notes:
+        Floating point based values are generated in the range 0 to 1.0, integers are inside the
+        range `-2**16` to `2**16`.
     """
 
     if shape == ():
@@ -48,5 +49,7 @@ def mkarray(
     if dtype == np.bool_:
         return np.random.random(shape) > 0.5  # noqa: NPY002
     if np.issubdtype(dtype, np.integer):
-        return np.random.randint(low=-2**30, high=2**30, size=shape, dtype=dtype)  # noqa: NPY002
+        return np.random.randint(low=-2**16, high=2**16, size=shape, dtype=dtype)  # noqa: NPY002
+    if np.issubdtype(dtype, np.complexfloating):
+        return np.array(mkarray(shape, np.float64) + 1.0j * mkarray(shape, np.float64), dtype=dtype)
     return np.array(np.random.random(shape), dtype=dtype)  # noqa: NPY002
