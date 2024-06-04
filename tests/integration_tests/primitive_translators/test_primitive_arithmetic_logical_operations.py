@@ -18,6 +18,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
+import dace
 import jax
 import numpy as np
 import pytest
@@ -77,6 +78,47 @@ def logical_ops(request) -> tuple[Callable, tuple[np.ndarray, ...]]:
         request.param[0],
         tuple(testutil.mkarray((2, 2), request.param[2]) for _ in range(request.param[1])),
     )
+
+
+@pytest.fixture(
+    params=[
+        np.float32,
+        pytest.param(
+            np.complex64,
+            marks=pytest.mark.skip("Some complex values operations are not fully supported."),
+        ),
+    ]
+)
+def dtype(request) -> np.generic:
+    """The dtypes that should be used for the full alu tests."""
+    return request.param
+
+
+@pytest.fixture(
+    params=[
+        lambda x: +(x - 1.0),
+        lambda x: -x,
+        jnp.floor,
+        jnp.ceil,
+        jnp.round,
+        jnp.exp2,
+        jnp.exp,
+        lambda x: jnp.abs(x - 0.5),
+        lambda x: jnp.log(x + 1.0),
+        lambda x: jnp.sqrt(x**2),
+        # The following have a restricted input domain, so we use `x = f^{-1}(f(x))`.
+        lambda x: jnp.log1p(jnp.expm1(x)),
+        lambda x: jnp.asin(jnp.sin(x)),
+        lambda x: jnp.acos(jnp.cos(x)),
+        lambda x: jnp.atan(jnp.tan(x)),
+        lambda x: jnp.asinh(jnp.sinh(x)),
+        lambda x: jnp.acosh(jnp.cosh(x)),
+        lambda x: jnp.atanh(jnp.tanh(x)),
+    ]
+)
+def alu_unary_ops(request, dtype) -> tuple[Callable, np.ndarray]:
+    """The inputs and the operation we need for the full test."""
+    return (request.param, testutil.mkarray((2, 2), dtype))
 
 
 def _perform_alu_test(testee: Callable, *args: Any) -> None:
@@ -254,6 +296,22 @@ def test_alu_binary_broadcast_3():
     _perform_alu_test(testee, B, A)
 
 
+def test_alu_unary_isfinite():
+    def testee(A: np.ndarray) -> np.ndarray:
+        return jnp.isfinite(A)
+
+    A = np.array([np.inf, +np.inf, -np.inf, np.nan, -np.nan, 1.0])
+
+    args = dace.Config.get("compiler", "cpu", "args")
+    try:
+        new_args = args.replace("-ffast-math", "-fno-finite-math-only")
+        dace.Config.set("compiler", "cpu", "args", value=new_args)
+        _perform_alu_test(testee, A)
+
+    finally:
+        dace.Config.set("compiler", "cpu", "args", value=args)
+
+
 def test_alu_logical_bitwise_operation(
     logical_ops: tuple[Callable, tuple[np.ndarray, ...]],
 ) -> None:
@@ -264,3 +322,12 @@ def test_alu_logical_bitwise_operation(
         return logical_ops[0](*args)
 
     _perform_alu_test(testee, *inputs)
+
+
+def test_alu_general_unary(alu_unary_ops: tuple[Callable, np.ndarray]):
+    """General test for the unary operations."""
+
+    def testee(A: np.ndarray) -> np.ndarray:
+        return alu_unary_ops[0](A)
+
+    _perform_alu_test(testee, alu_unary_ops[1])
