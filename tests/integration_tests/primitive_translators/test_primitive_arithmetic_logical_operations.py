@@ -39,6 +39,7 @@ def _only_alu_translators():
 
     This ensures that Jax is not doing some stuff that is supposed to be handled by the
     test class, such as broadcasting. It makes writing tests a bit harder, but it is worth.
+    For some reasons also type conversion s allowed.
     """
     from jace.translator.primitive_translators.arithmetic_logical_translators import (
         _ARITMETIC_OPERATION_TEMPLATES,
@@ -46,18 +47,20 @@ def _only_alu_translators():
     )
 
     # Remove all non ALU translators from the registry
-    all_translators = jace.translator.get_registered_primitive_translators()
-    alu_translators_names = (
-        _LOGICAL_OPERATION_TEMPLATES.keys() | _ARITMETIC_OPERATION_TEMPLATES.keys()
+    primitive_translators = jace.translator.get_registered_primitive_translators()
+    allowed_translators = (
+        _LOGICAL_OPERATION_TEMPLATES.keys()
+        | _ARITMETIC_OPERATION_TEMPLATES.keys()
+        | {"convert_element_type"}
     )
     jace.translator.set_active_primitive_translators_to(
-        {p: t for p, t in all_translators.items() if p in alu_translators_names}
+        {p: t for p, t in primitive_translators.items() if p in allowed_translators}
     )
 
     yield
 
     # Restore the initial state
-    jace.translator.set_active_primitive_translators_to(all_translators)
+    jace.translator.set_active_primitive_translators_to(primitive_translators)
 
 
 @pytest.fixture(
@@ -121,6 +124,44 @@ def alu_unary_ops(request, dtype) -> tuple[Callable, np.ndarray]:
     return (request.param, testutil.mkarray((2, 2), dtype))
 
 
+@pytest.fixture(
+    params=[
+        jnp.add,
+        jnp.multiply,
+        jnp.divide,
+        jnp.minimum,
+        jnp.maximum,
+        jnp.atan2,
+        jnp.nextafter,
+    ]
+)
+def alu_binary_ops_float(request) -> tuple[Callable, tuple[np.ndarray, np.ndarray]]:
+    """All binary operations that can handle floats, complex values are not tested."""
+    # Getting 0 in the division test is unlikely.
+    return (  # type: ignore[return-value]  # Type confusion.
+        request.param,
+        tuple(testutil.mkarray((2, 2), np.float64) for _ in range(2)),
+    )
+
+
+@pytest.fixture(
+    params=[
+        lambda x, y: x == y,
+        lambda x, y: x != y,
+        lambda x, y: x <= y,
+        lambda x, y: x < y,
+        lambda x, y: x >= y,
+        lambda x, y: x > y,
+    ]
+)
+def alu_binary_compare_ops(request) -> tuple[Callable, tuple[np.ndarray, np.ndarray]]:
+    """These are the comparison operations, that we test with integers, since it is simpler."""
+    return (
+        request.param,
+        tuple(np.abs(testutil.mkarray((20, 20), np.int32)) % 30 for _ in range(2)),
+    )
+
+
 def _perform_alu_test(testee: Callable, *args: Any) -> None:
     """General function that just performs the test."""
     wrapped = jace.jit(testee)
@@ -178,16 +219,15 @@ def test_alu_unary_integer_power():
     _perform_alu_test(testee, A)
 
 
-def test_alu_unary_regular_power():
+def test_alu_binary_power(dtype):
     """Tests the "normal" power operator, i.e. not with a known integer power."""
 
-    for exp in [3, np.float64(3.1415)]:
+    def testee(A: np.ndarray, exp: np.generic) -> np.ndarray:
+        return A**exp
 
-        def testee(A: np.ndarray, exp: int | float) -> np.ndarray:
-            return A**exp
-
-        A = testutil.mkarray((10, 2, 3))
-        _perform_alu_test(testee, A, exp)
+    exp = dtype(3)
+    A = testutil.mkarray((10, 2, 3), dtype=dtype)
+    _perform_alu_test(testee, A, exp)
 
 
 def test_alu_binary_scalar():
@@ -331,3 +371,23 @@ def test_alu_general_unary(alu_unary_ops: tuple[Callable, np.ndarray]):
         return alu_unary_ops[0](A)
 
     _perform_alu_test(testee, alu_unary_ops[1])
+
+
+def test_alu_general_binary_float(
+    alu_binary_ops_float: tuple[Callable, tuple[np.ndarray, np.ndarray]],
+):
+    """Tests the binary operations that runs on floating points."""
+
+    def testee(A: np.ndarray, B: np.ndarray) -> np.ndarray:
+        return alu_binary_ops_float[0](A, B)
+
+    _perform_alu_test(testee, *alu_binary_ops_float[1])
+
+
+def test_alu_compare_ops(alu_binary_compare_ops: tuple[Callable, tuple[np.ndarray, np.ndarray]]):
+    """Test all the comparison operations."""
+
+    def testee(A: np.ndarray, B: np.ndarray) -> np.ndarray:
+        return alu_binary_compare_ops[0](A, B)
+
+    _perform_alu_test(testee, *alu_binary_compare_ops[1])

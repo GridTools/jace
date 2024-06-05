@@ -178,10 +178,7 @@ _ARITMETIC_OPERATION_TEMPLATES: Final[dict[str, str]] = {
 
     "atan2": "__out = atan2((__in0), (__in1))",
 
-    "left_shift": "__out = (__in0) << (__in1)",
-    "right_shift": "__out = (__in0) >> (__in1)",
     "nextafter": "__out = nextafter((__in0), (__in1))",
-
 }
 
 

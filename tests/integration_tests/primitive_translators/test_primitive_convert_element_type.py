@@ -72,17 +72,14 @@ def _convert_element_type_impl(
     return True
 
 
-@pytest.mark.skip(reason="This test is too long, only do it on certain conditions.")
 def test_convert_element_type_main(src_type, dst_type):
     """Tests all conversions with the exception of conversions from bool and complex."""
     _convert_element_type_impl(src_type, dst_type)
 
 
-@pytest.mark.skip(reason="This test is too long, only do it on certain conditions.")
 def test_convert_element_type_from_bool(src_type):
     _convert_element_type_impl(np.bool_, src_type)
 
 
-@pytest.mark.skip(reason="This test is too long, only do it on certain conditions.")
-def test_convert_element_type_to_bool(dst_type):
-    _convert_element_type_impl(dst_type, np.bool_)
+def test_convert_element_type_to_bool(src_type):
+    _convert_element_type_impl(src_type, np.bool_)
