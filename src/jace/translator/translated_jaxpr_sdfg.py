@@ -16,25 +16,28 @@ import dace
 class TranslatedJaxprSDFG:
     """Encapsulates the translated SDFG together with the metadata that is needed to run it.
 
-    Contrary to the SDFG that is encapsulated inside the `TranslationContext` object, `self`
-    carries a proper SDFG, however:
-    - It does not have `__return*` variables, instead all return arguments are passed by arguments.
-    - All input arguments are passed through arguments mentioned in `inp_names`, while the outputs
-        are passed through `out_names`.
+    Contrary to the SDFG that is encapsulated inside the `TranslationContext`
+    object, `self` carries a proper SDFG, however:
+    - It does not have `__return*` variables, instead all return arguments are
+        passed by arguments.
+    - All input arguments are passed through arguments mentioned in `inp_names`,
+        while the outputs are passed through `out_names`.
     - Only variables listed as in/outputs are non transient.
     - The order inside `inp_names` and `out_names` is the same as in the translated Jaxpr.
     - If inputs are also used as outputs they appear in both `inp_names` and `out_names`.
-    - Its `arg_names` is set to  `inp_names + out_names`, but arguments that are input and outputs
-        are only listed as inputs.
+    - Its `arg_names` is set to  `inp_names + out_names`, but arguments that are
+        input and outputs are only listed as inputs.
 
-    The only valid way to obtain a `TranslatedJaxprSDFG` is by passing a `TranslationContext`,
-    that was in turn constructed by `JaxprTranslationBuilder.translate_jaxpr()`, to the
-    `finalize_translation_context()` or preferably to the `postprocess_jaxpr_sdfg()` function.
+    The only valid way to obtain a `TranslatedJaxprSDFG` is by passing a
+    `TranslationContext`, that was in turn constructed by
+    `JaxprTranslationBuilder.translate_jaxpr()`, to the
+    `finalize_translation_context()` or preferably to the `postprocess_jaxpr_sdfg()`
+    function.
 
     Attributes:
-        sdfg:           The encapsulated SDFG object.
-        inp_names:      A list of the SDFG variables that are used as input
-        out_names:      A list of the SDFG variables that are used as output.
+        sdfg: The encapsulated SDFG object.
+        inp_names: A list of the SDFG variables that are used as input
+        out_names: A list of the SDFG variables that are used as output.
     """
 
     sdfg: dace.SDFG
@@ -52,6 +55,12 @@ class TranslatedJaxprSDFG:
         if any(self.sdfg.arrays[out].transient for out in self.out_names):
             raise dace.sdfg.InvalidSDFGError(
                 f"Found transient outputs: {(out for out in self.out_names if self.sdfg.arrays[out].transient)}",
+                self.sdfg,
+                self.sdfg.node_id(self.sdfg.start_state),
+            )
+        if self.sdfg.free_symbols:  # This is a simplification that makes our life simple.
+            raise dace.sdfg.InvalidSDFGError(
+                f"Found free symbols: {self.sdfg.free_symbols}",
                 self.sdfg,
                 self.sdfg.node_id(self.sdfg.start_state),
             )

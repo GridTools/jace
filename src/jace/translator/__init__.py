@@ -7,8 +7,8 @@
 
 """Subpackage containing all the code related to the Jaxpr to SDFG translation.
 
-The concrete primitive translators that ships with JaCe are inside the `primitive_translators`
-subpackage.
+The concrete primitive translators that ships with JaCe are inside the
+`primitive_translators` subpackage.
 """
 
 from __future__ import annotations

@@ -9,15 +9,13 @@ We deviate from the [Google Python Style Guide][google-style-guide] only in the 
 - We use [`ruff-linter`][ruff-linter] instead of [`pylint`][pylint].
 - We use [`ruff-formatter`][ruff-formatter] for source code and imports formatting, which may work differently than indicated by the guidelines in section [_3. Python Style Rules_](https://google.github.io/styleguide/pyguide.html#3-python-style-rules). For example, maximum line length is set to 100 instead of 79 (although docstring lines should still be limited to 79).
 - According to subsection [_2.19 Power Features_](https://google.github.io/styleguide/pyguide.html#219-power-features), direct use of _power features_ (e.g. custom metaclasses, import hacks, reflection) should be avoided, but standard library classes that internally use these power features are accepted. Following the same spirit, we allow the use of power features in infrastructure code with similar functionality and scope as the Python standard library.
-- For readability purposes, when a docstring contains more than the required summary line, we prefer indenting the first line at the same cursor position as the first opening quote, although this is not explicitly considered in the doctring conventions described in subsection [_3.8.1 Docstrings_](https://google.github.io/styleguide/pyguide.html#381-docstrings). Example:
 
   ```python
   # single line docstring
   """A one-line summary of the module or program, terminated by a period."""
 
   # multi-line docstring
-  """
-  A one-line summary of the module or program, terminated by a period.
+  """ A one-line summary of the module or program, terminated by a period.
 
   Leave one blank line. The rest of this docstring should contain an
   overall description of the module or program.

@@ -29,15 +29,10 @@ if TYPE_CHECKING:
 def compile_jax_sdfg(
     tsdfg: translator.TranslatedJaxprSDFG,
 ) -> dace_helper.CompiledSDFG:
-    """Compiles the SDFG embedded in `tsdfg` and return the resulting `CompiledSDFG` object.
-
-    Note:
-        For calling the returned `CompiledSDFG` object you need the `inp_names` and `out_names`
-        of the input `TranslatedJaxprSDFG`.
-    """
+    """Compiles the SDFG embedded in `tsdfg` and return the resulting `CompiledSDFG` object."""
     if any(  # We do not support the DaCe return mechanism
-        arrname.startswith("__return")
-        for arrname in tsdfg.sdfg.arrays.keys()  # noqa: SIM118  # we can not use `in` because we are also interested in `__return_`!
+        array_name.startswith("__return")
+        for array_name in tsdfg.sdfg.arrays.keys()  # noqa: SIM118  # we can not use `in` because we are also interested in `__return_`!
     ):
         raise ValueError("Only support SDFGs without '__return' members.")
 
@@ -71,76 +66,73 @@ def run_jax_sdfg(
     csdfg: dace_helper.CompiledSDFG,
     inp_names: Sequence[str],
     out_names: Sequence[str],
-    cargs: Sequence[Any],
-    ckwargs: Mapping[str, Any],
+    call_args: Sequence[Any],
+    call_kwargs: Mapping[str, Any],
 ) -> tuple[Any, ...] | Any:
     """Run the compiled SDFG.
 
-    The function assumes that the SDFG was finalized and then compiled by `compile_jax_sdfg()`.
-    For running the SDFG you also have to pass the input names (`inp_names`) and output names
-    (`out_names`) that were inside the `TranslatedJaxprSDFG` from which `csdfg` was compiled from.
+    The function assumes that the SDFG was finalized and then compiled by
+    `compile_jax_sdfg()`. For running the SDFG you also have to pass the input
+    names (`inp_names`) and output names (`out_names`) that were inside the
+    `TranslatedJaxprSDFG` from which `csdfg` was compiled from.
 
     Args:
-        csdfg:      The `CompiledSDFG` object.
-        inp_names:  List of names of the input arguments.
-        out_names:  List of names of the output arguments.
-        cargs:      All positional arguments of the call.
-        ckwargs:    All keyword arguments of the call.
+        csdfg: The `CompiledSDFG` object.
+        inp_names: List of names of the input arguments.
+        out_names: List of names of the output arguments.
+        call_args: All positional arguments of the call.
+        call_kwargs: All keyword arguments of the call.
 
     Note:
-        There is no pytree mechanism jet, thus the return values are returned inside a `tuple`
-        or in case of one value, directly, in the order determined by Jax.
-        Furthermore, DaCe does not support scalar return values, thus they are silently converted
-        into arrays of length 1, the same holds for inputs.
+        There is no pytree mechanism jet, thus the return values are returned
+        inside a `tuple` or in case of one value, directly, in the order
+        determined by Jax. Furthermore, DaCe does not support scalar return
+        values, thus they are silently converted into arrays of length 1, the
+        same holds for inputs.
 
     Todo:
-        - Since we do not have symbols and a fixed size this works and there is no problem.
-            However, if we have symbols or variable sizes, we must ensure that the init function of
-            the SDFG is called every time, or ensure that its exit function runs every time.
         - Implement non C strides.
     """
     sdfg: dace.SDFG = csdfg.sdfg
 
-    if len(ckwargs) != 0:
+    if len(call_kwargs) != 0:
         raise NotImplementedError("No kwargs are supported yet.")
-    if len(inp_names) != len(cargs):
+    if len(inp_names) != len(call_args):
         raise RuntimeError("Wrong number of arguments.")
-    if len(sdfg.free_symbols) != 0:  # This is a simplification that makes our life simple.
+    if sdfg.free_symbols:  # This is a simplification that makes our life simple.
         raise NotImplementedError(
             f"No externally defined symbols are allowed, found: {sdfg.free_symbols}"
         )
 
     # Build the argument list that we will pass to the compiled object.
-    call_args: dict[str, Any] = {}
-    for in_name, in_val in zip(inp_names, cargs, strict=True):
+    sdfg_call_args: dict[str, Any] = {}
+    for in_name, in_val in zip(inp_names, call_args, strict=True):
         if util.is_scalar(in_val):
             # Currently the translator makes scalar into arrays, this has to be reflected here
             in_val = np.array([in_val])
-        call_args[in_name] = in_val
+        sdfg_call_args[in_name] = in_val
 
-    for out_name, sarray in ((name, sdfg.arrays[name]) for name in out_names):
-        if out_name in call_args:
-            if util.is_jax_array(call_args[out_name]):
+    for out_name, sdfg_array in ((out_name, sdfg.arrays[out_name]) for out_name in out_names):
+        if out_name in sdfg_call_args:
+            if util.is_jax_array(sdfg_call_args[out_name]):
                 # Jax arrays are immutable, so they can not be return values too.
                 raise ValueError("Passed a Jax array as output.")
         else:
-            call_args[out_name] = dace_data.make_array_from_descriptor(sarray)
+            sdfg_call_args[out_name] = dace_data.make_array_from_descriptor(sdfg_array)
 
-    assert len(call_args) == len(csdfg.argnames), (
+    assert len(sdfg_call_args) == len(csdfg.argnames), (
         "Failed to construct the call arguments,"
         f" expected {len(csdfg.argnames)} but got {len(call_args)}."
-        f"\nExpected: {csdfg.argnames}\nGot: {list(call_args.keys())}"
+        f"\nExpected: {csdfg.argnames}\nGot: {list(sdfg_call_args.keys())}"
     )
 
     # Calling the SDFG
     with dace.config.temporary_config():
         dace.Config.set("compiler", "allow_view_arguments", value=True)
-        csdfg(**call_args)
+        csdfg(**sdfg_call_args)
 
     # Handling the output (pytrees are missing)
-    if len(out_names) == 0:
+    if not out_names:
         return None
-    ret_val: tuple[Any] = tuple(call_args[out_name] for out_name in out_names)
-    if len(out_names) == 1:
-        return ret_val[0]
-    return ret_val
+    ret_val: tuple[Any] = tuple(sdfg_call_args[out_name] for out_name in out_names)
+    return ret_val[0] if len(out_names) == 1 else ret_val

@@ -8,7 +8,6 @@
 """This module contains all functions that are related to post processing the SDFG.
 
 Most of them operate on `TranslatedJaxprSDFG` objects.
-
 Currently they mostly exist for the sake of existing.
 """
 
@@ -36,10 +35,10 @@ def postprocess_jaxpr_sdfg(
     However, the function will return a decoupled `TranslatedJaxprSDFG` object.
 
     Args:
-        trans_ctx:  The `TranslationContext` obtained from the `translate_jaxpr()` function.
-        fun:        The original function that was translated.
-        call_args:  The linearized input arguments.
-        intree:     The pytree describing the inputs.
+        trans_ctx: The `TranslationContext` obtained from the `translate_jaxpr()` function.
+        fun: The original function that was translated.
+        call_args: The linearized input arguments.
+        intree: The pytree describing the inputs.
 
     Todo:
         - Setting correct input names (layer that does not depend on JAX).
@@ -62,18 +61,18 @@ def finalize_translation_context(
 ) -> translator.TranslatedJaxprSDFG:
     """Finalizes the supplied translation context `trans_ctx`.
 
-    The function will process the SDFG that is encapsulated inside the context, i.e. a canonical
-    one, into a proper SDFG, as it is described in `TranslatedJaxprSDFG`.
-    It is important to realize that this function does not perform any optimization of the
-    underlying SDFG itself, instead it prepares an SDFG such that it can be passed to the
-    optimization pipeline.
+    The function will process the SDFG that is encapsulated inside the context,
+    i.e. a canonical one, into a proper SDFG, as it is described in
+    `TranslatedJaxprSDFG`. It is important to realize that this function does
+    not perform any optimization of the underlying SDFG itself, instead it
+    prepares an SDFG such that it can be passed to the optimization pipeline.
 
-    The function will not mutate the passed translation context and the output is always decoupled
-    from its output.
+    The function will not mutate the passed translation context and the output
+    is always decoupled from its output.
 
     Args:
-        trans_ctx:      The context that should be finalized.
-        validate:       Call the validate function after the finalizing.
+        trans_ctx: The context that should be finalized.
+        validate: Call the validate function after the finalizing.
     """
     trans_ctx.validate()
     if trans_ctx.inp_names is None:
