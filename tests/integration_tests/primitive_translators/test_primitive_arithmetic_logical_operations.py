@@ -297,7 +297,7 @@ def test_alu_binary_broadcast_3():
 
 
 def test_alu_unary_isfinite():
-    def testee(A: np.ndarray) -> np.ndarray:
+    def testee(A: np.ndarray) -> jax.Array:
         return jnp.isfinite(A)
 
     A = np.array([np.inf, +np.inf, -np.inf, np.nan, -np.nan, 1.0])

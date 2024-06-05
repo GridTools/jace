@@ -49,7 +49,7 @@ def mkarray(
     if dtype == np.bool_:
         return np.random.random(shape) > 0.5  # noqa: NPY002
     if np.issubdtype(dtype, np.integer):
-        return np.random.randint(low=-2**16, high=2**16, size=shape, dtype=dtype)  # noqa: NPY002
+        return np.random.randint(low=-(2**16), high=2**16, size=shape, dtype=dtype)  # noqa: NPY002
     if np.issubdtype(dtype, np.complexfloating):
         return np.array(mkarray(shape, np.float64) + 1.0j * mkarray(shape, np.float64), dtype=dtype)
     return np.array(np.random.random(shape), dtype=dtype)  # noqa: NPY002

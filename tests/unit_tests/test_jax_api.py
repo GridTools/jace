@@ -15,7 +15,7 @@ import pytest
 from jax import numpy as jnp
 
 import jace
-from jace import translator, util
+from jace import translator
 from jace.translator import pre_post_translation as ptrans
 
 from tests import util as testutil
@@ -32,11 +32,6 @@ def test_jit():
 
     jax_testee = jax.jit(testee)
     jace_testee = jace.jit(testee)
-
-    assert util.is_jaxified(jax_testee)
-    assert not util.is_jaxified(jace_testee)
-    assert not util.is_jaceified(jax_testee)
-    assert util.is_jaceified(jace_testee)
 
     ref = jax_testee(A, B)
     res = jace_testee(A, B)
@@ -72,7 +67,7 @@ def test_composition_itself():
     def ddf(x):
         return df(x)
 
-    assert all(util.is_jaceified(x) for x in [f, df, ddf])
+    assert all(isinstance(x, jace.stages.JaCeWrapped) for x in [f, df, ddf])
 
     x = 1.0
     for fun, fref in zip([f, df, ddf], [f_ref, df_ref, ddf_ref]):
@@ -108,30 +103,21 @@ def test_composition_with_jax_2():
     def f1_jax(A, B):
         return A + B
 
-    assert util.is_jaxified(f1_jax)
-
     @jace.jit
     def f2_jace(A, B, C):
         return f1_jax(A, B) - C
-
-    assert util.is_jaceified(f2_jace)
 
     @jax.jit
     def f3_jax(A, B, C, D):
         return f2_jace(A, B, C) * D
 
-    assert util.is_jaxified(f3_jax)
-
     @jace.jit
     def f3_jace(A, B, C, D):
         return f3_jax(A, B, C, D)
 
-    assert util.is_jaceified(f3_jace)
-
     A, B, C, D = (testutil.mkarray((10, 3, 50)) for _ in range(4))
 
     ref = ((A + B) - C) * D
-
     res_jax = f3_jax(A, B, C, D)
     res_jace = f3_jace(A, B, C, D)
 

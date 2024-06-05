@@ -56,18 +56,16 @@ def jace_optimize(
 ) -> None:
     """Performs optimization of the translated SDFG _in place_.
 
-    It is recommended to use the `CompilerOptions` `TypedDict` to pass options to the function.
-    However, any option that is not specified will be interpreted as to be disabled.
+    It is recommended to use the `CompilerOptions` `TypedDict` to pass options
+    to the function. However, any option that is not specified will be
+    interpreted as to be disabled.
 
     Args:
-        tsdfg:          The translated SDFG that should be optimized.
-        simplify:       Run the simplification pipeline.
-        auto_optimize:  Run the auto optimization pipeline (currently does nothing)
-        persistent:     Make the memory allocation persistent, i.e. allocate the transients only
-                            once at the beginning and then reuse the memory across the lifetime of the SDFG.
-
-    Note:
-        Its main job is to exists that we have something that we can call in the tool chain.
+        tsdfg: The translated SDFG that should be optimized.
+        simplify: Run the simplification pipeline.
+        auto_optimize: Run the auto optimization pipeline (currently does nothing)
+        persistent:  Make the memory allocation persistent, i.e. allocate the transients only
+            once at the beginning and then reuse the memory across the lifetime of the SDFG.
     """
     # Currently this function exists primarily for the same of existing.
 

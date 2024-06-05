@@ -27,8 +27,8 @@ if TYPE_CHECKING:
 class JaxprTranslationBuilder:
     """Internal builder class for creating an SDFG equivalent of a `Jaxpr` instance.
 
-    The SDFG created by this class has a very particular form, which we call canonical. The main
-    features of such an SDFG are:
+    The SDFG created by this class has a very particular form, which we call
+    canonical. The main features of such an SDFG are:
     - the SDFG is a list of states, ideally each state corresponds to single Jax primitive,
     - it has a single source and sink state.
     - all variable names are derived from Jax names,
@@ -36,35 +36,38 @@ class JaxprTranslationBuilder:
     - It lacks the special `__return` variable,
     - the `arg_names` parameter is not set.
 
-    For these reasons the SDFG is not directly usable, and further manipulations have to be
-    performed. Especially, DaCe's validation function will fail and it is unable to be processed
-    by JaCe's optimization pipeline. For more information also see `jace.translator.post_translation`
-    module.
+    For these reasons the SDFG is not directly usable, and further manipulations
+    have to be performed. Especially, DaCe's validation function will fail and
+    it is unable to be processed by JaCe's optimization pipeline. For more
+    information also see `jace.translator.post_translation` module.
 
-    The idea of the translator is extremely simple. A Jaxpr is essentially a list consisting of
-    more or less simple instructions/equations, they get processed one after the other. Each
-    equation is translated into its own state that is successively appended to the SDFG, while the
-    SDFG is being build, which explains the particular form of the SDFG.
+    The idea of the translator is extremely simple. A Jaxpr is essentially a
+    list consisting of more or less simple instructions/equations, they get
+    processed one after the other. Each equation is translated into its own
+    state that is successively appended to the SDFG, while the SDFG is being
+    build, which explains the particular form of the SDFG.
 
-    However, the actual translation of the equations is not handled by the builder. Instead the
-    request is forwarded to a `PrimitiveTranslator` object, known as primitive translator. This is
-    a highly specialized object that is able to handle one kind of primitive. For more information
-    on them see the documentation of `PrimitiveTranslator`.
+    However, the actual translation of the equations is not handled by the
+    builder. Instead the request is forwarded to a `PrimitiveTranslator`
+    object, known as primitive translator. This is a highly specialized object
+    that is able to handle one kind of primitive. For more information on them
+    see the documentation of `PrimitiveTranslator`.
 
-    To start a translation the `translate_jaxpr()` function has to be called, if this happens it is
-    said that the builder has an ongoing translation. The first translator is known as root,
-    translator. If `translate_jaxpr()` is called on a builder that has an ongoing translation,
-    a new translation context will be set up. Thus the builder will then translate the supplied
-    (nested) Jaxpr and return the result. However, this will have no influence on the translation
-    process that is already going.
+    To start a translation the `translate_jaxpr()` function has to be called,
+    if this happens it is said that the builder has an ongoing translation.
+    The first translator is known as root, translator. If `translate_jaxpr()`
+    is called on a builder that has an ongoing translation, a new translation
+    context will be set up. Thus the builder will then translate the supplied
+    (nested) Jaxpr and return the result. However, this will have no influence
+    on the translation process that is already going.
 
     Args:
-        primitive_translators:      Primitive translators to use in the translation.
+        primitive_translators: Primitive translators to use in the translation.
 
     Notes:
-        After a translation has been performed the translator object can be used again.
-        Currently the builder will generate only Array as SDFG variables, however, this is a
-        temporary solution, see `add_array()`.
+        After a translation has been performed the translator object can be used
+        again. Currently the builder will generate only Array as SDFG variables,
+        however, this is a temporary solution, see `add_array()`.
     """
 
     _primitive_translators: Mapping[str, translator.PrimitiveTranslatorCallable]
@@ -96,18 +99,19 @@ class JaxprTranslationBuilder:
     ) -> TranslationContext:
         """Perform the translation of a Jaxpr into a SDFG.
 
-        In case this function is called and `self` has an ongoing translation process, a new
-        translation context will be created. This allows to handle nested Jaxprs.
-        However, the variable map is shared among all.
+        In case this function is called and `self` has an ongoing translation
+        process, a new translation context will be created. This allows to
+        handle nested Jaxprs. However, the variable map is shared among all.
 
         Returns:
-            The function will translate the passed Jaxpr object into an SDFG in canonical form.
-            This SDFG together with additional meta data, that is needed for further processing
-            is encapsulated inside a `TranslationContext` object.
-            For further use it should be passed to `postprocess_jaxpr_sdfg()`.
+            The function will translate the passed Jaxpr object into an SDFG
+            in canonical form. This SDFG together with additional meta data,
+            that is needed for further processing is encapsulated inside a
+            `TranslationContext` object. For further use it should be passed
+            to `postprocess_jaxpr_sdfg()`.
 
         Args:
-            name:   Use this name for the SDFG instead some generated one.
+            name: Use this name for the SDFG instead some generated one.
         """
 
         if len(jaxpr.effects) != 0:
@@ -137,21 +141,22 @@ class JaxprTranslationBuilder:
     ) -> dace.SDFGState:
         """Creates a new `SDFGState`, adds it to the SDFG and returns it.
 
-        By default the new state is appended to the current terminal state. However, if
-        `prev_state` is specified it will be appended to it.
-        In case the new state is appended to the current terminal state, this will modify the
-        terminal state of `self`.
+        By default the new state is appended to the current terminal state.
+        However, if `prev_state` is specified it will be appended to it. In
+        case the new state is appended to the current terminal state, this will
+        modify the terminal state of `self`.
 
         Args:
-            label:          The name that should be given to the new `SDFGState`.
-            condition:      The condition of the state transitions used on the `InterstateEdge`.
-            assignments:    Symbol assignments that should be done during the transition.
-            prev_state:     Alternative `SDFGState` at which we should append the new state.
+            label: The name that should be given to the new `SDFGState`.
+            condition: The condition of the state transitions used on the `InterstateEdge`.
+            assignments: Symbol assignments that should be done during the transition.
+            prev_state: Alternative `SDFGState` at which we should append the new state.
 
         Notes:
-            It is potentially dangerous to not append to the current terminal state, as a
-            canonical SDFG only has one sink state. If this is done the user has to ensure,
-            that at the end of the processing the SDFG is back in canonical form.
+            It is potentially dangerous to not append to the current terminal
+            state, as a canonical SDFG only has one sink state. If this is done
+            the user has to ensure, that at the end of the processing the SDFG
+            is back in canonical form.
         """
         if isinstance(label, str) and (not util.VALID_SDFG_OBJ_NAME.fullmatch(label)):
             raise ValueError(f"Can not create state with label '{label}' since it is invalid.")
@@ -180,8 +185,8 @@ class JaxprTranslationBuilder:
         """Get all data descriptors that are currently known to the SDFG.
 
         Notes:
-            Essentially a shorthand and preferred way for `self.sdfg.arrays`. For getting a
-            specific data descriptor use `self.get_array()`.
+            Essentially a shorthand and preferred way for `self.sdfg.arrays`.
+            For getting a specific data descriptor use `self.get_array()`.
         """
         return cast(Mapping[str, ddata.Data], self._ctx.sdfg.arrays)
 
@@ -191,9 +196,9 @@ class JaxprTranslationBuilder:
     ) -> ddata.Data:
         """Returns the SDFG `Data` object `name` referees to.
 
-        `name` can either be a string, in which case it is interpreted as a verbatim SDFG name.
-        If it is a Jax or JaCe variable, the function will first perform a lookup using
-        `self.map_jax_var_to_sdfg(name)`.
+        `name` can either be a string, in which case it is interpreted as a
+        verbatim SDFG name. If it is a Jax or JaCe variable, the function will
+        first perform a lookup using `self.map_jax_var_to_sdfg(name)`.
         """
         if isinstance(name, (jax_core.Var, util.JaCeVar)):
             sdfg_name: str = self.map_jax_var_to_sdfg(name)
@@ -225,8 +230,8 @@ class JaxprTranslationBuilder:
         """Get the name of the SDFG variable to which `jax_var` is referring to.
 
         Args:
-            jax_var:        The Jax variable to look up.
-            allow_fail:     If no mapping is known return `None` instead of raising `KeyError`.
+            jax_var: The Jax variable to look up.
+            allow_fail: If no mapping is known return `None` instead of raising `KeyError`.
         """
         if isinstance(jax_var, jax_core.Literal):
             raise RuntimeError(f"There is no SDFG variable for literal '{jax_var}'.")
@@ -245,10 +250,7 @@ class JaxprTranslationBuilder:
 
     @property
     def sdfg(self) -> dace.SDFG:
-        """Returns the SDFG that is currently constructed.
-
-        If you want access to the arrays of the SDFG use `self.arrays`/`self.get_array()`.
-        """
+        """Returns the SDFG that is currently constructed."""
         return self._ctx.sdfg
 
     def is_allocated(self) -> bool:
@@ -261,7 +263,7 @@ class JaxprTranslationBuilder:
     def is_root_translator(self) -> bool:
         """Tests if `self` is the root translator.
 
-        The root translator (context) is the very first translator process that was started.
+        The root translator (context) is the very first translator process.
         """
         if not self.is_allocated():
             raise RuntimeError("Builder is not allocated.")
@@ -274,12 +276,12 @@ class JaxprTranslationBuilder:
     ) -> JaxprTranslationBuilder:
         """Creates a new mapping between `jax_var` to `sdfg_name`.
 
-        If the mapping already exists an error will be generated. This function is not able to
-        delete a variable mapping that was established before.
+        If the mapping already exists an error will be generated. This function
+        is not able to delete a variable mapping that was established before.
 
         Args:
-            jax_var:     The Jax variable.
-            sdfg_name:   The name of the corresponding SDFG variable.
+            jax_var: The Jax variable.
+            sdfg_name: The name of the corresponding SDFG variable.
         """
         assert sdfg_name
 
@@ -305,25 +307,27 @@ class JaxprTranslationBuilder:
     ) -> str:
         """Creates an SDFG variable for Jax variable `arg` and returns its SDFG name.
 
-        The SDFG object is always created as a transient. Furthermore, the function will not
-        update the internal variable mapping, by default.
+        The SDFG object is always created as a transient. Furthermore, the
+        function will not update the internal variable mapping, by default.
 
-        By default the function will use `jace.util.propose_jax_name()` to derive the name that
-        should be used. However, by passing a `JaCeVar` with a name it is possible to suggest a
-        specific name. In addition it is possible to specify `name_prefix` to supply a prefix
-        to the determined name that should be used.
+        By default the function will use `jace.util.propose_jax_name()` to derive
+        the name that should be used. However, by passing a `JaCeVar` with a
+        name it is possible to suggest a specific name. In addition it is possible
+        to specify `name_prefix` to supply a prefix to the determined name that
+        should be used.
 
         Args:
-            arg:                The Jax object for which a SDFG equivalent should be created.
-            name_prefix:        If given it will be used as prefix for the name.
+            arg: The Jax object for which a SDFG equivalent should be created.
+            name_prefix: If given it will be used as prefix for the name.
             update_var_mapping: Update the internal variable mapping; by default `False`.
 
         Notes:
-            As a temporary fix for handling scalar return values, the function will always
-            generate arrays, even if `arg` is a scalar.
-            According to the dace developer, the majority of the backend, i.e. optimization
-            pipeline, should be able to handle it. But there are some special parts that
-            might explicitly want a scalar, it also might block certain compiler optimization.
+            As a temporary fix for handling scalar return values, the function
+            will always generate arrays, even if `arg` is a scalar. According to
+            the DaCe developer, the majority of the backend, i.e. optimization
+            pipeline, should be able to handle it. But there are some special
+            parts that might explicitly want a scalar, it also might block
+            certain compiler optimization.
         """
 
         if isinstance(arg, jax_core.Literal):
@@ -402,23 +406,25 @@ class JaxprTranslationBuilder:
     ) -> list[None | str]:
         """Creates SDFG variables for the listed Jax variables and returns their SDFG names.
 
-        If a Jax variable already has a SDFG equivalent then the function will use this variable.
-        If no corresponding SDFG variable is known the function will create one using `add_array()`.
+        If a Jax variable already has a SDFG equivalent then the function will
+        use this variable. If no corresponding SDFG variable is known the function
+        will create one using `add_array()`.
 
-        By setting `prevent_creation` the function will not create any new SDFG variables, if no
-        corresponding SDFG variable exists an error is generated. By setting `only_creation` the
-        function will only create new SDFG variables, if a variable already have a corresponding
-        SDFG variable an error will be generated.
+        By setting `prevent_creation` the function will not create any new SDFG
+        variables, if no corresponding SDFG variable exists an error is generated.
+        By setting `only_creation` the function will only create new SDFG variables,
+        if a variable already have a corresponding SDFG variable an error will be
+        generated.
 
-        By default literals cause an error. However, by setting `handle_literals` to `True`
-        literals will will be included in the output with the value `None`.
+        By default literals cause an error. However, by setting `handle_literals`
+        to `True` literals will will be included in the output with the value `None`.
 
         Args:
-            jax_var_list:       The list of Jax variables that should be transformed to SDFG names.
-            prevent_creation:   Never create a variable, all must already be known.
-            only_creation:      Always create a variable, it is an error if one already exist.
-            handle_literals:    Allow the processing of literals.
-            kwargs:             Will be forwarded to `self.add_array()` if a variable is created.
+            jax_var_list: The list of Jax variables that should be transformed to SDFG names.
+            prevent_creation: Never create a variable, all must already be known.
+            only_creation: Always create a variable, it is an error if one already exist.
+            handle_literals: Allow the processing of literals.
+            kwargs: Will be forwarded to `self.add_array()` if a variable is created.
 
         Todo:
             - Rollback if the creation fails.
@@ -477,8 +483,8 @@ class JaxprTranslationBuilder:
     ) -> None:
         """Creates all constants requested by the `jaxpr`.
 
-        The function will create an SDFG variable and add them as constant to the SDFG. Their value
-        is deepcopied.
+        The function will create an SDFG variable and add them as constant to
+        the SDFG. Their value is deepcopied.
         """
         assert self.is_allocated(), "Builder is not allocated, can not create constants."
         if len(jaxpr.consts) == 0:
@@ -503,7 +509,7 @@ class JaxprTranslationBuilder:
         """Allocate a new context and activate it.
 
         Args:
-            name:               The name of the SDFG.
+            name: The name of the SDFG.
         """
         self._ctx_stack.append(
             TranslationContext(
@@ -599,14 +605,16 @@ class JaxprTranslationBuilder:
     ) -> TranslationContext:
         """Performs the actual translation of the Jaxpr into an SDFG.
 
-        The function assumes that the context is allocated as well as the initial variables.
-        The function removes and returns the currently active translation context.
+        The function assumes that the context is allocated as well as the
+        initial variables. The function removes and returns the currently
+        active translation context.
 
         Args:
-            jaxpr:      The Jaxpr to translate.
+            jaxpr: The Jaxpr to translate.
 
         Notes:
-            Equations that store into drop variables, i.e. with name `_`, will be ignored.
+            Equations that store into drop variables, i.e. with name `_`,
+            will be ignored.
         """
         nb_translated_eqn: int = 0
         out_var_names: Sequence[str] = ()
@@ -638,14 +646,16 @@ class JaxprTranslationBuilder:
     ) -> list[str]:
         """This function is called in case a `Jaxpr` with zero equations is encountered.
 
-        A function with zero equation might still have output, in which case an input is copied
-        to an output. This function will handle the copying from the input into the corresponding
-        output variable. It is important that the function will remove the variables that are used
-        as input and output from the mapping.
+        A function with zero equation might still have output, in which case
+        an input is copied to an output. This function will handle the copying
+        from the input into the corresponding output variable. It is important
+        that the function will remove the variables that are used as input and
+        output from the mapping.
 
         Returns:
-            The function returns a tuple containing the SDFG variables that refer to the output.
-            The order of the list is the same as in `jaxpr.jaxpr.outvars`.
+            The function returns a tuple containing the SDFG variables that
+            refer to the output. The order of the list is the same as in
+            `jaxpr.jaxpr.outvars`.
 
         Todo:
             - Handle the case if if the output is a literal.
@@ -713,12 +723,13 @@ class JaxprTranslationBuilder:
 class TranslationContext:
     """Translation context used by the `JaxprTranslationBuilder`.
 
-    Internal representation of the builder of an SDFG under construction together with the needed
-    metadata. Essentially it is an extended version of the `TranslatedJaxprSDFG`, but carrying
-    an unfinished canonical SDFG.
-    A user should consider this class as an opaque object, that represents an invalid
-    `TranslatedJaxprSDFG` object, and the only valid operation a user can do with it is passing it
-    either to `finalize_translation_context()` or the `postprocess_jaxpr_sdfg()` function.
+    Internal representation of the builder of an SDFG under construction together
+    with the needed metadata. Essentially it is an extended version of the
+    `TranslatedJaxprSDFG`, but carrying an unfinished canonical SDFG.
+    A user should consider this class as an opaque object, that represents an
+    invalid `TranslatedJaxprSDFG` object, and the only valid operation a user
+    can do with it is passing it either to `finalize_translation_context()` or
+    the `postprocess_jaxpr_sdfg()` function.
 
     Attributes:
         sdfg:              The encapsulated SDFG object.
@@ -728,7 +739,7 @@ class TranslationContext:
         terminal_state:    The (currently) last state in the state machine.
 
     Args:
-        name:       The name of the SDFG, will be forwarded to the encapsulated `TranslatedJaxprSDFG`.
+        name: The name of the SDFG, will be forwarded to the encapsulated `TranslatedJaxprSDFG`.
 
     Note:
         Access of any attribute of this class by an outside user is considered undefined behaviour.

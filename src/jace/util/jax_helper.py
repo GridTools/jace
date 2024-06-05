@@ -7,8 +7,8 @@
 
 """Implements all utility functions that are related to Jax.
 
-Most of the functions defined here allow an unified access to Jax' internal in a consistent and
-stable way.
+Most of the functions defined here allow an unified access to Jax' internal in
+a consistent and stable way.
 """
 
 from __future__ import annotations
@@ -32,23 +32,25 @@ if TYPE_CHECKING:
 class JaCeVar:
     """Replacement for the `jax.Var` class.
 
-    This class can be seen as some kind of substitute `jax.core.Var`. The main intention of this
-    class is as an internal representation of values, as they are used in Jax, but without the Jax
-    machinery. As abstract values in Jax this class has a datatype, which is a `dace.typeclass`
-    instance and a shape. In addition it has an optional name, which allows to create variables
-    with a certain name using `JaxprTranslationBuilder.add_array()`.
+    This class can be seen as some kind of substitute `jax.core.Var`. The main
+    intention of this class is as an internal representation of values, as they
+    are used in Jax, but without the Jax machinery. As abstract values in Jax
+    this class has a datatype, which is a `dace.typeclass` instance and a shape.
+    In addition it has an optional name, which allows to create variables with
+    a certain name using `JaxprTranslationBuilder.add_array()`.
 
-    If you are expect to handle both real Jax variables and JaCe variable, you should use the
-    `get_jax_var_*()` functions to access them.
+    If it is expected that code must handle both Jax variables and `JaCeVar`
+    then the `get_jax_var_*()` functions should be used.
 
     Args:
-        shape:      The shape of the variable.
-        dtype:      The dace datatype of the variable.
-        name:       Name the variable should have, optional.
+        shape: The shape of the variable.
+        dtype: The dace datatype of the variable.
+        name: Name the variable should have, optional.
 
     Note:
-        If the name of a `JaCeVar` is '_' it is considered a drop variable.
-        The definitions of `__hash__` and `__eq__` are in accordance with how Jax variable works.
+        If the name of a `JaCeVar` is '_' it is considered a drop variable. The
+        definitions of `__hash__` and `__eq__` are in accordance with how Jax
+        variable works.
 
     Todo:
         - Add support for strides.
@@ -78,13 +80,7 @@ class JaCeVar:
 
 
 def get_jax_var_name(jax_var: jax_core.Atom | JaCeVar) -> str:
-    """Returns the name of `jax_var` as a string.
-
-    Notes:
-        If `jax_var` is a `JaCeVar` the function will return, if defined, its `.name` property.
-        Otherwise it will compose a name similar to Jax `Var` objects. The returned names are
-        stable, i.e. it will output the same value for the same variable.
-    """
+    """Returns the name of `jax_var` as a string."""
     match jax_var:
         case jax_core.DropVar():
             return "_"
@@ -135,8 +131,8 @@ def is_tracing_ongoing(
 ) -> bool:
     """Test if tracing is ongoing.
 
-    While a return value `True` guarantees that a translation is ongoing, a value of `False`
-    does not guarantees that no tracing is ongoing.
+    While a return value `True` guarantees that a translation is ongoing, a
+    value of `False` does not guarantees that no tracing is ongoing.
     """
     # The current implementation only checks the arguments if it contains tracers.
     if (len(args) == 0) and (len(kwargs) == 0):
@@ -163,19 +159,22 @@ def propose_jax_name(
 ) -> str:
     """Proposes a variable name for `jax_var`.
 
-    If `jax_name_map` is `None` the function will fallback to `get_jax_var_name(jax_var)`.
-    If `jax_name_map` is supplied the function will:
+    If `jax_name_map` is `None` the function will fallback to
+    `get_jax_var_name(jax_var)`. If `jax_name_map` is supplied the function
+    will:
     - If `jax_var` is stored inside `jax_name_map`, returns the mapped value.
-    - If `jax_var` is a `JaCeVar` with a set `.name` property that name will be returned.
-    - Otherwise the function will generate a new name in a similar way to the pretty printer of Jaxpr.
+    - If `jax_var` is a `JaCeVar` with a set `.name` property that name will
+        be returned.
+    - Otherwise the function will generate a new name in a similar way to the
+        pretty printer of Jaxpr.
 
     Args:
-        jax_var:        The variable for which a name to propose.
-        jax_name_map:   A mapping of all Jax variables that were already named.
+        jax_var: The variable for which a name to propose.
+        jax_name_map: A mapping of all Jax variables that were already named.
 
     Note:
-        The function guarantees that the returned name passes `VALID_SDFG_VAR_NAME` test and that
-        the name is not inside `util.FORBIDDEN_SDFG_VAR_NAMES`.
+        The function guarantees that the returned name passes `VALID_SDFG_VAR_NAME`
+        test and that the name is not inside `util.FORBIDDEN_SDFG_VAR_NAMES`.
         Dropped variables will always be named `'_'`.
     """
     if isinstance(jax_var, jax_core.Literal):

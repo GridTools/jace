@@ -7,10 +7,11 @@
 
 """This module contains the functionality related to the compilation cache of the stages.
 
-The cache currently caches the lowering, i.e. the result of `JaCeWrapped.lower()` and the
-compilation, i.e. `JaCeLowered.compile()`. The caches are on a per stage basis and not on a
-per instant basis. To make a stage cacheable, it must be derived from `CachingStage` and
-its transition function must be decoration with `@cached_transition`.
+The cache currently caches the lowering, i.e. the result of `JaCeWrapped.lower()`
+and the compilation, i.e. `JaCeLowered.compile()`. The caches are on a per stage
+basis and not on a per instant basis. To make a stage cacheable, it must be
+derived from `CachingStage` and its transition function must be decoration with
+`@cached_transition`.
 """
 
 from __future__ import annotations
@@ -53,12 +54,14 @@ NextStage = TypeVar("NextStage", bound="stages.Stage")
 class CachingStage(Generic[NextStage]):
     """Annotates a stage whose transition to the next stage is cacheable.
 
-    To make the transition of a stage cacheable, the stage must be derived from this class,
-    and its initialization must call `CachingStage.__init__()`. Furthermore, its transition
-    function must be annotated by the `@cached_transition` decorator.
+    To make the transition of a stage cacheable, the stage must be derived from
+    this class, and its initialization must call `CachingStage.__init__()`.
+    Furthermore, its transition function must be annotated by the
+    `@cached_transition` decorator.
 
-    A class must implement the `_make_call_description()` to compute an abstract description
-    of the call. This is needed to operate the cache to store the stage transitions.
+    A class must implement the `_make_call_description()` to compute an abstract
+    description of the call. This is needed to operate the cache to store the
+    stage transitions.
 
     Notes:
         The `__init__()` function must explicitly be called to fully setup `self`.
@@ -93,8 +96,9 @@ def cached_transition(
 ) -> Callable[Concatenate[CachingStage[NextStage], P], NextStage]:
     """Decorator for making the transition function of the stage cacheable.
 
-    In order to work, the stage must be derived from `CachingStage`. For computing the key of a
-    call the function will use the `_make_call_description()` function of the cache.
+    In order to work, the stage must be derived from `CachingStage`. For computing
+    the key of a call the function will use the `_make_call_description()`
+    function of the cache.
 
     Todo:
         - Implement a way to temporary disable the cache.
@@ -136,19 +140,19 @@ def get_cache(
 class _AbstractCallArgument:
     """Class to represent a single argument to the transition function in an abstract way.
 
-    As noted in `StageTransformationSpec` there are two ways to describe an argument, either by
-    using its concrete value or an abstract description, which is similar to tracers in Jax.
-    This class represents the second way.
+    As noted in `StageTransformationSpec` there are two ways to describe an
+    argument, either by using its concrete value or an abstract description,
+    which is similar to tracers in Jax. This class represents the second way.
     To create an instance you should use `_AbstractCallArgument.from_value()`.
 
-    Its description is limited to scalars and arrays. To describe more complex types, they
-    should be processed by pytrees first.
+    Its description is limited to scalars and arrays. To describe more complex
+    types, they should be processed by pytrees first.
 
     Attributes:
-        shape:      In case of an array its shape, in case of a scalar the empty tuple.
-        dtype:      The DaCe type of the argument.
-        strides:    The strides of the argument, or `None` if they are unknown or a scalar.
-        storage:    The storage type where the argument is stored.
+        shape: In case of an array its shape, in case of a scalar the empty tuple.
+        dtype: The DaCe type of the argument.
+        strides: The strides of the argument, or `None` if they are unknown or a scalar.
+        storage: The storage type where the argument is stored.
     """
 
     shape: tuple[int, ...]
@@ -206,22 +210,21 @@ CallArgsSpec: TypeAlias = tuple[
 class StageTransformationSpec:
     """Represents the entire call to a state transformation function of a stage.
 
-    State transition functions are annotated with `@cached_transition` and their result may be
-    cached. They key to locate them inside the cache is represented by this class and computed by
-    the `CachingStage._make_call_description()` function.
-    The actual key is consists of two parts, `stage_id` and `call_args`.
+    State transition functions are annotated with `@cached_transition` and their
+    result may be cached. They key to locate them inside the cache is represented
+    by this class and computed by the `CachingStage._make_call_description()`
+    function. The actual key is consists of two parts, `stage_id` and `call_args`.
 
     Args:
-        stage_id:   Origin of the call, for which the id of the stage object should be used.
-        call_args:  Description of the arguments of the call. There are two ways to describe
-            the arguments:
-            - Abstract description: In this way, the actual value of the argument is irrelevant,
-                only the structure of them are important, similar to the tracers used in Jax.
-            - Concrete description: Here one caches on the actual value of the argument.
-                The only requirement is that they can be hashed.
-
-    Todo:
-        In the future pytrees will be used as third part.
+        stage_id: Origin of the call, for which the id of the stage object should
+            be used.
+        call_args: Description of the arguments of the call. There are two ways
+            to describe the arguments:
+            - Abstract description: In this way, the actual value of the argument
+                is irrelevant, only the structure of them are important, similar
+                to the tracers used in Jax.
+            - Concrete description: Here one caches on the actual value of the
+                argument. The only requirement is that they can be hashed.
     """
 
     stage_id: int
@@ -236,12 +239,10 @@ class StageCache(Generic[StageType]):
     """Simple LRU cache to cache the results of the stage transition function.
 
     Args:
-        size:   The size of the cache, defaults to 256.
-
-    Notes:
-        The most recently used entry is at the end of the `OrderedDict`.
+        size: The size of the cache, defaults to 256.
     """
 
+    # The most recently used entry is at the end of the `OrderedDict`.
     _memory: collections.OrderedDict[StageTransformationSpec, StageType]
     _capacity: int
 

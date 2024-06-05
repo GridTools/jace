@@ -23,20 +23,18 @@ from .jax_helper import (
     propose_jax_name,
     translate_dtype,
 )
+from .misc import (
+    FORBIDDEN_SDFG_VAR_NAMES,
+    VALID_SDFG_OBJ_NAME,
+    VALID_SDFG_VAR_NAME,
+)
 from .traits import (
     is_array,
     is_drop_var,
     is_fully_addressable,
-    is_jaceified,
     is_jax_array,
-    is_jaxified,
     is_on_device,
     is_scalar,
-)
-from .util import (
-    FORBIDDEN_SDFG_VAR_NAMES,
-    VALID_SDFG_OBJ_NAME,
-    VALID_SDFG_VAR_NAME,
 )
 
 
@@ -54,9 +52,7 @@ __all__ = [
     "is_array",
     "is_drop_var",
     "is_fully_addressable",
-    "is_jaceified",
     "is_jax_array",
-    "is_jaxified",
     "is_on_device",
     "is_scalar",
     "is_tracing_ongoing",
