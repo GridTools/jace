@@ -5,12 +5,20 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Implements tests for the ALU and the `MappedOperationTranslatorBase` translator.
+"""Tests for `MappedOperationTranslatorBase` class and arithmetic & logical operations.
 
-The function mostly tests the `MappedOperationTranslatorBase` class by performing additions.
+The `MappedOperationTranslatorBase` can not be tested on its own, since it does
+not generate a Tasklet. For that reason it is thoroughly tested together with
+the arithmetic and logical translators (ALT).
 
-Todo:
-    - Add all supported primitives, to see if the template is valid.
+Thus the first tests tests the behaviour of the `MappedOperationTranslatorBase`
+class such as
+- broadcasting,
+- literal substitution,
+- scalar vs array computation.
+
+Followed by tests that are specific to the ALTs, which mostly focuses
+on the validity of the template of the ALT.
 """
 
 from __future__ import annotations
@@ -34,7 +42,7 @@ if TYPE_CHECKING:
 
 
 @pytest.fixture(autouse=True)
-def _only_alu_translators() -> None:
+def _only_alt_translators() -> None:
     """Removes all non arithmetic/logical translator from the registry.
 
     This ensures that Jax is not doing some stuff that is supposed to be handled by the
@@ -96,8 +104,8 @@ def logical_ops(
 )
 def dtype(
     request,
-) -> np.generic:
-    """The dtypes that should be used for the full alu tests."""
+) -> type:
+    """Data types that should be used for the numerical tests of the ALT translators."""
     return request.param
 
 
@@ -123,7 +131,7 @@ def dtype(
         lambda x: jnp.atanh(jnp.tanh(x)),
     ]
 )
-def alu_unary_ops(
+def alt_unary_ops(
     request,
     dtype: type,
 ) -> tuple[Callable, np.ndarray]:
@@ -142,10 +150,10 @@ def alu_unary_ops(
         jnp.nextafter,
     ]
 )
-def alu_binary_ops_float(
+def alt_binary_ops_float(
     request,
 ) -> tuple[Callable, tuple[np.ndarray, np.ndarray]]:
-    """All binary operations that can handle floats, complex values are not tested."""
+    """Binary ALT operations that operates on floats."""
     # Getting 0 in the division test is unlikely.
     return (  # type: ignore[return-value]  # Type confusion.
         request.param,
@@ -163,17 +171,31 @@ def alu_binary_ops_float(
         lambda x, y: x > y,
     ]
 )
-def alu_binary_compare_ops(
+def alt_binary_compare_ops(
     request,
 ) -> tuple[Callable, tuple[np.ndarray, np.ndarray]]:
-    """These are the comparison operations, that we test with integers, since it is simpler."""
+    """Comparison operations, operates on integers."""
     return (
         request.param,
         tuple(np.abs(testutil.mkarray((20, 20), np.int32)) % 30 for _ in range(2)),
     )
 
 
-def _perform_alu_test(
+@pytest.fixture(
+    params=[
+        [(100, 1), (100, 10)],
+        [(100, 1, 3), (100, 1, 1)],
+        [(5, 1, 3, 4, 1, 5), (5, 1, 3, 1, 2, 5)],
+    ]
+)
+def broadcast_input(
+    request,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Inputs to be used for the broadcast test."""
+    return tuple(testutil.mkarray(shape) for shape in request.param)  # type: ignore[return-value] # can not deduce that it is only size 2.
+
+
+def _perform_alt_test(
     testee: Callable,
     *args: Any,
 ) -> None:
@@ -194,70 +216,40 @@ def _perform_alu_test(
     assert np.allclose(ref, res), f"Expected '{ref.tolist()}' got '{res.tolist()}'"
 
 
-def test_alu_unary_scalar() -> None:
-    """Test unary ALU translator in the scalar case."""
+# <------------ Tests for `MappedOperationTranslatorBase`
 
+
+def test_mapped_unary_scalar() -> None:
     def testee(A: np.float64) -> np.float64 | jax.Array:
         return jnp.cos(A)
 
-    _perform_alu_test(testee, np.float64(1.0))
+    _perform_alt_test(testee, np.float64(1.0))
 
 
-def test_alu_unary_array() -> None:
-    """Test unary ALU translator with array argument."""
-
+def test_mapped_unary_array() -> None:
     def testee(A: np.ndarray) -> jax.Array:
         return jnp.sin(A)
 
     A = testutil.mkarray((100, 10, 3))
 
-    _perform_alu_test(testee, A)
+    _perform_alt_test(testee, A)
 
 
-def test_alu_unary_scalar_literal() -> None:
-    """Test unary ALU translator with literal argument"""
-
+def test_mapped_unary_scalar_literal() -> None:
     def testee(A: float) -> float | jax.Array:
         return jnp.sin(1.98) + A
 
-    _perform_alu_test(testee, 10.0)
+    _perform_alt_test(testee, 10.0)
 
 
-def test_alu_unary_integer_power() -> None:
-    """Tests the integer power, which has a parameter."""
-
-    def testee(A: np.ndarray) -> np.ndarray:
-        return A**3
-
-    A = testutil.mkarray((10, 2, 3))
-    _perform_alu_test(testee, A)
-
-
-def test_alu_binary_power(
-    dtype: type,
-):
-    """Tests the "normal" power operator, i.e. not with a known integer power."""
-
-    def testee(A: np.ndarray, exp: np.generic) -> np.ndarray:
-        return A**exp
-
-    exp = dtype(3)
-    A = testutil.mkarray((10, 2, 3), dtype=dtype)
-    _perform_alu_test(testee, A, exp)
-
-
-def test_alu_binary_scalar() -> None:
-    """Scalar binary operation."""
-
+def test_mapped_binary_scalar() -> None:
     def testee(A: np.float64, B: np.float64) -> np.float64:
         return A * B
 
-    _perform_alu_test(testee, np.float64(1.0), np.float64(2.0))
+    _perform_alt_test(testee, np.float64(1.0), np.float64(2.0))
 
 
-def test_alu_binary_scalar_literal() -> None:
-    """Scalar binary operation, with a literal."""
-
+def test_mapped_binary_scalar_partial_literal() -> None:
     def testeeR(A: np.float64) -> np.float64:
         return A * 2.03
 
@@ -265,11 +257,11 @@ def test_alu_binary_scalar_literal() -> None:
         return 2.03 * A
 
     A = np.float64(7.0)
-    _perform_alu_test(testeeR, A)
-    _perform_alu_test(testeeL, A)
+    _perform_alt_test(testeeR, A)
+    _perform_alt_test(testeeL, A)
 
 
-def test_alu_binary_array() -> None:
+def test_mapped_binary_array() -> None:
     """Test binary of arrays, with same size."""
 
     def testee(A: np.ndarray, B: np.ndarray) -> np.ndarray:
@@ -277,24 +269,20 @@ def test_alu_binary_array() -> None:
 
     A = testutil.mkarray((100, 10, 3))
     B = testutil.mkarray((100, 10, 3))
-    _perform_alu_test(testee, A, B)
+    _perform_alt_test(testee, A, B)
 
 
-def test_alu_binary_array_scalar() -> None:
-    """Test binary of array with scalar."""
-
+def test_mapped_binary_array_scalar() -> None:
     def testee(A: np.ndarray | np.float64, B: np.float64 | np.ndarray) -> np.ndarray:
         return A + B  # type: ignore[return-value]  # It is always an array.
 
     A = testutil.mkarray((100, 22))
     B = np.float64(1.34)
-    _perform_alu_test(testee, A, B)
-    _perform_alu_test(testee, B, A)
+    _perform_alt_test(testee, A, B)
+    _perform_alt_test(testee, B, A)
 
 
-def test_alu_binary_array_literal() -> None:
-    """Test binary of array with literal"""
-
+def test_mapped_binary_array_partial_literal() -> None:
     def testeeR(A: np.ndarray) -> np.ndarray:
         return A + 1.52
 
@@ -302,57 +290,79 @@ def test_alu_binary_array_literal() -> None:
         return 1.52 + A
 
     A = testutil.mkarray((100, 22))
-    _perform_alu_test(testeeR, A)
-    _perform_alu_test(testeeL, A)
+    _perform_alt_test(testeeR, A)
+    _perform_alt_test(testeeL, A)
 
 
-def test_alu_binary_array_constants() -> None:
-    """Test binary of array with constant."""
-
+def test_mapped_binary_array_constants() -> None:
     def testee(A: np.ndarray) -> np.ndarray:
         return A + jnp.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]])
 
     A = testutil.mkarray((3, 3))
-    _perform_alu_test(testee, A)
+    _perform_alt_test(testee, A)
 
 
-def test_alu_binary_broadcast_1() -> None:
-    """Test broadcasting."""
-
+def test_mapped_broadcast(
+    broadcast_input: tuple[np.ndarray, np.ndarray],
+) -> None:
     def testee(A: np.ndarray, B: np.ndarray) -> np.ndarray:
         return A + B
 
-    A = testutil.mkarray((100, 1, 3))
-    B = testutil.mkarray((100, 1, 1))
-    _perform_alu_test(testee, A, B)
-    _perform_alu_test(testee, B, A)
+    A = broadcast_input[0]
+    B = broadcast_input[1]
+    _perform_alt_test(testee, A, B)
+    _perform_alt_test(testee, B, A)
 
 
-def test_alu_binary_broadcast_2() -> None:
-    """Test broadcasting."""
+# <------------ Tests for ALT
+
+
+def test_alt_general_unary(
+    alt_unary_ops: tuple[Callable, np.ndarray],
+) -> None:
+    """General test for the unary operations."""
+
+    def testee(A: np.ndarray) -> np.ndarray:
+        return alt_unary_ops[0](A)
+
+    _perform_alt_test(testee, alt_unary_ops[1])
+
+
+def test_alt_general_binary_float(
+    alt_binary_ops_float: tuple[Callable, tuple[np.ndarray, np.ndarray]],
+) -> None:
+    """Tests the binary operations that runs on floating points."""
 
     def testee(A: np.ndarray, B: np.ndarray) -> np.ndarray:
-        return A + B
+        return alt_binary_ops_float[0](A, B)
 
-    A = testutil.mkarray((100, 1))
-    B = testutil.mkarray((100, 10))
-    _perform_alu_test(testee, A, B)
-    _perform_alu_test(testee, B, A)
+    _perform_alt_test(testee, *alt_binary_ops_float[1])
 
 
-def test_alu_binary_broadcast_3() -> None:
-    """Test broadcasting."""
+def test_alt_compare_ops(
+    alt_binary_compare_ops: tuple[Callable, tuple[np.ndarray, np.ndarray]],
+) -> None:
+    """Test all the comparison operations."""
 
     def testee(A: np.ndarray, B: np.ndarray) -> np.ndarray:
-        return A + B
+        return alt_binary_compare_ops[0](A, B)
 
-    A = testutil.mkarray((5, 1, 3, 4, 1, 5))
-    B = testutil.mkarray((5, 1, 3, 1, 2, 5))
-    _perform_alu_test(testee, A, B)
-    _perform_alu_test(testee, B, A)
+    _perform_alt_test(testee, *alt_binary_compare_ops[1])
 
 
-def test_alu_unary_isfinite() -> None:
+def test_alt_logical_bitwise_operation(
+    logical_ops: tuple[Callable, tuple[np.ndarray, ...]],
+) -> None:
+    """Tests if the logical and bitwise operations works as they do in Jax."""
+    inputs: tuple[np.ndarray, ...] = logical_ops[1]
+
+    def testee(*args: np.ndarray) -> np.ndarray:
+        return logical_ops[0](*args)
+
+    _perform_alt_test(testee, *inputs)
+
+
+def test_alt_unary_isfinite() -> None:
     def testee(A: np.ndarray) -> jax.Array:
         return jnp.isfinite(A)
 
@@ -362,52 +372,28 @@ def test_alu_unary_isfinite() -> None:
     try:
         new_args = args.replace("-ffast-math", "-fno-finite-math-only")
         dace.Config.set("compiler", "cpu", "args", value=new_args)
-        _perform_alu_test(testee, A)
+        _perform_alt_test(testee, A)
 
     finally:
         dace.Config.set("compiler", "cpu", "args", value=args)
 
 
-def test_alu_logical_bitwise_operation(
-    logical_ops: tuple[Callable, tuple[np.ndarray, ...]],
-) -> None:
-    """Tests if the logical and bitwise operations works as they do in Jax."""
-    inputs: tuple[np.ndarray, ...] = logical_ops[1]
-
-    def testee(*args: np.ndarray) -> np.ndarray:
-        return logical_ops[0](*args)
-
-    _perform_alu_test(testee, *inputs)
-
-
-def test_alu_general_unary(
-    alu_unary_ops: tuple[Callable, np.ndarray],
-) -> None:
-    """General test for the unary operations."""
-
+def test_alt_unary_integer_power() -> None:
     def testee(A: np.ndarray) -> np.ndarray:
-        return alu_unary_ops[0](A)
+        return A**3
 
-    _perform_alu_test(testee, alu_unary_ops[1])
-
-
-def test_alu_general_binary_float(
-    alu_binary_ops_float: tuple[Callable, tuple[np.ndarray, np.ndarray]],
-) -> None:
-    """Tests the binary operations that runs on floating points."""
-
-    def testee(A: np.ndarray, B: np.ndarray) -> np.ndarray:
-        return alu_binary_ops_float[0](A, B)
-
-    _perform_alu_test(testee, *alu_binary_ops_float[1])
+    A = testutil.mkarray((10, 2, 3))
+    _perform_alt_test(testee, A)
 
 
-def test_alu_compare_ops(
-    alu_binary_compare_ops: tuple[Callable, tuple[np.ndarray, np.ndarray]],
-) -> None:
-    """Test all the comparison operations."""
+def test_alt_binary_power(
+    dtype: type,
+):
+    """Tests the "normal" power operator, i.e. not with a known integer power."""
 
-    def testee(A: np.ndarray, B: np.ndarray) -> np.ndarray:
-        return alu_binary_compare_ops[0](A, B)
+    def testee(A: np.ndarray, exp: np.generic) -> np.ndarray:
+        return A**exp
 
-    _perform_alu_test(testee, *alu_binary_compare_ops[1])
+    exp = dtype(3)
+    A = testutil.mkarray((10, 2, 3), dtype=dtype)
+    _perform_alt_test(testee, A, exp)
