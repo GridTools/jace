@@ -9,10 +9,6 @@
 
 from __future__ import annotations
 
-from .compiling import (
-    compile_jax_sdfg,
-    run_jax_sdfg,
-)
 from .jax_helper import (
     JaCeVar,
     get_jax_var_dtype,
@@ -42,7 +38,6 @@ __all__ = [
     "VALID_SDFG_OBJ_NAME",
     "VALID_SDFG_VAR_NAME",
     "JaCeVar",
-    "compile_jax_sdfg",
     "dataclass_with_default_init",
     "get_jax_var_dtype",
     "get_jax_var_name",
@@ -55,6 +50,5 @@ __all__ = [
     "is_scalar",
     "is_tracing_ongoing",
     "propose_jax_name",
-    "run_jax_sdfg",
     "translate_dtype",
 ]

@@ -232,12 +232,15 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"]):
         optimization.jace_optimize(tsdfg=tsdfg, **self._make_compiler_options(compiler_options))
 
         return JaCeCompiled(
-            csdfg=util.compile_jax_sdfg(tsdfg),
+            csdfg=dace_helper.compile_jax_sdfg(tsdfg),
             inp_names=tsdfg.inp_names,
             out_names=tsdfg.out_names,
         )
 
-    def compiler_ir(self, dialect: str | None = None) -> translator.TranslatedJaxprSDFG:
+    def compiler_ir(
+        self,
+        dialect: str | None = None,
+    ) -> translator.TranslatedJaxprSDFG:
         """Returns the internal SDFG.
 
         The function returns a `TranslatedJaxprSDFG` object. Direct modification
@@ -247,8 +250,14 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"]):
             return self._translated_sdfg
         raise ValueError(f"Unknown dialect '{dialect}'.")
 
-    def as_html(self, filename: str | None = None) -> None:
-        """Runs the `view()` method of the underlying SDFG."""
+    def view(
+        self,
+        filename: str | None = None,
+    ) -> None:
+        """Runs the `view()` method of the underlying SDFG.
+
+        This will open a browser and display the SDFG.
+        """
         self.compiler_ir().sdfg.view(filename=filename, verbose=False)
 
     def as_sdfg(self) -> dace.SDFG:
@@ -322,7 +331,7 @@ class JaCeCompiled:
         The arguments must be the same as for the wrapped function, but with
         all static arguments removed.
         """
-        return util.run_jax_sdfg(
+        return dace_helper.run_jax_sdfg(
             self._csdfg,
             self._inp_names,
             self._out_names,
