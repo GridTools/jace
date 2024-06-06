@@ -27,25 +27,27 @@ if TYPE_CHECKING:
 class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
     """Implements the base for all "mapped base operations".
 
-    A mapped base operation `f` is an operation that has several inputs arrays that are
-    elementwise combined to a single output array. A prime example for this would be the
-    addition of two arrays.
-    Essentially it assumes that the Tasklet code can be written as:
+    A mapped base operation `f` is an operation that has several inputs arrays
+    that are elementwise combined to a single output array. A prime example for
+    this would be the addition of two arrays. Essentially it assumes that the
+    Tasklet code can be written as:
     ```
         __out = f(__in0, __in1, __in3, ...)
     ```
-    where `__in*` are the connector names of the Tasklet and `__out` is the output connector. For
-    problems such as this, the SDFG API provides the `SDFGState.add_mapped_tasklet()` function,
-    however, in most cases it can not be directly used, for various reasons.
-    Thus this class acts like a convenience wrapper around it.
+    where `__in*` are the connector names of the Tasklet and `__out` is the
+    output connector. For problems such as this, the SDFG API provides the
+    `SDFGState.add_mapped_tasklet()` function, however, in most cases it can not
+    be directly used, for various reasons. Thus this class acts like a
+    convenience wrapper around it.
 
-    To use this class a user has to overwrite the `write_tasklet_code()` function. This function
-    generates the entire code that should be put into the Tasklet, include the assignment to
-    `__out`. If needed the translator will perform literal substitution on the returned code and
-    broadcast the inputs to match the outputs.
+    To use this class a user has to overwrite the `write_tasklet_code()` function.
+    This function generates the entire code that should be put into the Tasklet,
+    include the assignment to `__out`. If needed the translator will perform
+    literal substitution on the returned code and broadcast the inputs to match
+    the outputs.
 
-    If needed a subclass can also override the `make_input_memlets()` function to generate custom
-    input Memlets, such as adding an offset.
+    If needed a subclass can also override the `make_input_memlets()` function
+    to generate custom input Memlets, such as adding an offset.
 
     Args:
         primitive_name:     The name of the primitive `self` should bind to.
@@ -77,11 +79,11 @@ class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
     ) -> None:
         """Create the mapped Tasklet.
 
-        The function will create the map ranges and based on the shape of the output array.
-        It will then call `make_input_memlets()` to get the input Memlets.
-        After that it calls `write_tasklet_code()` to get the Tasklet code
-        and perform literal substitution by forwarding it to `self.literal_substitution()`.
-        After that it will create the mapped Tasklet.
+        The function will create the map ranges and based on the shape of the
+        output array. It will then call `make_input_memlets()` to get the input
+        Memlets. After that it calls `write_tasklet_code()` to get the Tasklet
+        code and perform literal substitution by forwarding it to
+        `self.literal_substitution()`. After that it will create the mapped Tasklet.
 
         Note:
             For a description of the arguments see `PrimitiveTranslatorCallable`.
@@ -135,8 +137,8 @@ class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
         However, the base will do literal substitution on the returned object.
 
         Args:
-            tskl_ranges:    List of pairs used as map parameter, first element is the name
-                iteration index of the dimension, second is its range, i.e. `0:SIZE`.
+            tskl_ranges:    List of pairs used as map parameter, first element
+                is the name iteration index of the dimension, second is its range.
             in_var_names:   The list of SDFG variables used as input, `None` if literal.
             eqn:            The equation.
         """
@@ -150,12 +152,12 @@ class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
     ) -> dict[str, dace.Memlet]:
         """Generate the input Memlets for the non literal operators of the primitive.
 
-        The returned `dict` maps the input connector of the Tasklet to the Memlet that is used
-        to connect it to the Map entry node.
+        The returned `dict` maps the input connector of the Tasklet to the Memlet
+        that is used to connect it to the Map entry node.
 
         Args:
-            tskl_ranges:    List of pairs used as map parameter, first element is the name
-                iteration index of the dimension, second is its range, i.e. `0:SIZE`.
+            tskl_ranges:    List of pairs used as map parameter, first element
+                is the name iteration index of the dimension, second is its range
             in_var_names:   The list of SDFG variables used as input, `None` if literal.
             eqn:            The equation object.
         """

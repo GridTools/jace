@@ -70,12 +70,14 @@ class DynamicSlicingTranslator(translator.PrimitiveTranslator):
     """Implements the dynamic slicing translator.
 
     The [dynamic slicing](https://jax.readthedocs.io/en/latest/_autosummary/jax.lax.dynamic_slice.html)
-    performs a slicing of a _fixed_ window, however, the starting indexes are not fix, but are
-    variables that can come from the outside. Thus, the translator uses "Dynamic Map Ranges".
-    Furthermore, Jax guarantees that if the window overruns the start indexes are adjusted.
+    performs a slicing of a _fixed_ window, however, the starting indexes are
+    not fix, but are variables that can come from the outside. Thus, the
+    translator uses "Dynamic Map Ranges". Furthermore, Jax guarantees that if
+    the window overruns the start indexes are adjusted.
 
     Note:
-        Unlike the normal slicing primitive, it is not derived from `MappedOperationTranslatorBase`.
+        Unlike the normal slicing primitive, it is not derived from
+        `MappedOperationTranslatorBase`.
     """
 
     @property

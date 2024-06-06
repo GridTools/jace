@@ -30,13 +30,13 @@ class ConvertElementTypeTranslator(mapped_base.MappedOperationTranslatorBase):
     Copies the input to the output and performs type conversion.
 
     Notes:
-        This translator ignores the `new_dtype` and `weak_type` parameter the equation
-        and only performs the casting.
+        This translator ignores the `new_dtype` and `weak_type` parameter the
+        equation and only performs the casting.
 
     Todo:
-        - Occasionally Jax generates a cast that is not needed, because the types are the same.
-            Currently this is handled, by generating an explicit copy, however, it should be
-            handled by a Memlet.
+        Occasionally Jax generates a cast that is not needed, because the types
+        are the same. Currently this is handled, by generating an explicit copy,
+        however, it should be handled by a Memlet.
     """
 
     def __init__(self) -> None:

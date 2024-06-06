@@ -195,9 +195,9 @@ def register_primitive_translator(
         overwrite: Replace the current primitive translator with `primitive_translator`.
 
     Note:
-        To add a `primitive` property use the `@make_primitive_translator` decorator.
-        This function returns `primitive_translator` unmodified, which allows it to be
-        used as decorator.
+        To add a `primitive` property use the `@make_primitive_translator`
+        decorator. This function returns `primitive_translator` unmodified,
+        which allows it to be used as decorator.
     """
 
     def wrapper(

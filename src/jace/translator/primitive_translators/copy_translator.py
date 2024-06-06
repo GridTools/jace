@@ -24,7 +24,11 @@ if TYPE_CHECKING:
 
 
 class CopyTranslator(mapped_base.MappedOperationTranslatorBase):
-    """Copy operations are implemented as a map to ensure that they can be fused with other maps."""
+    """Implements the `copy` primitive.
+
+    Copy operations are implemented as a map to ensure that they can be fused
+    with other maps
+    ."""
 
     def __init__(self) -> None:
         super().__init__(primitive_name="copy")
@@ -42,13 +46,14 @@ class CopyTranslator(mapped_base.MappedOperationTranslatorBase):
 class DevicePutTranslator(mapped_base.MappedOperationTranslatorBase):
     """The `device_put` primitive is used to transfer data between host and device.
 
-    The current implementation only supports the copying where the data already is. Currently DaCe
-    only knows about the Host and the GPU. Furthermore, currently JaCe works in such a way that
-    everything is either put on the host or the device. Because of this, the `DevicePutTranslator`
-    is, currently, just a simple copy operation that should be removed, by the optimization.
+    The current implementation only supports the copying where the data already
+    is. Currently DaCe only knows about the Host and the GPU. Furthermore,
+    currently JaCe works in such a way that everything is either put on the host
+    or the device. Because of this, the `DevicePutTranslator` is, currently,
+    just a simple copy operation that should be removed, by the optimization.
 
     Todo:
-        - Make into a Memlet because only the Memlet can handle copying between devices.
+        Make into a Memlet because only the Memlet can handle copying between devices.
     """
 
     def __init__(self) -> None:

@@ -27,16 +27,16 @@ if TYPE_CHECKING:
 class SelectNTranslator(mapped_base.MappedOperationTranslatorBase):
     """Implements the `select_n` primitive, which is a generalization of `np.where`
 
-    While `numpy.where` only supports two cases, the Jax primitive supports an arbitrary number
-    of cases. In that sense it is essentially a `C` `switch` statement, only that all cases have
-    to materialize.
+    While `numpy.where` only supports two cases, the Jax primitive supports an
+    arbitrary number of cases. In that sense it is essentially a `C` `switch`
+    statement, only that all cases have to materialize.
 
     The behaviour is undefined if the predicate is out of bound.
 
     Note:
-        For a better understanding this function renames its input connectors. The first one,
-        which is the predicate, is renamed to `__cond` and the others are renamed again to
-        `__in{i}`, starting with zero.
+        For a better understanding this function renames its input connectors.
+        The first one, which is the predicate, is renamed to `__cond` and the
+        others are renamed again to `__in{i}`, starting with zero.
     """
 
     def __init__(self) -> None:
