@@ -40,7 +40,7 @@ nscal = JaCeVar((), dace.int32, "nscal")
 
 
 @pytest.fixture()
-def translation_builder():
+def translation_builder() -> translator.JaxprTranslationBuilder:
     """Returns an allocated builder instance."""
     name = "fixture_builder"
     builder = translator.JaxprTranslationBuilder(
@@ -188,7 +188,9 @@ def test_builder_variable_alloc_auto_naming_wrapped(
             ), f"Automated naming failed, expected '{exp_name}' but got '{sdfg_name}'."
 
 
-def test_builder_nested(translation_builder: translator.JaxprTranslationBuilder) -> None:
+def test_builder_nested(
+    translation_builder: translator.JaxprTranslationBuilder,
+) -> None:
     """Tests the ability of the nesting of the builder."""
 
     # Now add a variable to the current subtext.
@@ -261,7 +263,9 @@ def test_builder_nested(translation_builder: translator.JaxprTranslationBuilder)
     assert name_3 == translation_builder.map_jax_var_to_sdfg(array3)
 
 
-def test_builder_append_state(translation_builder: translator.JaxprTranslationBuilder) -> None:
+def test_builder_append_state(
+    translation_builder: translator.JaxprTranslationBuilder,
+) -> None:
     """Tests the functionality of appending states."""
     sdfg: dace.SDFG = translation_builder.sdfg
 

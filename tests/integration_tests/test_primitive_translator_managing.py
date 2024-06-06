@@ -10,7 +10,7 @@
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pytest
@@ -25,8 +25,12 @@ from jace.translator import (
 )
 
 
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+
 @pytest.fixture(autouse=True)
-def _conserve_builtin_translators():
+def _conserve_builtin_translators() -> None:
     """Restores the set of registered subtranslators after a test."""
     initial_translators = get_registered_primitive_translators()
     yield
@@ -34,7 +38,7 @@ def _conserve_builtin_translators():
 
 
 @pytest.fixture()
-def no_builtin_translators():  # noqa: PT004  # This is how you should do it: https://docs.pytest.org/en/7.1.x/how-to/fixtures.html#use-fixtures-in-classes-and-modules-with-usefixtures
+def no_builtin_translators() -> None:  # noqa: PT004  # This is how you should do it: https://docs.pytest.org/en/7.1.x/how-to/fixtures.html#use-fixtures-in-classes-and-modules-with-usefixtures
     """This fixture can be used if the test does not want any builtin translators."""
     initial_translators = translator.set_active_primitive_translators_to({})
     yield
@@ -70,14 +74,14 @@ def fake_add_translator(*args: Any, **kwargs: Any) -> None:  # noqa: ARG001
     raise NotImplementedError
 
 
-def test_are_subtranslators_imported():
+def test_are_subtranslators_imported() -> None:
     """Tests if something is inside the list of subtranslators."""
     # Must be adapted if new primitives are implemented.
     assert len(get_registered_primitive_translators()) == 60
 
 
 @pytest.mark.usefixtures("no_builtin_translators")
-def test_subtranslatior_managing():
+def test_subtranslatior_managing() -> None:
     """Basic functionality of the subtranslators."""
     original_active_subtrans = get_registered_primitive_translators()
     assert len(original_active_subtrans) == 0
@@ -100,7 +104,7 @@ def test_subtranslatior_managing():
     assert len(active_subtrans) == 3
 
 
-def test_subtranslatior_managing_isolation():
+def test_subtranslatior_managing_isolation() -> None:
     """Tests if `get_registered_primitive_translators()` protects the internal registry."""
     assert (
         get_registered_primitive_translators()
@@ -117,11 +121,14 @@ def test_subtranslatior_managing_isolation():
     assert get_registered_primitive_translators()["add"] is org_add_prim
 
 
-def test_subtranslatior_managing_swap():
+def test_subtranslatior_managing_swap() -> None:
     """Tests the `set_active_primitive_translators_to()` functionality."""
 
     # Allows to compare the structure of dicts.
-    def same_structure(d1: dict, d2: dict) -> bool:
+    def same_structure(
+        d1: Mapping,
+        d2: Mapping,
+    ) -> bool:
         return d1.keys() == d2.keys() and all(id(d2[k]) == id(d1[k]) for k in d1)
 
     initial_primitives = get_registered_primitive_translators()
@@ -144,7 +151,7 @@ def test_subtranslatior_managing_swap():
 
 
 @pytest.mark.usefixtures("no_builtin_translators")
-def test_subtranslatior_managing_callable_annotation():
+def test_subtranslatior_managing_callable_annotation() -> None:
     """Test if `make_primitive_translator()` works."""
 
     prim_name = "non_existing_property"
@@ -158,7 +165,7 @@ def test_subtranslatior_managing_callable_annotation():
     assert len(get_registered_primitive_translators()) == 0
 
 
-def test_subtranslatior_managing_overwriting():
+def test_subtranslatior_managing_overwriting() -> None:
     """Tests if we are able to overwrite something."""
     current_add_translator = get_registered_primitive_translators()["add"]
 
@@ -184,7 +191,7 @@ def test_subtranslatior_managing_overwriting():
 
 
 @pytest.mark.usefixtures("no_builtin_translators")
-def test_subtranslatior_managing_overwriting_2():
+def test_subtranslatior_managing_overwriting_2() -> None:
     """Again an overwriting test, but this time a bit more complicated."""
 
     trans_cnt = [0]
@@ -206,7 +213,7 @@ def test_subtranslatior_managing_overwriting_2():
     assert trans_cnt[0] == 4
 
 
-def test_subtranslatior_managing_decoupling():
+def test_subtranslatior_managing_decoupling() -> None:
     """Shows that we have proper decoupling.
 
     I.e. changes to the global state, does not affect already annotated functions.

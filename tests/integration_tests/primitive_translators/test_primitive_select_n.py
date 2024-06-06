@@ -24,13 +24,16 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
 
-def _perform_test(testee: Callable, *args: Any):
+def _perform_test(
+    testee: Callable,
+    *args: Any,
+) -> None:
     res = testee(*args)
     ref = jace.jit(testee)(*args)
     assert np.all(res == ref)
 
 
-def test_select_n_where():
+def test_select_n_where() -> None:
     """Normal `np.where` test."""
 
     def testee(P: Any, T: Any, F: Any) -> Any:
@@ -43,7 +46,7 @@ def test_select_n_where():
     _perform_test(testee, pred, tbranch, fbranch)
 
 
-def test_select_n_where_literal():
+def test_select_n_where_literal() -> None:
     """`np.where` where one of the input is a literal."""
 
     def testee1(P: Any, F: Any) -> Any:
@@ -65,7 +68,7 @@ def test_select_n_where_literal():
     _perform_test(testee3, pred)
 
 
-def test_select_n_many_inputs():
+def test_select_n_many_inputs() -> None:
     """Tests the generalized way of using the primitive."""
 
     def testee(pred: np.ndarray, *cases: np.ndarray) -> jax.Array:

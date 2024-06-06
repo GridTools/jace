@@ -21,7 +21,7 @@ from jace.translator import pre_post_translation as ptrans
 from tests import util as testutil
 
 
-def test_jit():
+def test_jit() -> None:
     """Simple add function."""
 
     def testee(A: np.ndarray, B: np.ndarray) -> np.ndarray:
@@ -39,7 +39,7 @@ def test_jit():
     assert np.allclose(ref, res), f"Expected '{ref}' got '{res}'."
 
 
-def test_composition_itself():
+def test_composition_itself() -> None:
     """Tests if JaCe is composable with itself."""
 
     # Pure Python functions
@@ -77,7 +77,7 @@ def test_composition_itself():
 
 
 @pytest.mark.skip(reason="Nested Jaxpr are not handled.")
-def test_composition_with_jax():
+def test_composition_with_jax() -> None:
     """Tests if JaCe can interact with Jax and vice versa."""
 
     def base_fun(A, B, C):
@@ -96,7 +96,7 @@ def test_composition_with_jax():
 
 
 @pytest.mark.skip(reason="Nested Jaxpr are not handled.")
-def test_composition_with_jax_2():
+def test_composition_with_jax_2() -> None:
     """Second test if JaCe can interact with Jax and vice versa."""
 
     @jax.jit
@@ -125,7 +125,7 @@ def test_composition_with_jax_2():
     assert np.allclose(ref, res_jace), "JaCe Failed."
 
 
-def test_grad_annotation_direct():
+def test_grad_annotation_direct() -> None:
     """Test if `jace.grad` works directly."""
 
     def f(x):
@@ -149,7 +149,7 @@ def test_grad_annotation_direct():
         assert np.allclose(res, ref)
 
 
-def test_grad_control_flow():
+def test_grad_control_flow() -> None:
     """Tests if `grad` and controlflow works.
 
     This requirement is mentioned in `https://jax.readthedocs.io/en/latest/notebooks/Common_Gotchas_in_JAX.html#python-control-flow-autodiff`.

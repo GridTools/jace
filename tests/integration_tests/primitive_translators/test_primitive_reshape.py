@@ -47,7 +47,9 @@ def _test_impl_reshaping(
 @pytest.fixture(
     params=["C", pytest.param("F", marks=pytest.mark.skip("Non C order is not supported"))]
 )
-def mem_order(request) -> str:
+def mem_order(
+    request,
+) -> str:
     """Gets the memory order that we want
 
     Currently 'F' is skipped because it is not implemented by the logic.
@@ -56,19 +58,25 @@ def mem_order(request) -> str:
 
 
 @pytest.fixture(params=[(216, 1, 1), (1, 216, 1), (1, 1, 216), (1, 6, 36), (36, 1, 6)])
-def new_shape(request):
+def new_shape(
+    request,
+) -> None:
     """New shapes for the `test_reshaping_same_rank()` test."""
     return request.param
 
 
 @pytest.fixture(params=[(12, 1), (1, 12), (1, 1, 12), (1, 2, 6)])
-def expanded_shape(request):
+def expanded_shape(
+    request,
+) -> None:
     """New shapes for the `test_reshaping_removing_rank()` test."""
     return request.param
 
 
 @pytest.fixture(params=[(216,), (6, 36), (36, 6), (216, 1)])
-def reduced_shape(request):
+def reduced_shape(
+    request,
+) -> None:
     """New shapes for the `test_reshaping_adding_rank()` test."""
     return request.param
 

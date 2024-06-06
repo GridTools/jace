@@ -34,13 +34,17 @@ _DACE_COMPLEX_TYPES: Final[list[type]] = [
 
 
 @pytest.fixture(params=_DACE_REAL_TYPES)
-def src_type(request) -> type:
+def src_type(
+    request,
+) -> type:
     """All valid source types, with the exception of bool."""
     return request.param
 
 
 @pytest.fixture(params=_DACE_REAL_TYPES + _DACE_COMPLEX_TYPES)
-def dst_type(request) -> type:
+def dst_type(
+    request,
+) -> type:
     """All valid destination types, with the exception of bool.
 
     Includes also complex types, because going from real to complex is useful, but the other
@@ -72,14 +76,21 @@ def _convert_element_type_impl(
     return True
 
 
-def test_convert_element_type_main(src_type, dst_type):
+def test_convert_element_type_main(
+    src_type: type,
+    dst_type: type,
+) -> None:
     """Tests all conversions with the exception of conversions from bool and complex."""
     _convert_element_type_impl(src_type, dst_type)
 
 
-def test_convert_element_type_from_bool(src_type):
+def test_convert_element_type_from_bool(
+    src_type: type,
+) -> None:
     _convert_element_type_impl(np.bool_, src_type)
 
 
-def test_convert_element_type_to_bool(src_type):
+def test_convert_element_type_to_bool(
+    src_type: type,
+) -> None:
     _convert_element_type_impl(src_type, np.bool_)

@@ -59,7 +59,9 @@ def _roundtrip_implementation(
 
 
 @pytest.fixture(params=[0, -1, 1])
-def simple_axis(request) -> int:
+def simple_axis(
+    request,
+) -> int:
     return request.param
 
 
@@ -71,13 +73,19 @@ def simple_axis(request) -> int:
         (3, 2, 1),
     ]
 )
-def hard_axis(request) -> Sequence[int] | int:
+def hard_axis(
+    request,
+) -> Sequence[int] | int:
     return request.param
 
 
-def test_expand_squeeze_rountrip_simple(simple_axis):
+def test_expand_squeeze_rountrip_simple(
+    simple_axis,
+) -> None:
     _roundtrip_implementation((10,), simple_axis)
 
 
-def test_expand_squeeze_rountrip_big(hard_axis):
+def test_expand_squeeze_rountrip_big(
+    hard_axis,
+) -> None:
     _roundtrip_implementation((2, 3, 4, 5), hard_axis)

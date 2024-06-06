@@ -16,7 +16,7 @@ import jace
 from tests import util as testutil
 
 
-def test_copy():
+def test_copy() -> None:
     @jace.jit
     def testee(A: np.ndarray) -> jax.Array:
         return jnp.copy(A)

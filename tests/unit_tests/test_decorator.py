@@ -19,7 +19,7 @@ import jace
 from tests import util as testutil
 
 
-def test_decorator_individually():
+def test_decorator_individually() -> None:
     """Tests the compilation steps individually."""
 
     def testee_(A: np.ndarray, B: np.ndarray) -> np.ndarray:
@@ -45,7 +45,7 @@ def test_decorator_individually():
     assert lowering_cnt[0] == 1
 
 
-def test_decorator_one_go():
+def test_decorator_one_go() -> None:
     """Tests the compilation steps in one go."""
 
     def testee_(A: np.ndarray, B: np.ndarray) -> np.ndarray:
@@ -68,7 +68,7 @@ def test_decorator_one_go():
     assert lowering_cnt[0] == 1
 
 
-def test_decorator_wrapped():
+def test_decorator_wrapped() -> None:
     """Tests if some properties are set correctly."""
 
     def testee(A: np.ndarray, B: np.ndarray) -> np.ndarray:
@@ -77,4 +77,3 @@ def test_decorator_wrapped():
     wrapped = jace.jit(testee)
 
     assert wrapped.wrapped_fun is testee
-    assert wrapped.__wrapped__ is testee

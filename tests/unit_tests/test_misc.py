@@ -18,7 +18,7 @@ from tests import util as testutil
 
 
 @pytest.mark.skip("Possible bug in DaCe.")
-def test_mismatch_in_datatyte_calling():
+def test_mismatch_in_datatyte_calling() -> None:
     """Tests compilation and calling with different types.
 
     Note that this more or less a test for the calling implementation of the `CompiledSDFG`

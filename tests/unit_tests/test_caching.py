@@ -70,7 +70,7 @@ def test_caching_same_sizes() -> None:
     assert lowering_cnt[0] == 1
 
 
-def test_caching_different_sizes():
+def test_caching_different_sizes() -> None:
     """The behaviour of the cache if different sizes where used."""
 
     # Counter for how many time it was lowered.
@@ -193,7 +193,7 @@ def test_caching_compilation() -> None:
     assert optiCompiled._csdfg.sdfg.number_of_nodes() < unoptiCompiled._csdfg.sdfg.number_of_nodes()
 
 
-def test_caching_dtype():
+def test_caching_dtype() -> None:
     """Tests if the data type is properly included in the test."""
 
     lowering_cnt = [0]
@@ -219,7 +219,7 @@ def test_caching_dtype():
         assert lowering_cnt[0] == i + 1
 
 
-def test_caching_eviction_simple():
+def test_caching_eviction_simple() -> None:
     """Simple tests for cache eviction."""
 
     @jace.jit

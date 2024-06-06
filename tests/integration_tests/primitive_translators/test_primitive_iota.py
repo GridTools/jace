@@ -14,7 +14,7 @@ from jax import numpy as jnp
 import jace
 
 
-def test_iota_arange():
+def test_iota_arange() -> None:
     """Tests `jnp.arange` functionality."""
 
     def testee(A: int) -> jax.Array:
@@ -25,7 +25,7 @@ def test_iota_arange():
     assert np.all(ref == res)
 
 
-def test_iota_broadcast():
+def test_iota_broadcast() -> None:
     """Test more iota using the `jax.lax.broadcasted_iota()` function."""
     shape = (2, 2, 2, 2)
 

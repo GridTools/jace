@@ -22,26 +22,28 @@ from jace.util import translation_cache as tcache
 
 
 @pytest.fixture(autouse=True)
-def _enable_x64_mode_in_jax():
+def _enable_x64_mode_in_jax() -> None:
     """Fixture of enable the `x64` mode in Jax.
 
-    Currently, JaCe requires that `x64` mode is enabled and will do all Jax things with it enabled.
-    However, if we use Jax with the intend to compare it against JaCe we must also enable it for
-    Jax.
+    Currently, JaCe requires that `x64` mode is enabled and will do all Jax
+    things with it enabled. However, if we use Jax with the intend to compare
+    it against JaCe we must also enable it for Jax.
     """
     with jax.experimental.enable_x64():
         yield
 
 
 @pytest.fixture(autouse=True)
-def _disable_jit():
+def _disable_jit() -> None:
     """Fixture for disable the dynamic jiting in Jax.
 
-    For certain reasons Jax puts certain primitives inside a `pjit` primitive, i.e. nested Jaxpr.
-    The intent is, that these operations can/should run on an accelerator.
+    For certain reasons Jax puts certain primitives inside a `pjit` primitive,
+    i.e. nested Jaxpr. The intent is, that these operations can/should run on
+    an accelerator.
 
-    But this is a problem, since JaCe can not handle this primitive, it leads to an error.
-    To overcome this problem, we will globally disable this feature until we can handle `pjit`.
+    But this is a problem, since JaCe can not handle this primitive, it leads
+    to an error. To overcome this problem, we will globally disable this feature
+    until we can handle `pjit`.
 
     Todo:
         Remove as soon as we can handle nested `jit`.
@@ -51,7 +53,7 @@ def _disable_jit():
 
 
 @pytest.fixture(autouse=True)
-def _clear_translation_cache():
+def _clear_translation_cache() -> None:
     """Decorator that clears the translation cache.
 
     Ensures that a function finds an empty cache and clears up afterwards.
@@ -62,7 +64,7 @@ def _clear_translation_cache():
 
 
 @pytest.fixture(autouse=True)
-def _reset_random_seed():
+def _reset_random_seed() -> None:
     """Fixture for resetting the random seed.
 
     This ensures that for every test the random seed of NumPy is reset.
