@@ -19,7 +19,9 @@ from jax import core as jax_core
 import jace.util as util
 
 
-def is_drop_var(jax_var: jax_core.Atom | util.JaCeVar) -> TypeGuard[jax_core.DropVar]:
+def is_drop_var(
+    jax_var: jax_core.Atom | util.JaCeVar,
+) -> TypeGuard[jax_core.DropVar]:
     """Tests if `jax_var` is a drop variable, i.e. a variable that is not read from in a Jaxpr."""
 
     if isinstance(jax_var, jax_core.DropVar):

@@ -219,7 +219,9 @@ class JaxprTranslationBuilder:
 
     @overload
     def map_jax_var_to_sdfg(
-        self, jax_var: jax_core.Atom | util.JaCeVar, allow_fail: Literal[True]
+        self,
+        jax_var: jax_core.Atom | util.JaCeVar,
+        allow_fail: Literal[True],
     ) -> str | None: ...
 
     def map_jax_var_to_sdfg(
@@ -568,19 +570,19 @@ class JaxprTranslationBuilder:
             update_var_mapping=True,
         )
 
-        pname: str = eqn.primitive.name
-        if pname not in self._primitive_translators:
-            raise NotImplementedError(f"No translator known to handle '{pname}'.")
-        ptranslator = self._primitive_translators[pname]
+        primitive_name: str = eqn.primitive.name
+        if primitive_name not in self._primitive_translators:
+            raise NotImplementedError(f"No translator known to handle '{primitive_name}'.")
+        translator = self._primitive_translators[primitive_name]
 
         # Create the state into which the equation should be translated
         eqn_state = self.append_new_state(
-            label=f"{pname}_{'_'.join(out_var_names)}",
+            label=f"{primitive_name}_{'_'.join(out_var_names)}",
             prev_state=None,  # forces the creation of a new terminal state
         )
 
         # Now perform the actual translation of the equation.
-        new_sdfg_term_state = ptranslator(
+        new_sdfg_term_state = translator(
             builder=self,
             in_var_names=in_var_names,
             out_var_names=out_var_names,
