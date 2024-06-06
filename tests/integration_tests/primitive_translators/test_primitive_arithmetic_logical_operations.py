@@ -23,7 +23,6 @@ on the validity of the template of the ALT.
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 import dace
@@ -38,11 +37,11 @@ from tests import util as testutil
 
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Generator
 
 
 @pytest.fixture(autouse=True)
-def _only_alt_translators() -> None:
+def _only_alt_translators() -> Generator[None, None, None]:
     """Removes all non arithmetic/logical translator from the registry.
 
     This ensures that Jax is not doing some stuff that is supposed to be handled by the
@@ -111,17 +110,15 @@ def dtype(
 
 @pytest.fixture(
     params=[
-        lambda x: +(x - 1.0),
+        lambda x: +(x - 0.5),
         lambda x: -x,
         jnp.floor,
         jnp.ceil,
         jnp.round,
         jnp.exp2,
-        jnp.exp,
-        lambda x: jnp.abs(x - 0.5),
-        lambda x: jnp.log(x + 1.0),
-        lambda x: jnp.sqrt(x**2),
-        # The following have a restricted input domain, so we use `x = f^{-1}(f(x))`.
+        lambda x: jnp.abs(-x),
+        lambda x: jnp.sqrt(x**2),  # includes integer power.
+        lambda x: jnp.log(jnp.exp(x)),
         lambda x: jnp.log1p(jnp.expm1(x)),
         lambda x: jnp.asin(jnp.sin(x)),
         lambda x: jnp.acos(jnp.cos(x)),
@@ -135,7 +132,11 @@ def alt_unary_ops(
     request,
     dtype: type,
 ) -> tuple[Callable, np.ndarray]:
-    """The inputs and the operation we need for the full test."""
+    """The inputs and the operation we need for the full test.
+
+    Some of the unary operations are combined to ensure that they will succeed.
+    An example is `asin()` which only takes values in the range `[-1, 1]`.
+    """
     return (request.param, testutil.mkarray((2, 2), dtype))
 
 
@@ -148,6 +149,7 @@ def alt_unary_ops(
         jnp.maximum,
         jnp.atan2,
         jnp.nextafter,
+        lambda x, y: x**y,
     ]
 )
 def alt_binary_ops_float(
@@ -314,52 +316,16 @@ def test_mapped_broadcast(
     _perform_alt_test(testee, B, A)
 
 
-# <------------ Tests for ALT
+# <------------ Tests for arithmetic and logical translators/operations
 
 
 def test_alt_general_unary(
     alt_unary_ops: tuple[Callable, np.ndarray],
 ) -> None:
-    """General test for the unary operations."""
-
     def testee(A: np.ndarray) -> np.ndarray:
         return alt_unary_ops[0](A)
 
     _perform_alt_test(testee, alt_unary_ops[1])
-
-
-def test_alt_general_binary_float(
-    alt_binary_ops_float: tuple[Callable, tuple[np.ndarray, np.ndarray]],
-) -> None:
-    """Tests the binary operations that runs on floating points."""
-
-    def testee(A: np.ndarray, B: np.ndarray) -> np.ndarray:
-        return alt_binary_ops_float[0](A, B)
-
-    _perform_alt_test(testee, *alt_binary_ops_float[1])
-
-
-def test_alt_compare_ops(
-    alt_binary_compare_ops: tuple[Callable, tuple[np.ndarray, np.ndarray]],
-) -> None:
-    """Test all the comparison operations."""
-
-    def testee(A: np.ndarray, B: np.ndarray) -> np.ndarray:
-        return alt_binary_compare_ops[0](A, B)
-
-    _perform_alt_test(testee, *alt_binary_compare_ops[1])
-
-
-def test_alt_logical_bitwise_operation(
-    logical_ops: tuple[Callable, tuple[np.ndarray, ...]],
-) -> None:
-    """Tests if the logical and bitwise operations works as they do in Jax."""
-    inputs: tuple[np.ndarray, ...] = logical_ops[1]
-
-    def testee(*args: np.ndarray) -> np.ndarray:
-        return logical_ops[0](*args)
-
-    _perform_alt_test(testee, *inputs)
 
 
 def test_alt_unary_isfinite() -> None:
@@ -378,22 +344,38 @@ def test_alt_unary_isfinite() -> None:
         dace.Config.set("compiler", "cpu", "args", value=args)
 
 
+def test_alt_general_binary_float(
+    alt_binary_ops_float: tuple[Callable, tuple[np.ndarray, np.ndarray]],
+) -> None:
+    def testee(A: np.ndarray, B: np.ndarray) -> np.ndarray:
+        return alt_binary_ops_float[0](A, B)
+
+    _perform_alt_test(testee, *alt_binary_ops_float[1])
+
+
+def test_alt_compare_operation(
+    alt_binary_compare_ops: tuple[Callable, tuple[np.ndarray, np.ndarray]],
+) -> None:
+    def testee(A: np.ndarray, B: np.ndarray) -> np.ndarray:
+        return alt_binary_compare_ops[0](A, B)
+
+    _perform_alt_test(testee, *alt_binary_compare_ops[1])
+
+
+def test_alt_logical_bitwise_operation(
+    logical_ops: tuple[Callable, tuple[np.ndarray, ...]],
+) -> None:
+    inputs: tuple[np.ndarray, ...] = logical_ops[1]
+
+    def testee(*args: np.ndarray) -> np.ndarray:
+        return logical_ops[0](*args)
+
+    _perform_alt_test(testee, *inputs)
+
+
 def test_alt_unary_integer_power() -> None:
     def testee(A: np.ndarray) -> np.ndarray:
         return A**3
 
     A = testutil.mkarray((10, 2, 3))
     _perform_alt_test(testee, A)
-
-
-def test_alt_binary_power(
-    dtype: type,
-):
-    """Tests the "normal" power operator, i.e. not with a known integer power."""
-
-    def testee(A: np.ndarray, exp: np.generic) -> np.ndarray:
-        return A**exp
-
-    exp = dtype(3)
-    A = testutil.mkarray((10, 2, 3), dtype=dtype)
-    _perform_alt_test(testee, A, exp)
