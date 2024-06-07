@@ -57,33 +57,22 @@ class ConvertElementTypeTranslator(mapped_base.MappedOperationTranslatorBase):
         out_dtype = util.get_jax_var_dtype(eqn.outvars[0]).type
         out_dtype_s: str = out_dtype.__name__
 
-        # This is the base of the template that we use for conversion.
-        #  You should notice that the Tasklet `__out = __in0` will fail, see commit
-        #  `f5aabc3` of the prototype. Thus we have to do it in this way.
+        # This is the base of the template that we use for conversion. You should notice that
+        #  the Tasklet `__out = __in0` will fail, see commit `f5aabc3` of the prototype. Thus
+        #  we have to do it in this way.
         conv_code = "__in0"
 
-        # Handle special cases
-        if in_dtype_s.startswith("bool") and in_dtype == out_dtype:
-            #  Second and more importantly, in Jax the casting from bool to bool has a special
-            #  meaning, because in Jax all logical operations are bitwise. If a logical operation
-            #  is used, then Jax first makes it a bool by running `a != 0`.
-            #  Jax does this to ensure that it has either `0` or a `1`, I assume that is because
-            #  XLA does not have a native bool, similar as C.
-            #  However, in C++, that has a native bool, this operation is kind of useless.
-            #  But we keep it as special case to serve as a documentation.
-            return f"__out = {conv_code}"
         if in_dtype == out_dtype:
-            # For some odd reason, this conversion also happens if with other types as bool,
-            #  see above. For that reason we also keep it as special case.
-            #  In previous versions we generated a warning here, but it had become so annoying
-            #  that it was removed.
+            # For some reason Jax sometimes adds conversions where no are needed. I think
+            #  that the reason for this is the special type system that Jax made. In these cases
+            #  we do not add a cast, because such a Tasklet is not trivial and DaCe can not remove it.
             return f"__out = {conv_code}"
 
         if in_dtype_s.startswith("bool"):
             # Interestingly `__out = int(__in0)` will not work, see commit `f5aabc` of the prototype.
             conv_code = f"(1 if {conv_code} else 0)"
 
-        if out_dtype_s == "bool":
+        if out_dtype_s.startswith("bool"):
             conv_code = f"dace.bool_({conv_code})"
         elif hasattr(dace.dtypes, out_dtype_s):
             conv_code = f"dace.{out_dtype_s}({conv_code})"
