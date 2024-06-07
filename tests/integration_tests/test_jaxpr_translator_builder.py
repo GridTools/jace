@@ -5,16 +5,22 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Implements some tests of the subtranslator builder."""
+"""Tests for the `JaxprTranslationBuilder` object.
+
+Although this is an integration test, the tests here manipulate the builder on
+a low and direct level.
+"""
 
 from __future__ import annotations
 
 import re
 
 import dace
+import jax
 import numpy as np
 import pytest
 from dace.data import Array
+from jax import numpy as jnp
 
 import jace
 from jace import translator, util
@@ -51,10 +57,7 @@ def translation_builder() -> translator.JaxprTranslationBuilder:
 
 
 def test_builder_alloc() -> None:
-    """Tests the state right after allocation.
-
-    Does not use the fixture because it does it on its own.
-    """
+    """Tests for correct allocation."""
     builder = translator.JaxprTranslationBuilder(
         primitive_translators=translator.get_registered_primitive_translators()
     )
@@ -80,7 +83,7 @@ def test_builder_alloc() -> None:
 def test_builder_variable_alloc_auto_naming(
     translation_builder: translator.JaxprTranslationBuilder,
 ) -> None:
-    """Tests simple variable allocation."""
+    """Tests if autonaming of variables works."""
     for i, var in enumerate([array1, array2, scal1, array3, scal2, scal3]):
         sdfg_name = translation_builder.add_array(var, update_var_mapping=True)
         sdfg_var = translation_builder.get_array(sdfg_name)
@@ -93,10 +96,9 @@ def test_builder_variable_alloc_auto_naming(
 def test_builder_variable_alloc_mixed_naming(
     translation_builder: translator.JaxprTranslationBuilder,
 ) -> None:
-    """Tests the naming in a mixed setting.
+    """Test automatic naming if there are variables with a given name.
 
-    If `update_var_mapping=True` is given, then the naming will skip variables,
-    see also `test_builder_variable_alloc_mixed_naming2()`.
+    See also `test_builder_variable_alloc_mixed_naming2()`.
     """
     #                        *       b       c       d      *      f      g
     for i, var in enumerate([narray, array1, array2, scal1, nscal, scal2, scal3]):
@@ -114,11 +116,7 @@ def test_builder_variable_alloc_mixed_naming(
 def test_builder_variable_alloc_mixed_naming2(
     translation_builder: translator.JaxprTranslationBuilder,
 ) -> None:
-    """Tests the naming in a mixed setting.
-
-    This time we do not use `update_var_mapping=True`, instead it now depends on the name. This
-    means that automatic naming will now again include all, letters, but not in a linear order.
-    """
+    """Test automatic naming if there are variables with a given name."""
     letoff = 0
     #             *      a        b       c      *      d     e
     for var in [narray, array1, array2, scal1, nscal, scal2, scal3]:
@@ -132,6 +130,32 @@ def test_builder_variable_alloc_mixed_naming2(
         assert isinstance(sdfg_var, Array)  # Everything is now an array
         assert sdfg_var.shape == ((1,) if var.shape == () else var.shape)
         assert sdfg_var.dtype == var.dtype
+
+
+def test_builder_variable_alloc_auto_naming_wrapped(
+    translation_builder: translator.JaxprTranslationBuilder,
+) -> None:
+    """Tests the variable naming if we have more than 26 variables."""
+    single_letters = [chr(x) for x in range(97, 123)]
+    i = 0
+    for let1 in ["", *single_letters[1:]]:  # Note `z` is followed by `ba` and not by `aa`.
+        for let2 in single_letters:
+            i += 1
+            # Create a variable and enter it into the variable naming.
+            var = JaCeVar(shape=(19, 19), dtype=dace.float64)
+            sdfg_name = translation_builder.add_array(arg=var, update_var_mapping=True)
+            mapped_name = translation_builder.map_jax_var_to_sdfg(var)
+            assert (
+                sdfg_name == mapped_name
+            ), f"Mapping for '{var}' failed, expected '{sdfg_name}' got '{mapped_name}'."
+
+            # Get the name that we really expect, we must also handle some situations.
+            exp_name = let1 + let2
+            if exp_name in util.FORBIDDEN_SDFG_VAR_NAMES:
+                exp_name = "__jace_forbidden_" + exp_name
+            assert (
+                exp_name == sdfg_name
+            ), f"Automated naming failed, expected '{exp_name}' but got '{sdfg_name}'."
 
 
 def test_builder_variable_alloc_prefix_naming(
@@ -160,32 +184,6 @@ def test_builder_variable_alloc_prefix_naming(
         nscal, name_prefix=prefix_3, update_var_mapping=False
     )
     assert exp_name_3 == sdfg_name_3
-
-
-def test_builder_variable_alloc_auto_naming_wrapped(
-    translation_builder: translator.JaxprTranslationBuilder,
-) -> None:
-    """Tests the variable naming if we have more than 26 variables."""
-    single_letters = [chr(x) for x in range(97, 123)]
-    i = 0
-    for let1 in ["", *single_letters[1:]]:  # Note `z` is followed by `ba` and not by `aa`.
-        for let2 in single_letters:
-            i += 1
-            # Create a variable and enter it into the variable naming.
-            var = JaCeVar(shape=(19, 19), dtype=dace.float64)
-            sdfg_name = translation_builder.add_array(arg=var, update_var_mapping=True)
-            mapped_name = translation_builder.map_jax_var_to_sdfg(var)
-            assert (
-                sdfg_name == mapped_name
-            ), f"Mapping for '{var}' failed, expected '{sdfg_name}' got '{mapped_name}'."
-
-            # Get the name that we really expect, we must also handle some situations.
-            exp_name = let1 + let2
-            if exp_name in util.FORBIDDEN_SDFG_VAR_NAMES:
-                exp_name = "__jace_forbidden_" + exp_name
-            assert (
-                exp_name == sdfg_name
-            ), f"Automated naming failed, expected '{exp_name}' but got '{sdfg_name}'."
 
 
 def test_builder_nested(
@@ -246,8 +244,7 @@ def test_builder_nested(
     assert translation_builder.sdfg.number_of_nodes() == 2
     assert translation_builder.sdfg.number_of_edges() == 1
 
-    # Again the variable that was declared in the last stack is now no longer present.
-    #  Note if the nested SDFG was integrated into the parent SDFG it would be accessible
+    # Again the variable that was declared in the nested context is now no longer present.
     with pytest.raises(
         expected_exception=KeyError,
         match=re.escape(
@@ -302,10 +299,10 @@ def test_builder_append_state(
     assert next(iter(sdfg.in_edges(non_terminal_state))).src is terminal_state_1
 
 
-def test_builder_variable_multiple_variables(
+def test_builder_variable_multiple_versions(
     translation_builder: translator.JaxprTranslationBuilder,
 ) -> None:
-    """A simple test in which we try to add a variable that are known, but with a different name."""
+    """A simple test in which we try to add a variable that is known, but with a different name."""
     # Now we will add `array1` and then different ways of updating it.
     narray1: str = translation_builder.add_array(array1, update_var_mapping=True)
 
@@ -574,9 +571,10 @@ def test_builder_direct_return() -> None:
     """Tests the case, when an input value is returned as output.
 
     Note:
-        The test function below will not return a reference to its input, but perform an actual
-        copy. This behaviour does look strange from a Python point of view, however, it is (at the
-        time of writing) consistent with what Jax does, even when passing Jax arrays directly.
+        The test function below will not return a reference to its input,
+        but perform an actual copy. This behaviour does look strange from a
+        Python point of view, however, it is (at the time of writing)
+        consistent with what Jax does, even when passing Jax arrays directly.
     """
 
     @jace.jit
@@ -668,3 +666,17 @@ def test_builder_F_strides() -> None:
         match=re.escape("Currently can not yet handle strides beside 'C_CONTIGUOUS'."),
     ):
         _ = testee(F)
+
+
+def test_builder_drop_variables() -> None:
+    """Tests if the builder can handle drop variables."""
+
+    @jace.grad
+    def testee(A: np.float64) -> jax.Array:
+        return jnp.exp(jnp.sin(jnp.tan(A**3))) ** 2
+
+    A = np.e
+    ref = testee(A)
+    res = jace.jit(testee)(A)
+
+    assert np.allclose(ref, res)

@@ -20,7 +20,7 @@ import pytest
 import jace
 
 
-def test_empty_array() -> None:
+def test_empty_single_return() -> None:
     @jace.jit
     def wrapped(A: np.ndarray) -> np.ndarray:
         return A
@@ -32,7 +32,7 @@ def test_empty_array() -> None:
     assert res.__array_interface__["data"][0] != A.__array_interface__["data"][0]
 
 
-def test_empty_multiple() -> None:
+def test_empty_multiple_return() -> None:
     @jace.jit
     def wrapped(A: np.ndarray, B: np.float64) -> tuple[np.ndarray, np.float64]:
         return A, B
@@ -46,7 +46,9 @@ def test_empty_multiple() -> None:
     assert res[0].__array_interface__["data"][0] != A.__array_interface__["data"][0]
 
 
-def test_empty_unused() -> None:
+def test_empty_unused_argument() -> None:
+    """Empty body and an unused input argument."""
+
     @jace.jit
     def wrapped(A: np.ndarray, B: np.float64) -> np.ndarray:  # noqa: ARG001  # Explicitly unused.
         return A
@@ -66,7 +68,7 @@ def test_empty_unused() -> None:
 
 def test_empty_scalar() -> None:
     @jace.jit
-    def wrapped(A: float) -> float:
+    def wrapped(A: np.float64) -> np.float64:
         return A
 
     A = np.pi
@@ -77,7 +79,7 @@ def test_empty_scalar() -> None:
 @pytest.mark.skip(reason="Nested Jaxpr are not handled.")
 def test_empty_nested() -> None:
     @jace.jit
-    def wrapped(A: float) -> float:
+    def wrapped(A: np.float64) -> np.float64:
         return jax.jit(lambda A: A)(A)
 
     A = np.pi
@@ -85,37 +87,32 @@ def test_empty_nested() -> None:
     assert np.all(wrapped(A) == A)
 
 
-def test_empty_with_drop_vars() -> None:
-    """Tests if we can handle an empty input = output case, with present drop variables."""
+def test_empty_literal_return() -> None:
+    """An empty Jaxpr that only contains a literal return value."""
 
-    @jace.jit
-    @jace.grad
-    def wrapped(A: float) -> float:
-        return A * A
+    def testee() -> np.float64:
+        return np.float64(3.1415)
 
-    A = np.pi
+    ref = testee()
+    res = jace.jit(testee)()
 
-    assert np.all(wrapped(A) == 2.0 * A)
+    assert np.all(res == ref)
 
 
 @pytest.mark.skip(reason="Literal return value is not implemented.")
-def test_empty_literal_return() -> None:
-    """Tests if we can handle a literal return value.
+def test_empty_with_drop_vars() -> None:
+    """Jaxpr only containing drop variables.
 
-    Note:
-        Using this test function serves another purpose. Since Jax includes the original
-        computation in the Jaxpr coming from a `grad` annotated function, the result will have
-        only drop variables.
-
-    Todo:
-        Add a test if we really have a literal return value, but for that we need the Jaxpr.
+    Notes:
+        As a side effect the Jaxpr also has a literal return value.
     """
 
-    @jace.jit
     @jace.grad
-    def wrapped(A: float) -> float:
-        return A + A + A
+    def testee(a: np.float64, b: np.float64) -> np.float64:
+        return a + b
 
     A = np.e
+    ref = testee(A)
+    res = jace.jit(testee)(A)
 
-    assert np.all(wrapped(A) == 3.0)
+    assert np.all(ref == res)

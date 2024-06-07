@@ -5,7 +5,11 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Tests the element type conversion functionality."""
+"""Tests the element type conversion functionality.
+
+Todo:
+    The tests should only run on certain occasion.
+"""
 
 from __future__ import annotations
 
@@ -47,8 +51,8 @@ def dst_type(
 ) -> type:
     """All valid destination types, with the exception of bool.
 
-    Includes also complex types, because going from real to complex is useful, but the other
-    way is not.
+    Includes also complex types, because going from real to complex is useful,
+    but the other way is not.
     """
     return request.param
 
@@ -56,7 +60,7 @@ def dst_type(
 def _convert_element_type_impl(
     input_type: type,
     output_type: type,
-) -> bool:
+) -> None:
     """Implementation of the tests of the convert element types primitive."""
     lowering_cnt = [0]
     A: np.ndarray = testutil.mkarray((10, 10), input_type)
@@ -65,7 +69,7 @@ def _convert_element_type_impl(
     @jace.jit
     def converter(A: np.ndarray) -> jax.Array:
         lowering_cnt[0] += 1
-        return jnp.array(A, copy=False, dtype=output_type)  # Loop variable.
+        return jnp.array(A, copy=False, dtype=output_type)
 
     res = converter(A)
     assert lowering_cnt[0] == 1
@@ -73,14 +77,12 @@ def _convert_element_type_impl(
         res.dtype == output_type
     ), f"Expected '{output_type}', but got '{res.dtype}', input was '{input_type}'."
     assert np.allclose(ref, res)
-    return True
 
 
 def test_convert_element_type_main(
     src_type: type,
     dst_type: type,
 ) -> None:
-    """Tests all conversions with the exception of conversions from bool and complex."""
     _convert_element_type_impl(src_type, dst_type)
 
 

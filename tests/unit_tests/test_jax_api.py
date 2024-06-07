@@ -152,7 +152,7 @@ def test_grad_annotation_direct() -> None:
 def test_grad_control_flow() -> None:
     """Tests if `grad` and controlflow works.
 
-    This requirement is mentioned in `https://jax.readthedocs.io/en/latest/notebooks/Common_Gotchas_in_JAX.html#python-control-flow-autodiff`.
+    This requirement is mentioned in the [documentation](https://jax.readthedocs.io/en/latest/notebooks/Common_Gotchas_in_JAX.html#python-control-flow-autodiff).
     """
 
     @jace.grad
@@ -209,4 +209,7 @@ def test_disabled_x64() -> None:
     #  float64 as input! Calling the resulting SDFG with the arguments we used for lowering
     #  will result in an error, because of the situation, `sizeof(float32) < sizeof(float64)`,
     #  no out of bound error would result, but the values are garbage.
-    assert tsdfg.sdfg.arrays[tsdfg.inp_names[0]].dtype.as_numpy_dtype().type is np.float32
+    assert all(
+        tsdfg.sdfg.arrays[inp_name].dtype.as_numpy_dtype().type is np.float32
+        for inp_name in tsdfg.inp_names
+    )

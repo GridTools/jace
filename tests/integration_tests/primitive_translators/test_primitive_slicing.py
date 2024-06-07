@@ -38,16 +38,14 @@ def A_4x4x4x4() -> np.ndarray:
 )
 def full_dynamic_start_idx(
     request,
-) -> None:
+) -> tuple[int, int, int, int]:
     """Start indexes for the slice window of `test_dynamic_slice_full_dynamic()`."""
     return request.param
 
 
 def test_slice_sub_view(
-    A_4x4,
+    A_4x4: np.ndarray,
 ) -> None:
-    """Simple extraction of a subsize."""
-
     @jace.jit
     def testee(A: np.ndarray) -> np.ndarray:
         return A[1:3, 1:3]
@@ -60,9 +58,9 @@ def test_slice_sub_view(
 
 
 def test_slice_rslice(
-    A_4x4,
+    A_4x4: np.ndarray,
 ) -> None:
-    """Only slicing some rows."""
+    """Only extracting rows."""
 
     @jace.jit
     def testee(A: np.ndarray) -> np.ndarray:
@@ -76,7 +74,7 @@ def test_slice_rslice(
 
 
 def test_slice_cslice(
-    A_4x4,
+    A_4x4: np.ndarray,
 ) -> None:
     """Slicing some columns."""
 
@@ -93,7 +91,7 @@ def test_slice_cslice(
 
 
 def test_slice_singelton(
-    A_4x4,
+    A_4x4: np.ndarray,
 ) -> None:
     """Only extracting a single value."""
 
@@ -110,22 +108,18 @@ def test_slice_singelton(
 
 @pytest.mark.skip(reason="Missing 'gather' translator.")
 def test_slice_strides_vec() -> None:
-    """Using strides.
+    """Slice with strides.
 
-    Note:
-        Although we do not support the `strides` parameter of the `stride` primitive,
-        this is not the reason why the test fails.
-        It fails instead because Jax makes some strange gather stuff out of it.
+    Although the translator (and the primitive) would support a stride, for some
+    reason Jax makes a `gather` operation out of it, that is not yet supported.
     """
 
-    A = np.arange(16)
-
-    @jace.jit
     def testee(A: np.ndarray) -> np.ndarray:
         return A[1:15:2]
 
-    ref = A[1:15:2]
-    res = testee(A)
+    A = np.arange(16)
+    ref = testee(A)
+    res = jace.jit(testee)(A)
 
     assert ref.shape == res.shape
     assert np.all(ref == res)
@@ -133,7 +127,7 @@ def test_slice_strides_vec() -> None:
 
 @pytest.mark.skip(reason="Missing 'concatenate' translator.")
 def test_slice_strides(
-    A_4x4,
+    A_4x4: np.ndarray,
 ) -> None:
     """Using strides in a 2D matrix.
 
@@ -152,31 +146,24 @@ def test_slice_strides(
 
 
 def test_slice_too_big(
-    A_4x4,
+    A_4x4: np.ndarray,
 ) -> None:
-    """Tests what happens if we specify a size that is too big.
+    """Tests what happens if we specify a size that is too big."""
 
-    Note:
-        It seems that the array is just returned as it is.
-    """
-
-    @jace.jit
     def testee(A: np.ndarray) -> np.ndarray:
         return A[:20]
 
-    res = testee(A_4x4)
-    ref = A_4x4[:20]
+    ref = testee(A_4x4)
+    res = jace.jit(testee)(A_4x4)
 
     assert ref.shape == res.shape
     assert np.all(ref == res)
 
 
 def test_dynamic_slice_full_dynamic(
-    A_4x4x4x4,
-    full_dynamic_start_idx,
+    A_4x4x4x4: np.ndarray,
+    full_dynamic_start_idx: tuple[int, int, int, int],
 ) -> None:
-    """Dynamic slicing where all start index are input parameters."""
-
     def testee(A: np.ndarray, s1: int, s2: int, s3: int, s4: int) -> jax.Array:
         return jax.lax.dynamic_slice(A, (s1, s2, s3, s4), (2, 2, 2, 2))
 
@@ -187,10 +174,8 @@ def test_dynamic_slice_full_dynamic(
 
 
 def test_dynamic_slice_partially_dynamic(
-    A_4x4x4x4,
+    A_4x4x4x4: np.ndarray,
 ) -> None:
-    """Dynamic slicing where some start index are input parameters and others are literals."""
-
     def testee(A: np.ndarray, s1: int, s2: int) -> jax.Array:
         return jax.lax.dynamic_slice(A, (s1, 1, s2, 2), (2, 2, 2, 2))
 
@@ -201,10 +186,8 @@ def test_dynamic_slice_partially_dynamic(
 
 
 def test_dynamic_slice_full_literal(
-    A_4x4x4x4,
+    A_4x4x4x4: np.ndarray,
 ) -> None:
-    """Dynamic slicing where all start indexes are literals."""
-
     def testee(A: np.ndarray) -> jax.Array:
         return jax.lax.dynamic_slice(A, (0, 1, 0, 2), (2, 2, 2, 2))
 

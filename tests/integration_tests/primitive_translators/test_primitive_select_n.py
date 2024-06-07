@@ -34,9 +34,7 @@ def _perform_test(
 
 
 def test_select_n_where() -> None:
-    """Normal `np.where` test."""
-
-    def testee(P: Any, T: Any, F: Any) -> Any:
+    def testee(P: np.ndarray, T: np.ndarray, F: np.ndarray) -> jax.Array:
         return jnp.where(P, T, F)
 
     shape = (10, 10)
@@ -47,21 +45,19 @@ def test_select_n_where() -> None:
 
 
 def test_select_n_where_literal() -> None:
-    """`np.where` where one of the input is a literal."""
-
-    def testee1(P: Any, F: Any) -> Any:
+    def testee1(P: np.ndarray, F: np.ndarray) -> jax.Array:
         return jnp.where(P, 2, F)
 
-    def testee2(P: Any, T: Any) -> Any:
+    def testee2(P: np.ndarray, T: np.ndarray) -> jax.Array:
         return jnp.where(P, T, 3)
 
-    def testee3(P: Any) -> Any:
+    def testee3(P: np.ndarray) -> jax.Array:
         return jnp.where(P, 8, 9)
 
     shape = ()
     pred = testutil.mkarray(shape, np.bool_)
     tbranch = testutil.mkarray(shape, np.int_)
-    fbranch = testutil.mkarray(shape, np.int_)
+    fbranch = tbranch + 1
 
     _perform_test(testee1, pred, fbranch)
     _perform_test(testee2, pred, tbranch)

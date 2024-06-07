@@ -15,8 +15,6 @@ import jace
 
 
 def test_iota_arange() -> None:
-    """Tests `jnp.arange` functionality."""
-
     def testee(A: int) -> jax.Array:
         return jnp.arange(18, dtype=int) + A
 
@@ -26,7 +24,6 @@ def test_iota_arange() -> None:
 
 
 def test_iota_broadcast() -> None:
-    """Test more iota using the `jax.lax.broadcasted_iota()` function."""
     shape = (2, 2, 2, 2)
 
     for d in range(len(shape)):

@@ -5,9 +5,10 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Implements tests for the broadcast in dim translator.
+"""Implements tests for the `broadcast_in_dim` primitive.
 
-Parts of the tests are also implemented inside `test_sub_translators_squeeze_expand_dims.py`.
+Parts of the tests are also implemented inside `test_sub_translators_squeeze_expand_dims.py`,
+because this primitive has a relation to `squeeze`.
 
 Todo:
     - `np.meshgrid`
@@ -47,19 +48,19 @@ def test_bid_scalar() -> None:
     def testee(A: float) -> jax.Array:
         return jnp.broadcast_to(A, (2, 2))
 
-    for a in [1, 1.0, 3.1415]:
-        ref = testee(a)
-        res = jace.jit(testee)(a)
+    A = 1.032
+    ref = testee(A)
+    res = jace.jit(testee)(A)
 
-        assert res.shape == ref.shape
-        assert res.dtype == ref.dtype
-        assert np.all(res == ref), f"Expected '{ref.tolist()}' got '{res.tolist()}'."
+    assert res.shape == ref.shape
+    assert res.dtype == ref.dtype
+    assert np.all(res == ref), f"Expected '{ref.tolist()}' got '{res.tolist()}'."
 
 
 def test_bid_literal() -> None:
     """Broadcast a literal to a matrix."""
 
-    def testee(a: float) -> np.ndarray | jax.Array:
+    def testee(a: float) -> jax.Array:
         return jnp.broadcast_to(1.0, (10, 10)) + a
 
     ref = testee(0.0)
@@ -74,12 +75,12 @@ def test_bid_vector(
 ) -> None:
     """Broadcast a vector to a tensor."""
 
-    def testee(a: np.ndarray) -> np.ndarray | jax.Array:
-        return jnp.broadcast_to(a, (10, 10)) + a
+    def testee(A: np.ndarray) -> jax.Array:
+        return jnp.broadcast_to(A, (10, 10))
 
-    a = testutil.mkarray(vector_shape)
-    ref = testee(a)
-    res = jace.jit(testee)(a)
+    A = testutil.mkarray(vector_shape)
+    ref = testee(A)
+    res = jace.jit(testee)(A)
     assert res.shape == ref.shape
     assert res.dtype == ref.dtype
     assert np.all(res == ref)

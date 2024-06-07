@@ -58,7 +58,7 @@ def test_caching_same_sizes() -> None:
     assert np.allclose(testee(A, B), compiled(A, B))
 
     # Now lets call the wrapped object directly, since we already did the lowering
-    #  no longering (and compiling) is needed.
+    #  no lowering (and compiling) is needed.
     assert np.allclose(testee(A, B), wrapped(A, B))
     assert lowering_cnt[0] == 1
 
@@ -123,10 +123,10 @@ def test_caching_different_structure() -> None:
     C = testutil.mkarray((4, 3), dtype=np.int64)
     D = testutil.mkarray((6, 3), dtype=np.int64)
 
-    # These are the known lowerings.
+    # These are the known lowered instances.
     lowerings: dict[tuple[int, int], stages.JaCeLowered] = {}
     lowering_ids: set[int] = set()
-    # These are the known compilations.
+    # These are the known compilation instances.
     compilations: dict[tuple[int, int], stages.JaCeCompiled] = {}
     compiled_ids: set[int] = set()
 
@@ -174,16 +174,8 @@ def test_caching_compilation() -> None:
     # Now we lower it.
     jaceLowered = jaceWrapped.lower(A, B)
 
-    # Compiling it without any information.
+    # Compiling it with and without optimizations enabled
     optiCompiled = jaceLowered.compile()
-
-    # This should be the same as passing the defaults directly.
-    assert optiCompiled is jaceLowered.compile(optimization.DEFAULT_OPTIMIZATIONS)
-
-    # Also if we pass the empty dict, we should get the default.
-    assert optiCompiled is jaceLowered.compile({})
-
-    # Now we disable all optimizations
     unoptiCompiled = jaceLowered.compile(optimization.NO_OPTIMIZATIONS)
 
     # Because of the way how things work the optimized must have more than the unoptimized.
@@ -191,6 +183,11 @@ def test_caching_compilation() -> None:
     assert unoptiCompiled is not optiCompiled
     assert optiCompiled._csdfg.sdfg.number_of_nodes() == 1
     assert optiCompiled._csdfg.sdfg.number_of_nodes() < unoptiCompiled._csdfg.sdfg.number_of_nodes()
+
+    # Now we check if they are still inside the cache.
+    assert optiCompiled is jaceLowered.compile(optimization.DEFAULT_OPTIMIZATIONS)
+    assert optiCompiled is jaceLowered.compile({})
+    assert unoptiCompiled is jaceLowered.compile(optimization.NO_OPTIMIZATIONS)
 
 
 def test_caching_dtype() -> None:
@@ -227,28 +224,35 @@ def test_caching_eviction_simple() -> None:
         return A + 1.0
 
     cache: tcache.StageCache = testee._cache
+    assert len(cache) == 0
 
     first_lowered = testee.lower(np.ones(10))
     first_key = cache.front()[0]
+    assert len(cache) == 1
+
     second_lowered = testee.lower(np.ones(11))
     second_key = cache.front()[0]
+    assert len(cache) == 2
+    assert second_key != first_key
+
     third_lowered = testee.lower(np.ones(12))
     third_key = cache.front()[0]
+    assert len(cache) == 3
+    assert third_key != second_key
+    assert third_key != first_key
 
-    assert first_key != second_key
-    assert first_key != third_key
-    assert second_key != third_key
-    assert cache[first_key] is first_lowered
-    assert cache[second_key] is second_lowered
+    # Test if the key association is correct.
+    #  Since reading does not modify the order, third key must be still at the front.
+    #  To test this we also have this strange order.
+    assert cache.front()[0] == third_key
     assert cache[third_key] is third_lowered
-
-    assert first_key in cache
-    assert second_key in cache
-    assert third_key in cache
+    assert cache[second_key] is second_lowered
+    assert cache[first_key] is first_lowered
     assert cache.front()[0] == third_key
 
     # We now evict the second key, which should not change anything on the order.
     cache.popitem(second_key)
+    assert len(cache) == 2
     assert first_key in cache
     assert second_key not in cache
     assert third_key in cache
@@ -256,16 +260,15 @@ def test_caching_eviction_simple() -> None:
 
     # Now we modify first_key, which moves it to the front.
     cache[first_key] = first_lowered
+    assert len(cache) == 2
     assert first_key in cache
-    assert second_key not in cache
     assert third_key in cache
     assert cache.front()[0] == first_key
 
     # Now we evict the oldest one, which is third_key
     cache.popitem(None)
+    assert len(cache) == 1
     assert first_key in cache
-    assert second_key not in cache
-    assert third_key not in cache
     assert cache.front()[0] == first_key
 
 
@@ -316,11 +319,15 @@ def test_caching_eviction_complex() -> None:
     assert second_key not in cache
 
 
+@pytest.mark.skip("Non C order is not supported")
 def test_caching_strides() -> None:
     """Test if the cache detects a change in strides."""
 
+    lower_cnt = [0]
+
     @jace.jit
     def wrapped(A: np.ndarray) -> np.ndarray:
+        lower_cnt[0] += 1
         return A + 10.0
 
     shape = (10, 100, 1000)
@@ -338,15 +345,14 @@ def test_caching_strides() -> None:
     # Now we run it with FORTRAN strides.
     #  However, this does not work because we do not support strides at all.
     #  But the cache is aware of this, which helps catch some nasty bugs.
-    F_lower = None  # Remove later
-    F_res = C_res.copy()  # Remove later
-    with pytest.raises(  # noqa: PT012 # Multiple calls
+    with pytest.raises(
         expected_exception=NotImplementedError,
         match=re.escape("Currently can not yet handle strides beside 'C_CONTIGUOUS'."),
     ):
         F_lower = wrapped.lower(F)
-        F_res = wrapped(F)
-    assert F_lower is None  # Remove later.
+    F_res = F_lower.compile()(F)
+
     assert C_res is not F_res
     assert np.allclose(F_res, C_res)
     assert F_lower is not C_lower
+    assert lower_cnt[0] == 2

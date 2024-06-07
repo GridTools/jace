@@ -45,15 +45,15 @@ def _test_impl_reshaping(
 
 
 @pytest.fixture(
-    params=["C", pytest.param("F", marks=pytest.mark.skip("Non C order is not supported"))]
+    params=[
+        "C",
+        pytest.param("F", marks=pytest.mark.skip("Non C order is not supported")),
+    ]
 )
 def mem_order(
     request,
 ) -> str:
-    """Gets the memory order that we want
-
-    Currently 'F' is skipped because it is not implemented by the logic.
-    """
+    """Gets the memory order that we want."""
     return request.param
 
 

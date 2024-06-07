@@ -5,11 +5,11 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Implements tests for the squeeze translator.
+"""Tests about the `squeeze` primitive.
 
-For several reasons parts of the tests related to broadcasting, especially the ones in which
-a single dimension is added, are also here. This is because of the inverse relationship between
-`expand_dims` and `squeeze`.
+For several reasons parts of the tests related to broadcasting, especially the
+ones in which a single dimension is added, are also here. This is because of
+the inverse relationship between `expand_dims` and `squeeze`.
 """
 
 from __future__ import annotations
@@ -59,7 +59,7 @@ def _roundtrip_implementation(
 
 
 @pytest.fixture(params=[0, -1, 1])
-def simple_axis(
+def single_axis(
     request,
 ) -> int:
     return request.param
@@ -73,19 +73,19 @@ def simple_axis(
         (3, 2, 1),
     ]
 )
-def hard_axis(
+def multiple_axis(
     request,
-) -> Sequence[int] | int:
+) -> tuple[int, ...] | int:
     return request.param
 
 
 def test_expand_squeeze_rountrip_simple(
-    simple_axis,
+    single_axis: int,
 ) -> None:
-    _roundtrip_implementation((10,), simple_axis)
+    _roundtrip_implementation((10,), single_axis)
 
 
 def test_expand_squeeze_rountrip_big(
-    hard_axis,
+    multiple_axis: Sequence[int],
 ) -> None:
-    _roundtrip_implementation((2, 3, 4, 5), hard_axis)
+    _roundtrip_implementation((2, 3, 4, 5), multiple_axis)
