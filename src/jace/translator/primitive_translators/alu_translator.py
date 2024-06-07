@@ -29,11 +29,7 @@ class ALUTranslator(translator.PrimitiveTranslator):
     This translator will be reworked soon, it just exists that the initial PR can do anything at all!!
     """
 
-    def __init__(
-        self,
-        prim_name: str,
-        prim_tmpl: str,
-    ) -> None:
+    def __init__(self, prim_name: str, prim_tmpl: str) -> None:
         """Initialize the `ALUTranslator`."""
         self._prim_name = prim_name
         self._prim_tmpl = prim_tmpl
@@ -174,11 +170,7 @@ class ALUTranslator(translator.PrimitiveTranslator):
                 if in_var is None:  # So access node for literal
                     continue
                 eqn_state.add_edge(
-                    eqn_state.add_read(in_var),
-                    None,
-                    tskl_tasklet,
-                    in_connector,
-                    in_memlet,
+                    eqn_state.add_read(in_var), None, tskl_tasklet, in_connector, in_memlet
                 )
             eqn_state.add_edge(
                 tskl_tasklet,
@@ -200,9 +192,7 @@ class ALUTranslator(translator.PrimitiveTranslator):
         return eqn_state
 
     def _write_tasklet_code(
-        self,
-        in_var_names: Sequence[str | None],
-        eqn: jax_core.JaxprEqn,
+        self, in_var_names: Sequence[str | None], eqn: jax_core.JaxprEqn
     ) -> str:
         """This function generates the Tasklet code based on a primitive.
 

@@ -56,8 +56,7 @@ def postprocess_jaxpr_sdfg(
 
 
 def finalize_translation_context(
-    trans_ctx: translator.TranslationContext,
-    validate: bool = True,
+    trans_ctx: translator.TranslationContext, validate: bool = True
 ) -> translator.TranslatedJaxprSDFG:
     """Finalizes the supplied translation context `trans_ctx`.
 

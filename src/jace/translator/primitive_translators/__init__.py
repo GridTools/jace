@@ -11,6 +11,4 @@ from __future__ import annotations
 from .alu_translator import ALUTranslator
 
 
-__all__ = [
-    "ALUTranslator",
-]
+__all__ = ["ALUTranslator"]

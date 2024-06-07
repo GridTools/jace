@@ -75,8 +75,7 @@ class JaxprTranslationBuilder:
     _ctx_stack: list[TranslationContext]
 
     def __init__(
-        self,
-        primitive_translators: Mapping[str, translator.PrimitiveTranslatorCallable],
+        self, primitive_translators: Mapping[str, translator.PrimitiveTranslatorCallable]
     ) -> None:
         # Maps name of primitives to the associated translator.
         self._primitive_translators = {**primitive_translators}
@@ -92,10 +91,7 @@ class JaxprTranslationBuilder:
         self._ctx_stack = []
 
     def translate_jaxpr(
-        self,
-        jaxpr: jax_core.ClosedJaxpr,
-        *,
-        name: str | None = None,
+        self, jaxpr: jax_core.ClosedJaxpr, *, name: str | None = None
     ) -> TranslationContext:
         """Perform the translation of a Jaxpr into a SDFG.
 
@@ -122,12 +118,8 @@ class JaxprTranslationBuilder:
         #       Thus the builder will start to translate a second (nested) SDFG.
         #       Also note that there is no mechanism that forces the integration of the nested
         #       SDFG/Jaxpr, this must be done manually.
-        self._allocate_translation_ctx(
-            name=name,
-        )
-        self._create_constants(
-            jaxpr=jaxpr,
-        )
+        self._allocate_translation_ctx(name=name)
+        self._create_constants(jaxpr=jaxpr)
         self._create_initial_input(jaxpr=jaxpr)
 
         return self._translate_jaxpr_internal(jaxpr)
@@ -190,10 +182,7 @@ class JaxprTranslationBuilder:
         """
         return cast(Mapping[str, ddata.Data], self._ctx.sdfg.arrays)
 
-    def get_array(
-        self,
-        name: str | jax_core.Atom | util.JaCeVar,
-    ) -> ddata.Data:
+    def get_array(self, name: str | jax_core.Atom | util.JaCeVar) -> ddata.Data:
         """Returns the SDFG `Data` object `name` referees to.
 
         `name` can either be a string, in which case it is interpreted as a
@@ -212,22 +201,16 @@ class JaxprTranslationBuilder:
 
     @overload
     def map_jax_var_to_sdfg(
-        self,
-        jax_var: jax_core.Atom | util.JaCeVar,
-        allow_fail: Literal[False] = False,
+        self, jax_var: jax_core.Atom | util.JaCeVar, allow_fail: Literal[False] = False
     ) -> str: ...
 
     @overload
     def map_jax_var_to_sdfg(
-        self,
-        jax_var: jax_core.Atom | util.JaCeVar,
-        allow_fail: Literal[True],
+        self, jax_var: jax_core.Atom | util.JaCeVar, allow_fail: Literal[True]
     ) -> str | None: ...
 
     def map_jax_var_to_sdfg(
-        self,
-        jax_var: jax_core.Atom | util.JaCeVar,
-        allow_fail: bool = False,
+        self, jax_var: jax_core.Atom | util.JaCeVar, allow_fail: bool = False
     ) -> str | None:
         """Get the name of the SDFG variable to which `jax_var` is referring to.
 
@@ -272,9 +255,7 @@ class JaxprTranslationBuilder:
         return len(self._ctx_stack) == 1
 
     def add_jax_name_mapping(
-        self,
-        jax_var: jax_core.Var | util.JaCeVar,
-        sdfg_name: str,
+        self, jax_var: jax_core.Var | util.JaCeVar, sdfg_name: str
     ) -> JaxprTranslationBuilder:
         """Creates a new mapping between `jax_var` to `sdfg_name`.
 
@@ -454,10 +435,7 @@ class JaxprTranslationBuilder:
 
         return ret_list
 
-    def _create_initial_input(
-        self,
-        jaxpr: jax_core.ClosedJaxpr,
-    ) -> None:
+    def _create_initial_input(self, jaxpr: jax_core.ClosedJaxpr) -> None:
         """Creates the input variables of `jaxpr`.
 
         Notes:
@@ -479,10 +457,7 @@ class JaxprTranslationBuilder:
         # The output list is populated by `self._translate_jaxpr_internal()`
         self._ctx.inp_names = tuple(init_in_var_names)
 
-    def _create_constants(
-        self,
-        jaxpr: jax_core.ClosedJaxpr,
-    ) -> None:
+    def _create_constants(self, jaxpr: jax_core.ClosedJaxpr) -> None:
         """Creates all constants requested by the `jaxpr`.
 
         The function will create an SDFG variable and add them as constant to
@@ -504,20 +479,13 @@ class JaxprTranslationBuilder:
                 sdfg_name, copy.deepcopy(const_value), self._ctx.sdfg.arrays[sdfg_name]
             )
 
-    def _allocate_translation_ctx(
-        self,
-        name: str | None = None,
-    ) -> JaxprTranslationBuilder:
+    def _allocate_translation_ctx(self, name: str | None = None) -> JaxprTranslationBuilder:
         """Allocate a new context and activate it.
 
         Args:
             name: The name of the SDFG.
         """
-        self._ctx_stack.append(
-            TranslationContext(
-                name=name,
-            )
-        )
+        self._ctx_stack.append(TranslationContext(name=name))
         return self
 
     @property
@@ -542,10 +510,7 @@ class JaxprTranslationBuilder:
         # Remove the current head stack.
         return self._ctx_stack.pop()
 
-    def _translate_single_eqn(
-        self,
-        eqn: jax_core.JaxprEqn,
-    ) -> None:
+    def _translate_single_eqn(self, eqn: jax_core.JaxprEqn) -> None:
         """Translate `eqn` into its SDFG equivalent.
 
         To do this the function will perform the following steps:
@@ -601,10 +566,7 @@ class JaxprTranslationBuilder:
         # Modify terminal root state of 'self'
         self._ctx.terminal_state = new_sdfg_term_state
 
-    def _translate_jaxpr_internal(
-        self,
-        jaxpr: jax_core.ClosedJaxpr,
-    ) -> TranslationContext:
+    def _translate_jaxpr_internal(self, jaxpr: jax_core.ClosedJaxpr) -> TranslationContext:
         """Performs the actual translation of the Jaxpr into an SDFG.
 
         The function assumes that the context is allocated as well as the
@@ -633,19 +595,14 @@ class JaxprTranslationBuilder:
             out_var_names = self._handle_null_jaxpr(jaxpr)
         else:
             out_var_names = self.create_jax_var_list(
-                jaxpr.jaxpr.outvars,
-                prevent_creation=True,
-                handle_literals=False,
+                jaxpr.jaxpr.outvars, prevent_creation=True, handle_literals=False
             )
 
         self._ctx.out_names = tuple(out_var_names)
 
         return cast(TranslationContext, self._clear_translation_ctx())
 
-    def _handle_null_jaxpr(
-        self,
-        jaxpr: jax_core.ClosedJaxpr,
-    ) -> list[str]:
+    def _handle_null_jaxpr(self, jaxpr: jax_core.ClosedJaxpr) -> list[str]:
         """This function is called in case a `Jaxpr` with zero equations is encountered.
 
         A function with zero equation might still have output, in which case
@@ -688,9 +645,7 @@ class JaxprTranslationBuilder:
             # Now we create a variable that serves as true output, however, since the Jax variable
             #  is already known we can not update the variable mapping and must use another name.
             sdfg_out_name = self.add_array(
-                jax_out_var,
-                name_prefix="_zero_equation_output_for_",
-                update_var_mapping=False,
+                jax_out_var, name_prefix="_zero_equation_output_for_", update_var_mapping=False
             )
             out_var_names.append(sdfg_out_name)
 
@@ -753,10 +708,7 @@ class TranslationContext:
     start_state: dace.SDFGState
     terminal_state: dace.SDFGState
 
-    def __init__(
-        self,
-        name: str | None = None,
-    ) -> None:
+    def __init__(self, name: str | None = None) -> None:
         if isinstance(name, str) and not util.VALID_SDFG_OBJ_NAME.fullmatch(name):
             raise ValueError(f"'{name}' is not a valid SDFG name.")
 

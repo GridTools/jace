@@ -29,16 +29,10 @@ if TYPE_CHECKING:
     from jace import translator
     from jace.util import dace_helper
 
-__all__ = [
-    "CompiledSDFG",
-    "compile_jax_sdfg",
-    "run_jax_sdfg",
-]
+__all__ = ["CompiledSDFG", "compile_jax_sdfg", "run_jax_sdfg"]
 
 
-def compile_jax_sdfg(
-    tsdfg: translator.TranslatedJaxprSDFG,
-) -> dace_helper.CompiledSDFG:
+def compile_jax_sdfg(tsdfg: translator.TranslatedJaxprSDFG) -> dace_helper.CompiledSDFG:
     """Compiles the SDFG embedded in `tsdfg` and return the resulting `CompiledSDFG` object."""
     if any(  # We do not support the DaCe return mechanism
         array_name.startswith("__return")

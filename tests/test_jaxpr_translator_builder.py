@@ -341,10 +341,7 @@ def test_builder_variable_alloc_list(
     var_list_1 = [array1, nscal, scal2]
     exp_names_1 = ["a", nscal.name, "c"]
 
-    res_names_1 = translation_builder.create_jax_var_list(
-        var_list_1,
-        update_var_mapping=True,
-    )
+    res_names_1 = translation_builder.create_jax_var_list(var_list_1, update_var_mapping=True)
     assert len(translation_builder.arrays) == 3
     assert res_names_1 == exp_names_1
 
@@ -352,10 +349,7 @@ def test_builder_variable_alloc_list(
     var_list_2 = [array2, nscal, scal1]
     exp_names_2 = ["d", nscal.name, "e"]
 
-    res_names_2 = translation_builder.create_jax_var_list(
-        var_list_2,
-        update_var_mapping=True,
-    )
+    res_names_2 = translation_builder.create_jax_var_list(var_list_2, update_var_mapping=True)
     assert res_names_2 == exp_names_2
     assert len(translation_builder.arrays) == 5
 
@@ -399,10 +393,7 @@ def test_builder_variable_alloc_list_prevent_creation(
         expected_exception=ValueError,
         match=re.escape(f"'prevent_creation' given but have to create '{array2}'."),
     ):
-        translation_builder.create_jax_var_list(
-            var_list,
-            prevent_creation=True,
-        )
+        translation_builder.create_jax_var_list(var_list, prevent_creation=True)
     assert len(translation_builder.arrays) == 1
     assert translation_builder.map_jax_var_to_sdfg(array1) == "a"
 
@@ -426,10 +417,7 @@ def test_builder_variable_alloc_list_only_creation(
         expected_exception=ValueError,
         match=re.escape(f"'only_creation' given '{array1}' already exists."),
     ):
-        translation_builder.create_jax_var_list(
-            var_list,
-            only_creation=True,
-        )
+        translation_builder.create_jax_var_list(var_list, only_creation=True)
     assert len(translation_builder.arrays) == 1
     assert translation_builder.map_jax_var_to_sdfg(array1) == "a"
 
@@ -454,23 +442,15 @@ def test_builder_variable_alloc_list_handle_literal(
         expected_exception=ValueError,
         match=re.escape("Encountered a literal but `handle_literals` was `False`."),
     ):
-        translation_builder.create_jax_var_list(
-            var_list,
-            handle_literals=False,
-        )
+        translation_builder.create_jax_var_list(var_list, handle_literals=False)
     assert len(translation_builder.arrays) == 0
 
-    name_list = translation_builder.create_jax_var_list(
-        var_list,
-        handle_literals=True,
-    )
+    name_list = translation_builder.create_jax_var_list(var_list, handle_literals=True)
     assert len(translation_builder.arrays) == 0
     assert name_list == [None]
 
 
-def test_builder_constants(
-    translation_builder: translator.JaxprTranslationBuilder,
-) -> None:
+def test_builder_constants(translation_builder: translator.JaxprTranslationBuilder) -> None:
     """Tests part of the `JaxprTranslationBuilder._create_constants()` api.
 
     See also the `test_subtranslators_alu.py::test_add3` test.
@@ -533,8 +513,7 @@ def test_builder_jace_var() -> None:
     """Simple tests about the `JaCeVar` objects."""
     for iname in ["do", "", "_ _", "9al", "_!"]:
         with pytest.raises(
-            expected_exception=ValueError,
-            match=re.escape(f"Supplied the invalid name '{iname}'."),
+            expected_exception=ValueError, match=re.escape(f"Supplied the invalid name '{iname}'.")
         ):
             _ = JaCeVar((), dace.int8, name=iname)
 

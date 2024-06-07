@@ -36,21 +36,12 @@ class CompilerOptions(TypedDict, total=False):
 
 
 # TODO(phimuell): Add a context manager to modify the default.
-DEFAULT_OPTIMIZATIONS: Final[CompilerOptions] = {
-    "auto_optimize": True,
-    "simplify": True,
-}
+DEFAULT_OPTIMIZATIONS: Final[CompilerOptions] = {"auto_optimize": True, "simplify": True}
 
-NO_OPTIMIZATIONS: Final[CompilerOptions] = {
-    "auto_optimize": False,
-    "simplify": False,
-}
+NO_OPTIMIZATIONS: Final[CompilerOptions] = {"auto_optimize": False, "simplify": False}
 
 
-def jace_optimize(
-    tsdfg: translator.TranslatedJaxprSDFG,
-    **kwargs: Unpack[CompilerOptions],
-) -> None:
+def jace_optimize(tsdfg: translator.TranslatedJaxprSDFG, **kwargs: Unpack[CompilerOptions]) -> None:
     """Performs optimization of the translated SDFG _in place_.
 
     It is recommended to use the `CompilerOptions` `TypedDict` to pass options
