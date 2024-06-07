@@ -689,11 +689,11 @@ class TranslationContext:
     the `postprocess_jaxpr_sdfg()` function.
 
     Attributes:
-        sdfg:              The encapsulated SDFG object.
-        inp_names:         A list of the SDFG variables that are used as input
-        out_names:         A list of the SDFG variables that are used as output.
-        start_state:       The first state in the SDFG state machine.
-        terminal_state:    The (currently) last state in the state machine.
+        sdfg: The encapsulated SDFG object.
+        inp_names: A list of the SDFG variables that are used as input
+        out_names: A list of the SDFG variables that are used as output.
+        start_state: The first state in the SDFG state machine.
+        terminal_state: The (currently) last state in the state machine.
 
     Args:
         name: The name of the SDFG, will be forwarded to the encapsulated `TranslatedJaxprSDFG`.
