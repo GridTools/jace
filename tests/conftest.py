@@ -9,7 +9,6 @@
 
 Todo:
     - Implement some fixture that allows to force validation.
-    - Implement fixture to disable and enable optimisation, i.e. doing it twice.
 """
 
 from __future__ import annotations
@@ -20,6 +19,7 @@ import jax
 import numpy as np
 import pytest
 
+from jace import optimization, stages
 from jace.util import translation_cache as tcache
 
 
@@ -90,3 +90,16 @@ def _reset_random_seed() -> None:
     This seed is used by the `util.mkarray()` helper.
     """
     np.random.seed(42)  # noqa: NPY002  # We use this seed for the time being.
+
+
+@pytest.fixture(autouse=True)
+def _set_compile_options() -> Generator[None, None, None]:
+    """Disable all optimizations of jitted code.
+
+    Without explicitly supplied arguments `JaCeLowered.compile()` will not
+    perform any optimizations.
+    Please not that certain tests might override this fixture.
+    """
+    initial_compile_options = stages.update_active_compiler_options(optimization.NO_OPTIMIZATIONS)
+    yield
+    stages.update_active_compiler_options(initial_compile_options)
