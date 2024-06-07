@@ -115,10 +115,7 @@ def test_subtranslatior_managing_swap() -> None:
     """Tests the `translator.set_active_primitive_translators_to()` functionality."""
 
     # Allows to compare the structure of dicts.
-    def same_structure(
-        d1: Mapping,
-        d2: Mapping,
-    ) -> bool:
+    def same_structure(d1: Mapping, d2: Mapping) -> bool:
         return d1.keys() == d2.keys() and all(id(d2[k]) == id(d1[k]) for k in d1)
 
     initial_primitives = translator.get_registered_primitive_translators()

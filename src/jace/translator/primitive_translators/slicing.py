@@ -131,8 +131,7 @@ class DynamicSlicingTranslator(translator.PrimitiveTranslator):
 
             # Intermediate value to storing the adjusted start index.
             new_start_idx_var_name = builder.add_array(
-                eqn.invars[dim + 1],
-                name_prefix="__jace_adapted_start_idx_",
+                eqn.invars[dim + 1], name_prefix="__jace_adapted_start_idx_"
             )
             new_start_idx_acc = eqn_state.add_access(new_start_idx_var_name)
 
@@ -179,8 +178,7 @@ class DynamicSlicingTranslator(translator.PrimitiveTranslator):
 
         tskl_input = dace.Memlet.simple(in_var_name, ", ".join(memlet_accesses))
         tskl_output = dace.Memlet.simple(
-            out_var_names[0],
-            ", ".join(name for name, _ in tskl_ranges),
+            out_var_names[0], ", ".join(name for name, _ in tskl_ranges)
         )
 
         _, map_entry, _ = eqn_state.add_mapped_tasklet(

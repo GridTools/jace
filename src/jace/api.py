@@ -21,12 +21,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
 
 
-__all__ = [
-    "grad",
-    "jacfwd",
-    "jacrev",
-    "jit",
-]
+__all__ = ["grad", "jacfwd", "jacrev", "jit"]
 
 
 @overload

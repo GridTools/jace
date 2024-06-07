@@ -19,9 +19,7 @@ from jax import core as jax_core
 import jace.util as util
 
 
-def is_drop_var(
-    jax_var: jax_core.Atom | util.JaCeVar,
-) -> TypeGuard[jax_core.DropVar]:
+def is_drop_var(jax_var: jax_core.Atom | util.JaCeVar) -> TypeGuard[jax_core.DropVar]:
     """Tests if `jax_var` is a drop variable, i.e. a variable that is not read from in a Jaxpr."""
 
     if isinstance(jax_var, jax_core.DropVar):
@@ -31,9 +29,7 @@ def is_drop_var(
     return False
 
 
-def is_jax_array(
-    obj: Any,
-) -> TypeGuard[jax.Array]:
+def is_jax_array(obj: Any) -> TypeGuard[jax.Array]:
     """Tests if `obj` is a Jax array.
 
     Note:
@@ -43,16 +39,12 @@ def is_jax_array(
     return isinstance(obj, jax.Array)
 
 
-def is_array(
-    obj: Any,
-) -> bool:
+def is_array(obj: Any) -> bool:
     """Identifies arrays, this also includes Jax arrays."""
     return dace.is_array(obj) or is_jax_array(obj)
 
 
-def is_scalar(
-    obj: Any,
-) -> bool:
+def is_scalar(obj: Any) -> bool:
     """Tests if `obj` is a scalar."""
     # These are the type known to DaCe; Taken from `dace.dtypes`.
     known_types = {
@@ -82,9 +74,7 @@ def is_scalar(
     return type(obj) in known_types
 
 
-def is_on_device(
-    obj: Any,
-) -> bool:
+def is_on_device(obj: Any) -> bool:
     """Tests if `obj` is on a device.
 
     Jax arrays are always on the CPU and GPU (if there is one). Thus for Jax
@@ -95,18 +85,14 @@ def is_on_device(
     return dace.is_gpu_array(obj)
 
 
-def is_fully_addressable(
-    obj: Any,
-) -> bool:
+def is_fully_addressable(obj: Any) -> bool:
     """Tests if `obj` is fully addressable, i.e. is only on this host."""
     if is_jax_array(obj):
         return obj.is_fully_addressable
     return True
 
 
-def is_c_contiguous(
-    obj: Any,
-) -> bool:
+def is_c_contiguous(obj: Any) -> bool:
     """Tests if `obj` is in C order."""
     if not is_array(obj):
         return False

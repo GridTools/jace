@@ -47,10 +47,7 @@ NO_OPTIMIZATIONS: Final[CompilerOptions] = {
 }
 
 
-def jace_optimize(
-    tsdfg: translator.TranslatedJaxprSDFG,
-    **kwargs: Unpack[CompilerOptions],
-) -> None:
+def jace_optimize(tsdfg: translator.TranslatedJaxprSDFG, **kwargs: Unpack[CompilerOptions]) -> None:
     """Performs optimization of the translated SDFG _in place_.
 
     It is recommended to use the `CompilerOptions` `TypedDict` to pass options

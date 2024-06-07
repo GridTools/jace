@@ -24,10 +24,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
 
-def _perform_test(
-    testee: Callable,
-    *args: Any,
-) -> None:
+def _perform_test(testee: Callable, *args: Any) -> None:
     res = testee(*args)
     ref = jace.jit(testee)(*args)
     assert np.all(res == ref)

@@ -21,16 +21,7 @@ import collections
 import dataclasses
 import functools
 from collections.abc import Callable, Hashable
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Concatenate,
-    Generic,
-    ParamSpec,
-    TypeAlias,
-    TypeVar,
-    cast,
-)
+from typing import TYPE_CHECKING, Any, Concatenate, Generic, ParamSpec, TypeAlias, TypeVar, cast
 
 import dace
 from jax import core as jax_core
@@ -77,9 +68,7 @@ class CachingStage(Generic[NextStage]):
 
     @abc.abstractmethod
     def _make_call_description(
-        self: CachingStage,
-        *args: Any,
-        **kwargs: Any,
+        self: CachingStage, *args: Any, **kwargs: Any
     ) -> StageTransformationSpec:
         """Generates the key that is used to store/locate the call in the cache."""
         ...
@@ -105,11 +94,7 @@ def cached_transition(
     """
 
     @functools.wraps(transition)
-    def transition_wrapper(
-        self: CachingStageType,
-        *args: P.args,
-        **kwargs: P.kwargs,
-    ) -> NextStage:
+    def transition_wrapper(self: CachingStageType, *args: P.args, **kwargs: P.kwargs) -> NextStage:
         key: StageTransformationSpec = self._make_call_description(*args, **kwargs)
         if key in self._cache:
             return self._cache[key]
@@ -126,9 +111,7 @@ def clear_translation_cache() -> None:
         stage_caches.clear()
 
 
-def get_cache(
-    stage: CachingStage,
-) -> StageCache:
+def get_cache(stage: CachingStage) -> StageCache:
     """Returns the cache that should be used for `stage`."""
     stage_type = type(stage)
     if stage_type not in _TRANSLATION_CACHES:
@@ -161,10 +144,7 @@ class _AbstractCallArgument:
     storage: dace.StorageType
 
     @classmethod
-    def from_value(
-        cls,
-        value: Any,
-    ) -> _AbstractCallArgument:
+    def from_value(cls, value: Any) -> _AbstractCallArgument:
         """Construct an `_AbstractCallArgument` from `value`."""
         if not util.is_fully_addressable(value):
             raise NotImplementedError("Distributed arrays are not addressed yet.")
@@ -201,8 +181,7 @@ class _AbstractCallArgument:
 #: This type is the abstract description of a function call.
 #:  It is part of the key used in the cache.
 CallArgsSpec: TypeAlias = tuple[
-    _AbstractCallArgument | Hashable | tuple[str, _AbstractCallArgument | Hashable],
-    ...,
+    _AbstractCallArgument | Hashable | tuple[str, _AbstractCallArgument | Hashable], ...
 ]
 
 
@@ -246,33 +225,20 @@ class StageCache(Generic[StageType]):
     _memory: collections.OrderedDict[StageTransformationSpec, StageType]
     _capacity: int
 
-    def __init__(
-        self,
-        capachity: int = 256,
-    ) -> None:
+    def __init__(self, capachity: int = 256) -> None:
         self._memory = collections.OrderedDict()
         self._capacity = capachity
 
-    def __contains__(
-        self,
-        key: StageTransformationSpec,
-    ) -> bool:
+    def __contains__(self, key: StageTransformationSpec) -> bool:
         return key in self._memory
 
-    def __getitem__(
-        self,
-        key: StageTransformationSpec,
-    ) -> StageType:
+    def __getitem__(self, key: StageTransformationSpec) -> StageType:
         if key not in self:
             raise KeyError(f"Key '{key}' is unknown.")
         self._memory.move_to_end(key, last=True)
         return self._memory[key]
 
-    def __setitem__(
-        self,
-        key: StageTransformationSpec,
-        res: StageType,
-    ) -> None:
+    def __setitem__(self, key: StageTransformationSpec, res: StageType) -> None:
         if key in self:
             self._memory.move_to_end(key, last=True)
             self._memory[key] = res
@@ -281,10 +247,7 @@ class StageCache(Generic[StageType]):
                 self.popitem(None)
             self._memory[key] = res
 
-    def popitem(
-        self,
-        key: StageTransformationSpec | None,
-    ) -> None:
+    def popitem(self, key: StageTransformationSpec | None) -> None:
         """Evict `key` from `self`.
 
         If `key` is `None` the oldest entry is evicted.

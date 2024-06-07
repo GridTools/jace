@@ -74,10 +74,7 @@ class JaCeVar:
     def __hash__(self) -> int:
         return id(self)
 
-    def __eq__(
-        self,
-        other: Any,
-    ) -> bool:
+    def __eq__(self, other: Any) -> bool:
         if not isinstance(other, JaCeVar):
             return NotImplemented
         return id(self) == id(other)
@@ -103,9 +100,7 @@ def get_jax_var_name(jax_var: jax_core.Atom | JaCeVar) -> str:
             )
 
 
-def get_jax_var_shape(
-    jax_var: jax_core.Atom | JaCeVar,
-) -> tuple[int | dace.symbol | str, ...]:
+def get_jax_var_shape(jax_var: jax_core.Atom | JaCeVar) -> tuple[int | dace.symbol | str, ...]:
     """Returns the shape of `jax_var`."""
     match jax_var:
         case jax_core.Var() | jax_core.Literal():
@@ -118,9 +113,7 @@ def get_jax_var_shape(
             raise TypeError(f"'get_jax_var_shape()` is not implemented for '{type(jax_var)}'.")
 
 
-def get_jax_var_dtype(
-    jax_var: jax_core.Atom | JaCeVar,
-) -> dace.typeclass:
+def get_jax_var_dtype(jax_var: jax_core.Atom | JaCeVar) -> dace.typeclass:
     """Returns the DaCe equivalent of `jax_var`s datatype."""
     match jax_var:
         case jax_core.Var() | jax_core.Literal():
@@ -133,10 +126,7 @@ def get_jax_var_dtype(
             raise TypeError(f"'get_jax_var_dtype()` is not implemented for '{type(jax_var)}'.")
 
 
-def is_tracing_ongoing(
-    *args: Any,
-    **kwargs: Any,
-) -> bool:
+def is_tracing_ongoing(*args: Any, **kwargs: Any) -> bool:
     """Test if tracing is ongoing.
 
     While a return value `True` guarantees that a translation is ongoing, a
@@ -157,9 +147,7 @@ def is_tracing_ongoing(
     raise RuntimeError("Failed to determine if tracing is ongoing.")
 
 
-def translate_dtype(
-    dtype: Any,
-) -> dace.typeclass:
+def translate_dtype(dtype: Any) -> dace.typeclass:
     """Turns a Jax datatype into a DaCe datatype."""
     if dtype is None:
         raise NotImplementedError  # Handling a special case in DaCe.
@@ -220,9 +208,7 @@ def propose_jax_name(
     return jax_name
 
 
-def get_jax_literal_value(
-    lit: jax_core.Atom,
-) -> bool | float | int | np.generic:
+def get_jax_literal_value(lit: jax_core.Atom) -> bool | float | int | np.generic:
     """Returns the value a literal is wrapping.
 
     The function guarantees to return a scalar value.

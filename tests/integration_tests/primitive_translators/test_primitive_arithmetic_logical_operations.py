@@ -82,9 +82,7 @@ def _only_alt_translators() -> Generator[None, None, None]:
         (jnp.bitwise_not, 1, np.int64),
     ]
 )
-def logical_ops(
-    request,
-) -> tuple[Callable, tuple[np.ndarray, ...]]:
+def logical_ops(request) -> tuple[Callable, tuple[np.ndarray, ...]]:
     """Returns a logical operation function and inputs."""
     return (
         request.param[0],
@@ -101,9 +99,7 @@ def logical_ops(
         ),
     ]
 )
-def dtype(
-    request,
-) -> type:
+def dtype(request) -> type:
     """Data types that should be used for the numerical tests of the ALT translators."""
     return request.param
 
@@ -128,10 +124,7 @@ def dtype(
         lambda x: jnp.atanh(jnp.tanh(x)),
     ]
 )
-def alt_unary_ops(
-    request,
-    dtype: type,
-) -> tuple[Callable, np.ndarray]:
+def alt_unary_ops(request, dtype: type) -> tuple[Callable, np.ndarray]:
     """The inputs and the operation we need for the full test.
 
     Some of the unary operations are combined to ensure that they will succeed.
@@ -152,9 +145,7 @@ def alt_unary_ops(
         lambda x, y: x**y,
     ]
 )
-def alt_binary_ops_float(
-    request,
-) -> tuple[Callable, tuple[np.ndarray, np.ndarray]]:
+def alt_binary_ops_float(request) -> tuple[Callable, tuple[np.ndarray, np.ndarray]]:
     """Binary ALT operations that operates on floats."""
     # Getting 0 in the division test is unlikely.
     return (  # type: ignore[return-value]  # Type confusion.
@@ -173,9 +164,7 @@ def alt_binary_ops_float(
         lambda x, y: x > y,
     ]
 )
-def alt_binary_compare_ops(
-    request,
-) -> tuple[Callable, tuple[np.ndarray, np.ndarray]]:
+def alt_binary_compare_ops(request) -> tuple[Callable, tuple[np.ndarray, np.ndarray]]:
     """Comparison operations, operates on integers."""
     return (
         request.param,
@@ -190,17 +179,12 @@ def alt_binary_compare_ops(
         [(5, 1, 3, 4, 1, 5), (5, 1, 3, 1, 2, 5)],
     ]
 )
-def broadcast_input(
-    request,
-) -> tuple[np.ndarray, np.ndarray]:
+def broadcast_input(request) -> tuple[np.ndarray, np.ndarray]:
     """Inputs to be used for the broadcast test."""
     return tuple(testutil.mkarray(shape) for shape in request.param)  # type: ignore[return-value] # can not deduce that it is only size 2.
 
 
-def _perform_alt_test(
-    testee: Callable,
-    *args: Any,
-) -> None:
+def _perform_alt_test(testee: Callable, *args: Any) -> None:
     """General function that just performs the test."""
     wrapped = jace.jit(testee)
 
@@ -304,9 +288,7 @@ def test_mapped_binary_array_constants() -> None:
     _perform_alt_test(testee, A)
 
 
-def test_mapped_broadcast(
-    broadcast_input: tuple[np.ndarray, np.ndarray],
-) -> None:
+def test_mapped_broadcast(broadcast_input: tuple[np.ndarray, np.ndarray]) -> None:
     def testee(A: np.ndarray, B: np.ndarray) -> np.ndarray:
         return A + B
 
@@ -319,9 +301,7 @@ def test_mapped_broadcast(
 # <------------ Tests for arithmetic and logical translators/operations
 
 
-def test_alt_general_unary(
-    alt_unary_ops: tuple[Callable, np.ndarray],
-) -> None:
+def test_alt_general_unary(alt_unary_ops: tuple[Callable, np.ndarray]) -> None:
     def testee(A: np.ndarray) -> np.ndarray:
         return alt_unary_ops[0](A)
 

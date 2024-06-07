@@ -18,15 +18,10 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
 
-__all__ = [
-    "mkarray",
-]
+__all__ = ["mkarray"]
 
 
-def mkarray(
-    shape: Sequence[int] | int,
-    dtype: type = np.float64,
-) -> np.ndarray:
+def mkarray(shape: Sequence[int] | int, dtype: type = np.float64) -> np.ndarray:
     """Generates a NumPy ndarray with shape `shape`.
 
     The function uses the generator that is managed by the `_reset_random_seed()` fixture.

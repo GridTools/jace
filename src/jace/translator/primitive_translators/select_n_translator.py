@@ -71,18 +71,14 @@ class SelectNTranslator(mapped_base.MappedOperationTranslatorBase):
         """We have to add the offsets to the Memlet accesses."""
         return {
             f"__in{i-1}" if i else "__cond": dace.Memlet.simple(
-                in_var_name,
-                ", ".join(f"{it_idx}" for it_idx, _ in tskl_ranges),
+                in_var_name, ", ".join(f"{it_idx}" for it_idx, _ in tskl_ranges)
             )
             for i, in_var_name in enumerate(in_var_names)
             if in_var_name
         }
 
     def literal_substitution(
-        self,
-        tskl_code: str,
-        in_var_names: Sequence[str | None],
-        eqn: jax_core.JaxprEqn,
+        self, tskl_code: str, in_var_names: Sequence[str | None], eqn: jax_core.JaxprEqn
     ) -> str:
         """Can not be done by the base because of the renaming."""
         for i, in_var_name in enumerate(in_var_names[1:]):
