@@ -51,16 +51,17 @@ class SlicingTranslator(mapped_base.MappedOperationTranslatorBase):
         eqn: jax_core.JaxprEqn,
     ) -> dict[str, dace.Memlet]:
         """We have to add the offsets to the Memlet accesses."""
-        if eqn.params["strides"] is not None:
-            raise NotImplementedError("Non 1 strides are not implemented.")
 
-        start_indices = eqn.params["start_indices"]  # Fist index to slice
+        strides: Sequence[int] = (
+            ((1,) * len(tskl_ranges)) if eqn.params["strides"] is None else eqn.params["strides"]
+        )
+        start_indices: Sequence[int] = eqn.params["start_indices"]  # Fist index to slice
         return {
             "__in0": dace.Memlet.simple(
                 in_var_names[0],
                 ", ".join(
-                    f"{it_idx} + {start_index}"
-                    for (it_idx, _), start_index in zip(tskl_ranges, start_indices)
+                    f"{start_index} + {it_idx} * {stride}"
+                    for (it_idx, _), start_index, stride in zip(tskl_ranges, start_indices, strides)
                 ),
             )
         }

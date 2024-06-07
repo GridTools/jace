@@ -19,8 +19,8 @@ from tests import util as testutil
 
 
 @pytest.fixture()
-def A_4x4() -> np.ndarray:
-    return testutil.mkarray((4, 4))
+def A_20x20x20() -> np.ndarray:
+    return testutil.mkarray((20, 20, 20))
 
 
 @pytest.fixture()
@@ -43,118 +43,33 @@ def full_dynamic_start_idx(
     return request.param
 
 
-def test_slice_sub_view(
-    A_4x4: np.ndarray,
+def test_slice_no_strides(
+    A_20x20x20: np.ndarray,
 ) -> None:
-    @jace.jit
-    def testee(A: np.ndarray) -> np.ndarray:
-        return A[1:3, 1:3]
+    """Test without strides."""
 
-    ref = A_4x4[1:3, 1:3]
-    res = testee(A_4x4)
+    def testee(A: np.ndarray) -> jax.Array:
+        # Read as: A[2:18, 3:19, 4:17]
+        return jax.lax.slice(A, (2, 3, 4), (18, 19, 17), None)
 
-    assert ref.shape == res.shape
-    assert np.all(ref == res)
-
-
-def test_slice_rslice(
-    A_4x4: np.ndarray,
-) -> None:
-    """Only extracting rows."""
-
-    @jace.jit
-    def testee(A: np.ndarray) -> np.ndarray:
-        return A[1:3]
-
-    ref = A_4x4[1:3]
-    res = testee(A_4x4)
+    ref = testee(A_20x20x20)
+    res = jace.jit(testee)(A_20x20x20)
 
     assert ref.shape == res.shape
     assert np.all(ref == res)
 
 
-def test_slice_cslice(
-    A_4x4: np.ndarray,
-) -> None:
-    """Slicing some columns."""
-
-    @jace.jit
-    def testee(A: np.ndarray) -> np.ndarray:
-        # NOTE: using `A[..., 1:3]` would trigger the `gather` primitive.
-        return A[:, 1:3]
-
-    ref = A_4x4[:, 1:3]
-    res = testee(A_4x4)
-
-    assert ref.shape == res.shape
-    assert np.all(ref == res)
-
-
-def test_slice_singelton(
-    A_4x4: np.ndarray,
-) -> None:
-    """Only extracting a single value."""
-
-    @jace.jit
-    def testee(A: np.ndarray) -> np.ndarray:
-        return A[1:2, 1:2]
-
-    ref = A_4x4[1:2, 1:2]
-    res = testee(A_4x4)
-
-    assert ref.shape == res.shape
-    assert np.all(ref == res)
-
-
-@pytest.mark.skip(reason="Missing 'gather' translator.")
-def test_slice_strides_vec() -> None:
-    """Slice with strides.
-
-    Although the translator (and the primitive) would support a stride, for some
-    reason Jax makes a `gather` operation out of it, that is not yet supported.
-    """
-
-    def testee(A: np.ndarray) -> np.ndarray:
-        return A[1:15:2]
-
-    A = np.arange(16)
-    ref = testee(A)
-    res = jace.jit(testee)(A)
-
-    assert ref.shape == res.shape
-    assert np.all(ref == res)
-
-
-@pytest.mark.skip(reason="Missing 'concatenate' translator.")
 def test_slice_strides(
-    A_4x4: np.ndarray,
+    A_20x20x20: np.ndarray,
 ) -> None:
-    """Using strides in a 2D matrix.
+    """Test with strides."""
 
-    See `test_slice_strides_vec()` why the test is skipped.
-    """
+    def testee(A: np.ndarray) -> jax.Array:
+        # Read as: A[2:18:1, 3:19:2, 4:17:3]
+        return jax.lax.slice(A, (2, 3, 4), (18, 19, 17), (1, 2, 3))
 
-    @jace.jit
-    def testee(A: np.ndarray) -> np.ndarray:
-        return A[::2, ::2]
-
-    ref = A_4x4[::2, ::2]
-    res = testee(A_4x4)
-
-    assert ref.shape == res.shape
-    assert np.all(ref == res)
-
-
-def test_slice_too_big(
-    A_4x4: np.ndarray,
-) -> None:
-    """Tests what happens if we specify a size that is too big."""
-
-    def testee(A: np.ndarray) -> np.ndarray:
-        return A[:20]
-
-    ref = testee(A_4x4)
-    res = jace.jit(testee)(A_4x4)
+    ref = testee(A_20x20x20)
+    res = jace.jit(testee)(A_20x20x20)
 
     assert ref.shape == res.shape
     assert np.all(ref == res)
