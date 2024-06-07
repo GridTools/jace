@@ -218,7 +218,7 @@ class StageCache(Generic[StageType]):
     """Simple LRU cache to cache the results of the stage transition function.
 
     Args:
-        size: The size of the cache, defaults to 256.
+        capacity: The size of the cache, defaults to 256.
     """
 
     # The most recently used entry is at the end of the `OrderedDict`.
