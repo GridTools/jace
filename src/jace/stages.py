@@ -326,8 +326,11 @@ class JaCeCompiled:
         inp_names: Sequence[str],
         out_names: Sequence[str],
     ) -> None:
-        if (not inp_names) or (not out_names):
-            raise ValueError("Input and output can not be empty.")
+        # NOTE: We only check that we have output, we do not care about the input, since the
+        #  function `def foo(): return 1.0` is still a pure function, but we require that we have
+        #  output.
+        if not out_names:
+            raise ValueError("A jited function needs at least one output.")
         self._csdfg = csdfg
         self._inp_names = tuple(inp_names)
         self._out_names = tuple(out_names)

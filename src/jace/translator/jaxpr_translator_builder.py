@@ -666,7 +666,7 @@ class JaxprTranslationBuilder:
             The function will _not_ update the `out_names` field of the current context.
         """
         assert self._ctx.terminal_state is self._ctx.start_state
-        assert self._ctx.inp_names
+        assert isinstance(self._ctx.inp_names, tuple)
         assert self._ctx.out_names is None
 
         # There is not output so we do not have to copy anything around.
@@ -783,6 +783,24 @@ class TranslationContext:
             raise dace.sdfg.InvalidSDFGError(
                 f"Expected to find as terminal state '{self.terminal_state}',"
                 f" but instead found '{self.sdfg.sink_nodes()}'.",
+                self.sdfg,
+                self.sdfg.node_id(self.terminal_state),
+            )
+        if not (
+            self.inp_names is None
+            or all(inp_name in self.sdfg.arrays for inp_name in self.inp_names)
+        ):
+            raise dace.sdfg.InvalidSDFGError(
+                f"Missing input arguments: {(inp_name for inp_name in self.inp_names if inp_name not in self.sdfg.arrays)}",
+                self.sdfg,
+                self.sdfg.node_id(self.terminal_state),
+            )
+        if not (
+            self.out_names is None
+            or all(out_name in self.sdfg.arrays for out_name in self.out_names)
+        ):
+            raise dace.sdfg.InvalidSDFGError(
+                f"Missing output arguments: {(out_name for out_name in self.out_names if out_name not in self.sdfg.arrays)}",
                 self.sdfg,
                 self.sdfg.node_id(self.terminal_state),
             )
