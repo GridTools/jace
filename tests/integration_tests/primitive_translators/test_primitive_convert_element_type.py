@@ -38,17 +38,13 @@ _DACE_COMPLEX_TYPES: Final[list[type]] = [
 
 
 @pytest.fixture(params=_DACE_REAL_TYPES)
-def src_type(
-    request,
-) -> type:
+def src_type(request) -> type:
     """All valid source types, with the exception of bool."""
     return request.param
 
 
 @pytest.fixture(params=_DACE_REAL_TYPES + _DACE_COMPLEX_TYPES)
-def dst_type(
-    request,
-) -> type:
+def dst_type(request) -> type:
     """All valid destination types, with the exception of bool.
 
     Includes also complex types, because going from real to complex is useful,
@@ -57,10 +53,7 @@ def dst_type(
     return request.param
 
 
-def _convert_element_type_impl(
-    input_type: type,
-    output_type: type,
-) -> None:
+def _convert_element_type_impl(input_type: type, output_type: type) -> None:
     """Implementation of the tests of the convert element types primitive."""
     lowering_cnt = [0]
     A: np.ndarray = testutil.mkarray((10, 10), input_type)
@@ -79,20 +72,13 @@ def _convert_element_type_impl(
     assert np.allclose(ref, res)
 
 
-def test_convert_element_type_main(
-    src_type: type,
-    dst_type: type,
-) -> None:
+def test_convert_element_type_main(src_type: type, dst_type: type) -> None:
     _convert_element_type_impl(src_type, dst_type)
 
 
-def test_convert_element_type_from_bool(
-    src_type: type,
-) -> None:
+def test_convert_element_type_from_bool(src_type: type) -> None:
     _convert_element_type_impl(np.bool_, src_type)
 
 
-def test_convert_element_type_to_bool(
-    src_type: type,
-) -> None:
+def test_convert_element_type_to_bool(src_type: type) -> None:
     _convert_element_type_impl(src_type, np.bool_)

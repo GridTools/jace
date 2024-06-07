@@ -400,11 +400,7 @@ def test_caching_strides() -> None:
         return A + 10.0
 
     shape = (10, 100, 1000)
-    C = np.array(
-        (testutil.mkarray(shape) - 0.5) * 10,
-        order="C",
-        dtype=np.float64,
-    )
+    C = np.array((testutil.mkarray(shape) - 0.5) * 10, order="C", dtype=np.float64)
     F = np.array(C, copy=True, order="F")
 
     # First we compile run it with C strides.
@@ -431,8 +427,7 @@ def test_caching_jax_numpy_array() -> None:
     """Tests if jax arrays are handled the same way as numpy array."""
 
     def _test_impl(
-        for_lowering: np.ndarray | jax.Array,
-        for_calling: np.ndarray | jax.Array,
+        for_lowering: np.ndarray | jax.Array, for_calling: np.ndarray | jax.Array
     ) -> None:
         tcache.clear_translation_cache()
         lowering_cnt = [0]

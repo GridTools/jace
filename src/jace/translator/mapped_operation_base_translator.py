@@ -56,10 +56,7 @@ class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
         This class will always generate a mapped Tasklet, even if a scalar is handled.
     """
 
-    def __init__(
-        self,
-        primitive_name: str,
-    ) -> None:
+    def __init__(self, primitive_name: str) -> None:
         self._prim_name = primitive_name
 
     @property
@@ -96,8 +93,7 @@ class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
             ]
             tskl_output: dict[str, dace.Memlet] = {
                 "__out": dace.Memlet.simple(
-                    out_var_names[0],
-                    ", ".join(name for name, _ in tskl_ranges),
+                    out_var_names[0], ", ".join(name for name, _ in tskl_ranges)
                 )
             }
 
@@ -193,10 +189,7 @@ class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
         return tskl_inputs
 
     def literal_substitution(
-        self,
-        tskl_code: str,
-        in_var_names: Sequence[str | None],
-        eqn: jax_core.JaxprEqn,
+        self, tskl_code: str, in_var_names: Sequence[str | None], eqn: jax_core.JaxprEqn
     ) -> str:
         """Perform literal substitution on the proto Tasklet code `tskl_code`.
 

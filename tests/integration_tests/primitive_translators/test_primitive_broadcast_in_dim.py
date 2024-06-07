@@ -35,9 +35,7 @@ if TYPE_CHECKING:
 
 
 @pytest.fixture(params=[(10,), (10, 1), (1, 10)])
-def vector_shape(
-    request,
-) -> tuple[int, ...]:
+def vector_shape(request) -> tuple[int, ...]:
     """Shapes used in the `test_bid_vector()` tests."""
     return request.param
 
@@ -70,9 +68,7 @@ def test_bid_literal() -> None:
     assert np.all(res == ref)
 
 
-def test_bid_vector(
-    vector_shape: Sequence[int],
-) -> None:
+def test_bid_vector(vector_shape: Sequence[int]) -> None:
     """Broadcast a vector to a tensor."""
 
     def testee(A: np.ndarray) -> jax.Array:

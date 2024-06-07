@@ -117,8 +117,7 @@ class PrimitiveTranslator(PrimitiveTranslatorCallable, Protocol):
 
 @overload
 def make_primitive_translator(
-    primitive: str,
-    primitive_translator: Literal[None] = None,
+    primitive: str, primitive_translator: Literal[None] = None
 ) -> Callable[[translator.PrimitiveTranslatorCallable], translator.PrimitiveTranslator]: ...
 
 
@@ -129,8 +128,7 @@ def make_primitive_translator(
 
 
 def make_primitive_translator(
-    primitive: str,
-    primitive_translator: translator.PrimitiveTranslatorCallable | None = None,
+    primitive: str, primitive_translator: translator.PrimitiveTranslatorCallable | None = None
 ) -> (
     Callable[[translator.PrimitiveTranslatorCallable], translator.PrimitiveTranslator]
     | translator.PrimitiveTranslator
@@ -161,21 +159,18 @@ def make_primitive_translator(
 
 @overload
 def register_primitive_translator(
-    primitive_translator: Literal[None] = None,
-    overwrite: bool = False,
+    primitive_translator: Literal[None] = None, overwrite: bool = False
 ) -> Callable[[translator.PrimitiveTranslator], translator.PrimitiveTranslator]: ...
 
 
 @overload
 def register_primitive_translator(
-    primitive_translator: translator.PrimitiveTranslator,
-    overwrite: bool = False,
+    primitive_translator: translator.PrimitiveTranslator, overwrite: bool = False
 ) -> translator.PrimitiveTranslator: ...
 
 
 def register_primitive_translator(
-    primitive_translator: translator.PrimitiveTranslator | None = None,
-    overwrite: bool = False,
+    primitive_translator: translator.PrimitiveTranslator | None = None, overwrite: bool = False
 ) -> (
     translator.PrimitiveTranslator
     | Callable[[translator.PrimitiveTranslator], translator.PrimitiveTranslator]

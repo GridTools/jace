@@ -30,10 +30,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
 
-def _roundtrip_implementation(
-    shape: Sequence[int],
-    axis: int | Sequence[int],
-) -> None:
+def _roundtrip_implementation(shape: Sequence[int], axis: int | Sequence[int]) -> None:
     """Implementation of the test for `expand_dims()` and `squeeze()`.
 
     It will first add dimensions and then remove them.
@@ -59,33 +56,18 @@ def _roundtrip_implementation(
 
 
 @pytest.fixture(params=[0, -1, 1])
-def single_axis(
-    request,
-) -> int:
+def single_axis(request) -> int:
     return request.param
 
 
-@pytest.fixture(
-    params=[
-        0,
-        -1,
-        (1, 2, 3),
-        (3, 2, 1),
-    ]
-)
-def multiple_axis(
-    request,
-) -> tuple[int, ...] | int:
+@pytest.fixture(params=[0, -1, (1, 2, 3), (3, 2, 1)])
+def multiple_axis(request) -> tuple[int, ...] | int:
     return request.param
 
 
-def test_expand_squeeze_rountrip_simple(
-    single_axis: int,
-) -> None:
+def test_expand_squeeze_rountrip_simple(single_axis: int) -> None:
     _roundtrip_implementation((10,), single_axis)
 
 
-def test_expand_squeeze_rountrip_big(
-    multiple_axis: Sequence[int],
-) -> None:
+def test_expand_squeeze_rountrip_big(multiple_axis: Sequence[int]) -> None:
     _roundtrip_implementation((2, 3, 4, 5), multiple_axis)

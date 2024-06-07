@@ -45,11 +45,7 @@ class ArithmeticOperationTranslator(mapped_base.MappedOperationTranslatorBase):
             nested `pjit` implementation by Jax for unknown reasons.
     """
 
-    def __init__(
-        self,
-        prim_name: str,
-        tskl_tmpl: str,
-    ) -> None:
+    def __init__(self, prim_name: str, tskl_tmpl: str) -> None:
         super().__init__(primitive_name=prim_name)
         self._tskl_tmpl = tskl_tmpl
 
@@ -98,12 +94,7 @@ class LogicalOperationTranslator(mapped_base.MappedOperationTranslatorBase):
         `ArithmeticOperationTranslator` does.
     """
 
-    def __init__(
-        self,
-        prim_name: str,
-        int_tmpl: str,
-        bool_tmpl: str,
-    ) -> None:
+    def __init__(self, prim_name: str, int_tmpl: str, bool_tmpl: str) -> None:
         super().__init__(primitive_name=prim_name)
         self._int_tmpl = int_tmpl
         self._bool_tmpl = bool_tmpl
