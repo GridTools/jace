@@ -102,3 +102,14 @@ def is_fully_addressable(
     if is_jax_array(obj):
         return obj.is_fully_addressable
     return True
+
+
+def is_c_contiguous(
+    obj: Any,
+) -> bool:
+    """Tests if `obj` is in C order."""
+    if not is_array(obj):
+        return False
+    if is_jax_array(obj):
+        obj = obj.__array__()
+    return obj.flags["C_CONTIGUOUS"]

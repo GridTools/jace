@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import itertools as it
 import re
-from typing import TYPE_CHECKING
 
 import jax
 import numpy as np
@@ -21,12 +20,9 @@ from jax import numpy as jnp
 
 import jace
 from jace import optimization, stages
+from jace.util import translation_cache as tcache
 
 from tests import util as testutil
-
-
-if TYPE_CHECKING:
-    from jace.util import translation_cache as tcache
 
 
 def test_caching_working() -> None:
@@ -386,3 +382,35 @@ def test_caching_strides() -> None:
     assert np.allclose(F_res, C_res)
     assert F_lower is not C_lower
     assert lower_cnt[0] == 2
+
+
+def test_caching_jax_numpy_array() -> None:
+    """Tests if jax arrays are handled the same way as numpy array."""
+
+    def _test_impl(
+        for_lowering: np.ndarray | jax.Array,
+        for_calling: np.ndarray | jax.Array,
+    ) -> None:
+        tcache.clear_translation_cache()
+        lowering_cnt = [0]
+
+        @jace.jit
+        def wrapped(A: np.ndarray | jax.Array) -> np.ndarray | jax.Array:
+            lowering_cnt[0] += 1
+            return A + 1.0
+
+        # Explicit lowering.
+        _ = wrapped(for_lowering)
+        assert lowering_cnt[0] == 1
+
+        # Now calling with the second argument, it should not longer again.
+        _ = wrapped(for_calling)
+        assert lowering_cnt[0] == 1, "Expected no further lowering."
+        return
+
+    A_numpy = testutil.mkarray((10, 10))
+    A_jax = jnp.array(A_numpy, copy=True)
+    assert A_numpy.dtype == A_jax.dtype
+
+    _test_impl(A_numpy, A_jax)
+    _test_impl(A_jax, A_numpy)

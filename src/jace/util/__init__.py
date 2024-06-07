@@ -26,6 +26,7 @@ from .misc import (
 )
 from .traits import (
     is_array,
+    is_c_contiguous,
     is_drop_var,
     is_fully_addressable,
     is_jax_array,
@@ -45,6 +46,7 @@ __all__ = [
     "get_jax_var_name",
     "get_jax_var_shape",
     "is_array",
+    "is_c_contiguous",
     "is_drop_var",
     "is_fully_addressable",
     "is_jax_array",

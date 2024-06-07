@@ -251,3 +251,19 @@ def test_no_input() -> None:
     assert res.shape == (10, 10)
     assert res.dtype == np.int32
     assert np.all(res == 1)
+
+
+def test_jax_array_as_input() -> None:
+    """This function tests if we use Jax arrays as inputs."""
+
+    def testee(A: jax.Array) -> jax.Array:
+        return jnp.sin(A + 1.0)
+
+    A = jnp.array(testutil.mkarray((10, 19)))
+
+    ref = testee(A)
+    res = jace.jit(testee)(A)
+
+    assert res.shape == ref.shape
+    assert res.dtype == ref.dtype
+    assert np.allclose(res, ref)

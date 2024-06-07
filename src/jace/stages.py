@@ -149,7 +149,7 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"]):
         # TODO(phimuell): Currently the SDFG that we build only supports `C_CONTIGUOUS` memory
         #  order. Since we support the paradigm that "everything passed to `lower()` should also
         #  be accepted as argument to call the result", we forbid other memory orders here.
-        if not all((not util.is_array(arg)) or arg.flags["C_CONTIGUOUS"] for arg in args):
+        if not all((not util.is_array(arg)) or util.is_c_contiguous(arg) for arg in args):
             raise NotImplementedError("Currently can not yet handle strides beside 'C_CONTIGUOUS'.")
 
         # In Jax `float32` is the main datatype, and they go to great lengths to avoid some
