@@ -116,7 +116,6 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"]):
 
         The arguments passed to this function are the same as the wrapped function uses.
         """
-
         # If we are inside a traced context, then we forward the call to the wrapped function.
         #  This ensures that JaCe is composable with Jax.
         if util.is_tracing_ongoing(*args, **kwargs):
