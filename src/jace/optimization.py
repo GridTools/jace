@@ -5,10 +5,7 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""JaCe specific optimizations.
-
-Currently just a dummy exists for the sake of providing a callable function.
-"""
+"""JaCe specific optimizations."""
 
 from __future__ import annotations
 

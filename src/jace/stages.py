@@ -51,14 +51,14 @@ __all__ = [
     "Stage",
 ]
 
+_JACELOWERED_ACTIVE_COMPILE_OPTIONS: CompilerOptions = optimization.DEFAULT_OPTIMIZATIONS.copy()
+"""Global set of currently active compilation/optimization options.
 
-__all__ = [
-    "CompilerOptions",  # export for compatibility with Jax.
-    "JaCeCompiled",
-    "JaCeLowered",
-    "JaCeWrapped",
-    "Stage",
-]
+These options are used by `JaCeLowered.compile()` to determine which options
+are forwarded to the underlying `jace_optimize()` function. It is initialized
+to `jace.optimization.DEFAULT_OPTIMIZATIONS` and can be managed through
+`update_active_compiler_options()`.
+"""
 
 
 class JaCeWrapped(tcache.CachingStage["JaCeLowered"]):
@@ -197,10 +197,10 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"]):
 
     This class is the output type of `JaCeWrapped.lower()` and represents the
     originally wrapped computation as an SDFG. This stage is followed by the
-    `JaCeCompiled` stage.
+    `JaCeCompiled` stage, by calling `self.compile()`.
 
-    Args:
-        tsdfg: The translated SDFG object representing the computation.
+    Before the SDFG is optimized the SDFG is optimized, see `JaCeLowered.compile()`
+    for more information on this topic.
 
     Args:
         tsdfg:  The lowered SDFG with metadata. Must be finalized.
@@ -226,16 +226,18 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"]):
         self,
         compiler_options: CompilerOptions | None = None,
     ) -> JaCeCompiled:
-        """Optimize and compile the lowered SDFG using `compiler_options`.
+        """Optimize and compile the lowered SDFG and return a `JaCeCompiled` object.
 
-        Returns an object that encapsulates a compiled SDFG object. To influence
-        the various optimizations and compile options of JaCe you can use the
-        `compiler_options` argument. If nothing is specified
-        `jace.optimization.DEFAULT_OPTIMIZATIONS` will be used.
+        This is the transition function of this stage. Before the SDFG is
+        compiled, it will be optimized using `jace_optimize()`. The options
+        used for this consists of two parts. First there is the (global) set of
+        currently active compiler options, which is then merged with the options
+        passed through `compiler_options`, which take precedence. Thus
+        `compiler_options` describes the delta from the current active set of options.
 
-        Note:
-            Before `compiler_options` is forwarded to `jace_optimize()` it
-            will be merged with the default arguments.
+        See also:
+            `get_active_compiler_options()` to inspect the set of currently active
+            options and `update_active_compiler_options()` to modify the set.
         """
         # We **must** deepcopy before we do any optimization, because all optimizations are in
         #  place, however, to properly cache stages, stages needs to be immutable.
@@ -295,7 +297,34 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"]):
         self,
         compiler_options: CompilerOptions | None,
     ) -> CompilerOptions:
-        return optimization.DEFAULT_OPTIMIZATIONS | (compiler_options or {})
+        """Return the compilation options that should be used for compilation.
+
+        See `JaCeLowered.compile()` to see how to influence them.
+        """
+        return get_active_compiler_options() | (compiler_options or {})
+
+
+def update_active_compiler_options(
+    new_active_options: CompilerOptions,
+) -> CompilerOptions:
+    """Updates the set of active compiler options.
+
+    Merges the options passed as `new_active_options` with the currently active
+    compiler options. This set is used by `JaCeLowered.compile()` to determine
+    which options should be used for optimization.
+    The function will return the set of options that was active before the call.
+    """
+    previous_active_options = _JACELOWERED_ACTIVE_COMPILE_OPTIONS.copy()
+    _JACELOWERED_ACTIVE_COMPILE_OPTIONS.update(new_active_options)
+    return previous_active_options
+
+
+def get_active_compiler_options() -> CompilerOptions:
+    """Returns the set of currently active compiler options.
+
+    By default the set is initialized with `jace.optimization.DEFAULT_OPTIMIZATIONS`.
+    """
+    return _JACELOWERED_ACTIVE_COMPILE_OPTIONS.copy()
 
 
 class JaCeCompiled:
