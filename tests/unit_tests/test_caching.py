@@ -14,8 +14,10 @@ import itertools as it
 import re
 from typing import TYPE_CHECKING
 
+import jax
 import numpy as np
 import pytest
+from jax import numpy as jnp
 
 import jace
 from jace import optimization, stages
@@ -25,6 +27,33 @@ from tests import util as testutil
 
 if TYPE_CHECKING:
     from jace.util import translation_cache as tcache
+
+
+def test_caching_working() -> None:
+    """Simple test if the caching actually works."""
+
+    lowering_cnt = [0]
+
+    @jace.jit
+    def wrapped(A: np.ndarray) -> jax.Array:
+        lowering_cnt[0] += 1
+        return jnp.sin(A)
+
+    A = testutil.mkarray((10, 10))
+    ref = np.sin(A)
+    res_ids: set[int] = set()
+    # We have to store the array, because numpy does reuse the memory.
+    res_set: list[np.ndarray] = []
+
+    for _ in range(10):
+        res = wrapped(A)
+        res_id = res.__array_interface__["data"][0]
+
+        assert np.allclose(res, ref)
+        assert lowering_cnt[0] == 1
+        assert res_id not in res_ids
+        res_ids.add(res_id)
+        res_set.append(res)
 
 
 def test_caching_same_sizes() -> None:
@@ -242,12 +271,13 @@ def test_caching_eviction_simple() -> None:
     assert third_key != first_key
 
     # Test if the key association is correct.
-    #  Since reading does not modify the order, third key must be still at the front.
-    #  To test this we also have this strange order.
+    #  We have to do it in this order, because reading the key modifies the order.
     assert cache.front()[0] == third_key
-    assert cache[third_key] is third_lowered
-    assert cache[second_key] is second_lowered
     assert cache[first_key] is first_lowered
+    assert cache.front()[0] == first_key
+    assert cache[second_key] is second_lowered
+    assert cache.front()[0] == second_key
+    assert cache[third_key] is third_lowered
     assert cache.front()[0] == third_key
 
     # We now evict the second key, which should not change anything on the order.

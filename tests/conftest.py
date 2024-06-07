@@ -14,6 +14,8 @@ Todo:
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import jax
 import numpy as np
 import pytest
@@ -21,8 +23,12 @@ import pytest
 from jace.util import translation_cache as tcache
 
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
+
 @pytest.fixture(autouse=True)
-def _enable_x64_mode_in_jax() -> None:
+def _enable_x64_mode_in_jax() -> Generator[None, None, None]:
     """Fixture of enable the `x64` mode in Jax.
 
     Currently, JaCe requires that `x64` mode is enabled and will do all Jax
@@ -34,7 +40,7 @@ def _enable_x64_mode_in_jax() -> None:
 
 
 @pytest.fixture(autouse=True)
-def _disable_jit() -> None:
+def _disable_jit() -> Generator[None, None, None]:
     """Fixture for disable the dynamic jiting in Jax.
 
     For certain reasons Jax puts certain primitives inside a `pjit` primitive,
@@ -45,6 +51,9 @@ def _disable_jit() -> None:
     to an error. To overcome this problem, we will globally disable this feature
     until we can handle `pjit`.
 
+    Note this essentially disable the `jax.jit` decorator, however, the `jace.jit`
+    decorator is still working.
+
     Todo:
         Remove as soon as we can handle nested `jit`.
     """
@@ -52,8 +61,18 @@ def _disable_jit() -> None:
         yield
 
 
+@pytest.fixture()
+def _enable_jit() -> Generator[None, None, None]:
+    """Fixture to enable jit compilation.
+
+    Essentially it undoes the effects of the `_disable_jit()` fixture.
+    """
+    with jax.disable_jit(disable=False):
+        yield
+
+
 @pytest.fixture(autouse=True)
-def _clear_translation_cache() -> None:
+def _clear_translation_cache() -> Generator[None, None, None]:
     """Decorator that clears the translation cache.
 
     Ensures that a function finds an empty cache and clears up afterwards.

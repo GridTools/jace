@@ -15,7 +15,7 @@ import pytest
 from jax import numpy as jnp
 
 import jace
-from jace import translator
+from jace import translator, util
 from jace.translator import pre_post_translation as ptrans
 
 from tests import util as testutil
@@ -213,3 +213,41 @@ def test_disabled_x64() -> None:
         tsdfg.sdfg.arrays[inp_name].dtype.as_numpy_dtype().type is np.float32
         for inp_name in tsdfg.inp_names
     )
+
+
+@pytest.mark.usefixtures("_enable_jit")
+def test_tracing_detection() -> None:
+    """Tests our ability to detect if tracing is going on."""
+    expected_tracing_state = False
+
+    def testee(a: float, b: int) -> float:
+        c = a + b
+        assert util.is_tracing_ongoing(a, b) == expected_tracing_state
+        assert util.is_tracing_ongoing() == expected_tracing_state
+        return a + c
+
+    # We do not expect tracing to happen.
+    _ = testee(1.0, 1)
+
+    # Now tracing is going on
+    expected_tracing_state = True
+    _ = jax.jit(testee)(1.0, 1)
+    _ = jace.jit(testee)(1.0, 1)
+
+    # Tracing should now again be disabled
+    expected_tracing_state = False
+    _ = testee
+
+
+def test_no_input() -> None:
+    """Tests if we can handle the case of no input."""
+
+    @jace.jit
+    def ones10x10() -> jax.Array:
+        return jnp.ones((10, 10), dtype=np.int32)
+
+    res = ones10x10()
+
+    assert res.shape == (10, 10)
+    assert res.dtype == np.int32
+    assert np.all(res == 1)
