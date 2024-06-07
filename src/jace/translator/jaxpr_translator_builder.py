@@ -125,6 +125,7 @@ class JaxprTranslationBuilder:
         #       SDFG/Jaxpr, this must be done manually.
         self._allocate_translation_ctx(
             name=name,
+            jaxpr=jaxpr,
         )
         self._create_constants(
             jaxpr=jaxpr,
@@ -504,7 +505,8 @@ class JaxprTranslationBuilder:
 
     def _allocate_translation_ctx(
         self,
-        name: str | None = None,
+        name: str | None,
+        jaxpr: jax_core.ClosedJaxpr,
     ) -> JaxprTranslationBuilder:
         """Allocate a new context and activate it.
 
@@ -514,6 +516,7 @@ class JaxprTranslationBuilder:
         self._ctx_stack.append(
             TranslationContext(
                 name=name,
+                jaxpr=jaxpr,
             )
         )
         return self
@@ -732,11 +735,12 @@ class TranslationContext:
     the `postprocess_jaxpr_sdfg()` function.
 
     Attributes:
-        sdfg:              The encapsulated SDFG object.
-        inp_names:         A list of the SDFG variables that are used as input
-        out_names:         A list of the SDFG variables that are used as output.
-        start_state:       The first state in the SDFG state machine.
-        terminal_state:    The (currently) last state in the state machine.
+        sdfg: The encapsulated SDFG object.
+        inp_names: A list of the SDFG variables that are used as input
+        out_names: A list of the SDFG variables that are used as output.
+        start_state: The first state in the SDFG state machine.
+        terminal_state: The (currently) last state in the state machine.
+        jaxpr: The Jaxpr that was used to translate.
 
     Args:
         name: The name of the SDFG, will be forwarded to the encapsulated `TranslatedJaxprSDFG`.
@@ -750,10 +754,12 @@ class TranslationContext:
     out_names: tuple[str, ...] | None
     start_state: dace.SDFGState
     terminal_state: dace.SDFGState
+    jaxpr: jax_core.ClosedJaxpr
 
     def __init__(
         self,
-        name: str | None = None,
+        name: str | None,
+        jaxpr: jax_core.ClosedJaxpr,
     ) -> None:
         if isinstance(name, str) and not util.VALID_SDFG_OBJ_NAME.fullmatch(name):
             raise ValueError(f"'{name}' is not a valid SDFG name.")
@@ -763,6 +769,7 @@ class TranslationContext:
         self.out_names = None
         self.start_state = self.sdfg.add_state(label="initial_state", is_start_block=True)
         self.terminal_state = self.start_state
+        self.jaxpr = jaxpr
 
     def validate(self) -> bool:
         """Validate internal state of `self`.
