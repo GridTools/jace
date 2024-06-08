@@ -47,11 +47,29 @@ Discussions = "https://github.com/GridTools/JaCe/discussions"
 Homepage = "https://github.com/GridTools/JaCe"
 
 [tool.coverage]
-report.exclude_also = [
+
+[tool.coverage.html]
+show_contexts = true
+
+[tool.coverage.report]
+exclude_also = [
+  'def __repr__',
+  'if TYPE_CHECKING:',
   '\.\.\.',
-  'if typing.TYPE_CHECKING:'
+  '@overload',
+  'raise AssertionError',
+  'raise NotImplementedError',
+  'if 0:',
+  'if __name__ == .__main__.:',
+  '@(abc\\.)?abstractmethod',
+  '@(abc\\.)?abstract',
+  'class .*\bProtocol\):'
 ]
-run.source = ["jace"]
+
+[tool.coverage.run]
+branch = true
+dynamic_context = "test_function"
+source = ["jace"]
 
 # -- mypy  --
 [tool.mypy]
