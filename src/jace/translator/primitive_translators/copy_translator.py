@@ -44,16 +44,14 @@ class CopyTranslator(mapped_base.MappedOperationTranslatorBase):
 
 
 class DevicePutTranslator(mapped_base.MappedOperationTranslatorBase):
-    """The `device_put` primitive is used to transfer data between host and device.
+    """Implements the `device_put` primitive.
 
-    The current implementation only supports the copying where the data already
-    is. Currently DaCe only knows about the Host and the GPU. Furthermore,
-    currently JaCe works in such a way that everything is either put on the host
-    or the device. Because of this, the `DevicePutTranslator` is, currently,
-    just a simple copy operation that should be removed, by the optimization.
+    In Jax this primitive is used to copy data between the host and the device.
+    Because of the way how JaCe and the optimization pipeline works, either
+    everything is on the host or the device.
 
     Todo:
-        Make into a Memlet because only the Memlet can handle copying between devices.
+        Think about how to implement this correctly.
     """
 
     def __init__(self) -> None:

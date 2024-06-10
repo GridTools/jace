@@ -22,11 +22,12 @@ if TYPE_CHECKING:
 
 
 class ReshapeTranslator(translator.PrimitiveTranslator):
-    """Reshapes an array.
+    """Implements the `reshape` primitive.
 
-    Todo:
-        - Handle `dimensions` parameter fully.
-        - Find a way to make it as a Map.
+    The current implementation uses a Memlet for this and essentially acts as
+    an optimization barrier. Furthermore the Jax primitive also has the optional
+    `dimensions` parameters which allows to permute the input, this is not
+    supported.
     """
 
     @property

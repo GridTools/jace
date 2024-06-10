@@ -44,7 +44,7 @@ def mkarray(shape: Sequence[int] | int, dtype: type = np.float64, order: str = "
         res = np.random.random(shape) > 0.5  # noqa: NPY002
     elif np.issubdtype(dtype, np.integer):
         iinfo: np.iinfo = np.iinfo(dtype)
-        res = np.random.randint(  # type: ignore[assignment]  # noqa: NPY002
+        res = np.random.randint(  # noqa: NPY002
             low=iinfo.min, high=iinfo.max, size=shape, dtype=dtype
         )
     elif np.issubdtype(dtype, np.complexfloating):

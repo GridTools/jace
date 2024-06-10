@@ -30,13 +30,8 @@ class ConvertElementTypeTranslator(mapped_base.MappedOperationTranslatorBase):
     Copies the input to the output and performs type conversion.
 
     Notes:
-        This translator ignores the `new_dtype` and `weak_type` parameter the
-        equation and only performs the casting.
-
-    Todo:
-        Occasionally Jax generates a cast that is not needed, because the types
-        are the same. Currently this is handled, by generating an explicit copy,
-        however, it should be handled by a Memlet.
+        This translator ignores the `new_dtype` and `weak_type` parameters of
+        the equation and only performs the casting based on the type of the fields.
     """
 
     def __init__(self) -> None:
@@ -63,15 +58,14 @@ class ConvertElementTypeTranslator(mapped_base.MappedOperationTranslatorBase):
         conv_code = "__in0"
 
         if in_dtype == out_dtype:
-            # For some reason Jax sometimes adds conversions where no are needed. I think
-            #  that the reason for this is the special type system that Jax made. In these cases
-            #  we do not add a cast, because such a Tasklet is not trivial and DaCe can not remove it.
+            # For some reason Jax sometimes adds conversions where no are needed. In these cases
+            #  we explicitly create a copy Tasklet, which is trivial and can be removed by DaCe.
+            # TODO(phimuell): Create a Memlet instead.
             return f"__out = {conv_code}"
 
         if in_dtype_s.startswith("bool"):
             # Interestingly `__out = int(__in0)` will not work, see commit `f5aabc` of the prototype.
             conv_code = f"(1 if {conv_code} else 0)"
-
         if out_dtype_s.startswith("bool"):
             conv_code = f"dace.bool_({conv_code})"
         elif hasattr(dace.dtypes, out_dtype_s):

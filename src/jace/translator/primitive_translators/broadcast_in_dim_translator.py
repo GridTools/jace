@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 
 
 class BroadcastInDimTranslator(mapped_base.MappedOperationTranslatorBase):
-    """This handles the `broadcast_in_dim` primitives."""
+    """Implements the `broadcast_in_dim` primitive."""
 
     def __init__(self) -> None:
         super().__init__(primitive_name="broadcast_in_dim")

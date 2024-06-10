@@ -184,11 +184,10 @@ _LOGICAL_OPERATION_TEMPLATES: Final[dict[str, tuple[str, str]]] = {
 }
 
 
-
 # Create the arithmetic translators
 for pname, ptmpl in _ARITMETIC_OPERATION_TEMPLATES.items():
     translator.register_primitive_translator(ArithmeticOperationTranslator(pname, ptmpl))
 
-# create the logical translators.
+# Create the logical translators.
 for pname, (itmpl, btmpl) in _LOGICAL_OPERATION_TEMPLATES.items():
     translator.register_primitive_translator(LogicalOperationTranslator(pname, itmpl, btmpl))

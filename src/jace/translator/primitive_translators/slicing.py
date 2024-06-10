@@ -25,10 +25,11 @@ if TYPE_CHECKING:
 
 
 class SlicingTranslator(mapped_base.MappedOperationTranslatorBase):
-    """Implements the classical slicing operation.
+    """Implements the `slice` primitive.
 
-    It is basically a copy Tasklet that only copies parts of the input.
-    Note that there is also `dynamic_slice`.
+    This is the classical slicing operation which extracts a fixed sized window
+    from a fixed initial position. The `dynamic_slice` operation supports a
+    variable starting point.
     """
 
     def __init__(self) -> None:
@@ -68,17 +69,16 @@ class SlicingTranslator(mapped_base.MappedOperationTranslatorBase):
 
 
 class DynamicSlicingTranslator(translator.PrimitiveTranslator):
-    """Implements the dynamic slicing translator.
+    """Implements the `dynamic_slice` primitive.
 
-    The [dynamic slicing](https://jax.readthedocs.io/en/latest/_autosummary/jax.lax.dynamic_slice.html)
-    performs a slicing of a _fixed_ window, however, the starting indexes are
-    not fix, but are variables that can come from the outside. Thus, the
-    translator uses "Dynamic Map Ranges". Furthermore, Jax guarantees that if
-    the window overruns the start indexes are adjusted.
+    [Dynamic slicing](https://jax.readthedocs.io/en/latest/_autosummary/jax.lax.dynamic_slice.html)
+    performs a slicing of a _fixed_ window, but the start of the window is
+    not fix, instead it is passed by variables. Furthermore, (as it is in Jax),
+    if the window would overrun the start indexes are adjusted.
 
-    Note:
-        Unlike the normal slicing primitive, it is not derived from
-        `MappedOperationTranslatorBase`.
+    Todo:
+        - Prevent that the modified start indexes are promoted to symbols,
+            to ensure mergability.
     """
 
     @property
@@ -105,21 +105,18 @@ class DynamicSlicingTranslator(translator.PrimitiveTranslator):
         in_var_name: str = in_var_names[0]
         start_indices: list[str | None] = list(in_var_names[1:])
 
-        # For storing the adapted start index, we have to create access nodes, to store them.
-        #  To ensure a total order of execution we have to use the same access nodes that are
-        #  used to store the adjusted start index and to feed them into the map.
+        # Access nodes for the modified start indexes.
         in_access: dict[str, dace.nodes.AccessNode] = {}
 
-        # Jax will adjust the start indexes if the window will overrun.
-        #  The adjustment is based on the formula $min(s + w, N) - w$, where $s$ is the start
-        #  index, $w$ the window size and $N$ the length of a particular dimension.
-        #  To do it we will use Tasklets, because otherwise we can not merge the state.
+        # We will always adapt the start indexes and not check if it is needed.
         for dim, (start_index, dim_size, wsize) in enumerate(
             zip(start_indices, util.get_jax_var_shape(eqn.invars[0]), window_sizes)
         ):
             if start_index is None:
                 continue
 
+            # We use a Tasklet to perform the adjustment not a symbol, because this would
+            #  need an interstage edge serving as kind of an optimization barrier.
             tasklet = dace.nodes.Tasklet(
                 label=f"adjustment_of_slice_start_{start_index}_for_{out_var_names[0]}",
                 inputs={"unadjusted_start_idx": None},
@@ -127,13 +124,11 @@ class DynamicSlicingTranslator(translator.PrimitiveTranslator):
                 code=f"adjusted_start_idx = min(unadjusted_start_idx + {wsize}, {dim_size}) - {wsize}",
             )
 
-            # Intermediate value to storing the adjusted start index.
             new_start_idx_var_name = builder.add_array(
                 eqn.invars[dim + 1], name_prefix="__jace_adapted_start_idx_"
             )
             new_start_idx_acc = eqn_state.add_access(new_start_idx_var_name)
 
-            # Create the connections to and from the Tasklet.
             eqn_state.add_edge(
                 eqn_state.add_read(start_index),
                 None,
@@ -148,6 +143,7 @@ class DynamicSlicingTranslator(translator.PrimitiveTranslator):
                 None,
                 dace.Memlet.simple(new_start_idx_var_name, "0"),
             )
+            # Update the name of the start index
             start_indices[dim] = new_start_idx_var_name
             in_access[new_start_idx_var_name] = new_start_idx_acc
 
@@ -155,10 +151,9 @@ class DynamicSlicingTranslator(translator.PrimitiveTranslator):
             (f"__i{dim}", f"0:{N}") for dim, N in enumerate(util.get_jax_var_shape(eqn.outvars[0]))
         ]
 
-        # We use dynamic map ranges, thus the map entry has input connectors, that does not start
-        #  with `IN_*`, instead the connector name defines a symbol within the map scope. This
-        #  `dict` maps the symbol name to the name of the input variable, that has the value of the
-        #  symbol. Literal substitution is done later.
+        # For copying the data, we use dynamic map ranges, which is basically an input connector
+        #  on the map entry whose name is not `IN_*`, this name can then be used as a symbol
+        #  inside the map scope; this symbol is then used as offset.
         dynamic_map_ranges: dict[str, str] = {}
         memlet_accesses: list[str] = []
 
@@ -178,7 +173,6 @@ class DynamicSlicingTranslator(translator.PrimitiveTranslator):
         tskl_output = dace.Memlet.simple(
             out_var_names[0], ", ".join(name for name, _ in tskl_ranges)
         )
-
         _, map_entry, _ = eqn_state.add_mapped_tasklet(
             name=f"{self.primitive}_{out_var_names[0]}",
             map_ranges=tskl_ranges,
@@ -189,6 +183,7 @@ class DynamicSlicingTranslator(translator.PrimitiveTranslator):
         )
 
         # Creating the inputs for the dynamic map ranges.
+        #  We have to use the same access nodes as above, to ensure a single order of computation.
         for symb_name, start_index in dynamic_map_ranges.items():
             eqn_state.add_edge(
                 in_access[start_index],

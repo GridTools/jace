@@ -24,9 +24,11 @@ if TYPE_CHECKING:
 
 
 class SqueezeTranslator(mapped_base.MappedOperationTranslatorBase):
-    """Allows to remove dimensions with size one.
+    """Implements the `squeeze` primitive.
 
-    Essentially equivalent to `np.squeeze` and the inverse to `np.expand_dims()`.
+    The primitives allows to remove a dimension of size one. Essentially
+    equivalent to `np.squeeze` and the inverse to `np.expand_dims()`,
+    which is handled by the `broadcast_in_dim` primitive.
     """
 
     def __init__(self) -> None:
@@ -48,14 +50,15 @@ class SqueezeTranslator(mapped_base.MappedOperationTranslatorBase):
         in_var_names: Sequence[str | None],
         eqn: jax_core.JaxprEqn,
     ) -> dict[str, dace.Memlet]:
-        to_rem: Sequence[str] = eqn.params["dimensions"]
+        dims_to_delete: Sequence[str] = eqn.params["dimensions"]
         in_rank: int = len(util.get_jax_var_shape(eqn.invars[0]))
         cnt = itertools.count(0)
         return {
             "__in0": dace.Memlet.simple(
                 in_var_names[0],
                 ", ".join(
-                    "0" if dim in to_rem else tskl_ranges[next(cnt)][0] for dim in range(in_rank)
+                    "0" if dim in dims_to_delete else tskl_ranges[next(cnt)][0]
+                    for dim in range(in_rank)
                 ),
             )
         }

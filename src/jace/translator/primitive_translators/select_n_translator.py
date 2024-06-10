@@ -25,18 +25,19 @@ if TYPE_CHECKING:
 
 
 class SelectNTranslator(mapped_base.MappedOperationTranslatorBase):
-    """Implements the `select_n` primitive, which is a generalization of `np.where`
+    """Implements the `select_n` primitive.
 
-    While `numpy.where` only supports two cases, the Jax primitive supports an
-    arbitrary number of cases. In that sense it is essentially a `C` `switch`
-    statement, only that all cases have to materialize.
-
+    The `select_n` primitive is a generalization of `np.where`, that can take an
+    arbitrary number of branches, which are selected by an integer predicate.
     The behaviour is undefined if the predicate is out of bound.
 
     Note:
         For a better understanding this function renames its input connectors.
         The first one, which is the predicate, is renamed to `__cond` and the
         others are renamed again to `__in{i}`, starting with zero.
+
+    Todo:
+        Implement the primitive as a nested SDFG.
     """
 
     def __init__(self) -> None:
@@ -49,7 +50,6 @@ class SelectNTranslator(mapped_base.MappedOperationTranslatorBase):
         in_var_names: Sequence[str | None],
         eqn: jax_core.JaxprEqn,
     ) -> str:
-        """Writes the selection code."""
         if len(in_var_names) == 3:
             # This order is correct, since `False` is interpreted as `0`, which means the first
             #  case. DaCe seems to have some problems with bools and integer casting around,
