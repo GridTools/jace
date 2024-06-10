@@ -21,6 +21,7 @@ from .jax_helper import (
 )
 from .misc import FORBIDDEN_SDFG_VAR_NAMES, VALID_SDFG_OBJ_NAME, VALID_SDFG_VAR_NAME
 from .traits import (
+    get_strides_for_dace,
     is_array,
     is_c_contiguous,
     is_drop_var,
@@ -41,6 +42,7 @@ __all__ = [
     "get_jax_var_dtype",
     "get_jax_var_name",
     "get_jax_var_shape",
+    "get_strides_for_dace",
     "is_array",
     "is_c_contiguous",
     "is_drop_var",

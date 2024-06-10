@@ -11,11 +11,9 @@
 from __future__ import annotations
 
 import itertools as it
-import re
 
 import jax
 import numpy as np
-import pytest
 from jax import numpy as jnp
 
 import jace
@@ -200,7 +198,7 @@ def test_caching_compilation() -> None:
     jaceLowered = jaceWrapped.lower(A, B)
 
     # Compiling it with and without optimizations enabled
-    optiCompiled = jaceLowered.compile()
+    optiCompiled = jaceLowered.compile(optimization.DEFAULT_OPTIMIZATIONS)
     unoptiCompiled = jaceLowered.compile(optimization.NO_OPTIMIZATIONS)
 
     # Because of the way how things work the optimized must have more than the unoptimized.
@@ -211,7 +209,6 @@ def test_caching_compilation() -> None:
 
     # Now we check if they are still inside the cache.
     assert optiCompiled is jaceLowered.compile(optimization.DEFAULT_OPTIMIZATIONS)
-    assert optiCompiled is jaceLowered.compile({})
     assert unoptiCompiled is jaceLowered.compile(optimization.NO_OPTIMIZATIONS)
 
 
@@ -388,7 +385,6 @@ def test_caching_eviction_complex() -> None:
     assert second_key not in cache
 
 
-@pytest.mark.skip("Non C order is not supported")
 def test_caching_strides() -> None:
     """Test if the cache detects a change in strides."""
 
@@ -400,21 +396,14 @@ def test_caching_strides() -> None:
         return A + 10.0
 
     shape = (10, 100, 1000)
-    C = np.array((testutil.mkarray(shape) - 0.5) * 10, order="C", dtype=np.float64)
+    C = testutil.mkarray(shape, order="C")
     F = np.array(C, copy=True, order="F")
 
     # First we compile run it with C strides.
     C_lower = wrapped.lower(C)
     C_res = wrapped(C)
 
-    # Now we run it with FORTRAN strides.
-    #  However, this does not work because we do not support strides at all.
-    #  But the cache is aware of this, which helps catch some nasty bugs.
-    with pytest.raises(
-        expected_exception=NotImplementedError,
-        match=re.escape("Currently can not yet handle strides beside 'C_CONTIGUOUS'."),
-    ):
-        F_lower = wrapped.lower(F)
+    F_lower = wrapped.lower(F)
     F_res = F_lower.compile()(F)
 
     assert C_res is not F_res

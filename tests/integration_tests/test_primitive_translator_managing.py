@@ -190,7 +190,11 @@ def test_subtranslatior_managing_overwriting_2() -> None:
         D = C + 1
         return D + 1
 
-    _ = foo.lower(1)
+    with pytest.warns(
+        UserWarning,
+        match='WARNING: Use of uninitialized transient "e" in state output_processing_stage',
+    ):
+        _ = foo.lower(1)
     assert trans_cnt[0] == 4
 
 

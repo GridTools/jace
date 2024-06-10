@@ -19,7 +19,7 @@ import dace
 import jax
 import numpy as np
 import pytest
-from dace.data import Array
+from dace import data as dcdata
 from jax import numpy as jnp
 
 import jace
@@ -52,7 +52,8 @@ def translation_builder() -> translator.JaxprTranslationBuilder:
     builder = translator.JaxprTranslationBuilder(
         primitive_translators=translator.get_registered_primitive_translators()
     )
-    builder._allocate_translation_ctx(name=name)
+    jaxpr = jax.make_jaxpr(lambda A: A)(1.0)  # dummy jaxpr, needed for construction.
+    builder._allocate_translation_ctx(name=name, jaxpr=jaxpr)
     return builder
 
 
@@ -66,7 +67,8 @@ def test_builder_alloc() -> None:
 
     # The reserved names will be tested in `test_builder_fork()`.
     sdfg_name = "qwertzuiopasdfghjkl"
-    builder._allocate_translation_ctx(name=sdfg_name)
+    jaxpr = jax.make_jaxpr(lambda A: A)(1.0)  # dummy jaxpr, needed for construction.
+    builder._allocate_translation_ctx(name=sdfg_name, jaxpr=jaxpr)
     assert len(builder._ctx_stack) == 1
     assert builder.is_root_translator()
 
@@ -88,8 +90,11 @@ def test_builder_variable_alloc_auto_naming(
         sdfg_name = translation_builder.add_array(var, update_var_mapping=True)
         sdfg_var = translation_builder.get_array(sdfg_name)
         assert sdfg_name == chr(97 + i)
-        assert isinstance(sdfg_var, Array)  # Everything is now an array
-        assert sdfg_var.shape == ((1,) if var.shape == () else var.shape)
+        if var.shape == ():
+            assert isinstance(sdfg_var, dcdata.Scalar)
+        else:
+            assert isinstance(sdfg_var, dcdata.Array)
+            assert sdfg_var.shape == var.shape
         assert sdfg_var.dtype == var.dtype
 
 
@@ -108,8 +113,11 @@ def test_builder_variable_alloc_mixed_naming(
             assert sdfg_name == chr(97 + i)
         else:
             assert sdfg_name == var.name
-        assert isinstance(sdfg_var, Array)  # Everything is now an array
-        assert sdfg_var.shape == ((1,) if var.shape == () else var.shape)
+        if var.shape == ():
+            assert isinstance(sdfg_var, dcdata.Scalar)
+        else:
+            assert isinstance(sdfg_var, dcdata.Array)
+            assert sdfg_var.shape == var.shape
         assert sdfg_var.dtype == var.dtype
 
 
@@ -127,8 +135,11 @@ def test_builder_variable_alloc_mixed_naming2(
             letoff += 1
         else:
             assert sdfg_name == var.name
-        assert isinstance(sdfg_var, Array)  # Everything is now an array
-        assert sdfg_var.shape == ((1,) if var.shape == () else var.shape)
+        if var.shape == ():
+            assert isinstance(sdfg_var, dcdata.Scalar)
+        else:
+            assert isinstance(sdfg_var, dcdata.Array)
+            assert sdfg_var.shape == var.shape
         assert sdfg_var.dtype == var.dtype
 
 
@@ -202,7 +213,8 @@ def test_builder_nested(translation_builder: translator.JaxprTranslationBuilder)
     assert translation_builder.sdfg.number_of_edges() == 1
 
     # Now we go one subcontext deeper; note we do this manually which should not be done.
-    translation_builder._allocate_translation_ctx("builder")
+    jaxpr = jax.make_jaxpr(lambda A: A)(1.0)  # dummy jaxpr, needed for construction.
+    translation_builder._allocate_translation_ctx(name="builder", jaxpr=jaxpr)
     assert len(translation_builder._ctx_stack) == 2
     assert translation_builder.sdfg.name == "builder"
     assert translation_builder.sdfg.number_of_nodes() == 1
@@ -466,7 +478,7 @@ def test_builder_constants(translation_builder: translator.JaxprTranslationBuild
 
     # We have to manually allocate the builder context.
     #  You should not do that.
-    translation_builder._allocate_translation_ctx(name="Manual_test")
+    translation_builder._allocate_translation_ctx(name="Manual_test", jaxpr=jaxpr)
 
     # No create the constants.
     translation_builder._create_constants(jaxpr)
@@ -630,17 +642,15 @@ def test_builder_F_strides() -> None:
         See also `tests/test_caching.py::test_caching_strides`.
     """
 
-    @jace.jit
     def testee(A: np.ndarray) -> np.ndarray:
         return A + 10.0
 
-    F = np.full((4, 3), 10, dtype=np.float64, order="F")
+    A = testutil.mkarray((4, 3), order="F")
+    ref = testee(A)
+    res = jace.jit(testee)(A)
 
-    with pytest.raises(
-        expected_exception=NotImplementedError,
-        match=re.escape("Currently can not yet handle strides beside 'C_CONTIGUOUS'."),
-    ):
-        _ = testee(F)
+    assert ref.shape == res.shape
+    assert np.allclose(ref, res)
 
 
 def test_builder_drop_variables() -> None:
