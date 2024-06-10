@@ -52,7 +52,8 @@ def translation_builder() -> translator.JaxprTranslationBuilder:
     builder = translator.JaxprTranslationBuilder(
         primitive_translators=translator.get_registered_primitive_translators()
     )
-    builder._allocate_translation_ctx(name=name)
+    jaxpr = jax.make_jaxpr(lambda A: A)(1.0)  # dummy jaxpr, needed for construction.
+    builder._allocate_translation_ctx(name=name, jaxpr=jaxpr)
     return builder
 
 
@@ -66,7 +67,8 @@ def test_builder_alloc() -> None:
 
     # The reserved names will be tested in `test_builder_fork()`.
     sdfg_name = "qwertzuiopasdfghjkl"
-    builder._allocate_translation_ctx(name=sdfg_name)
+    jaxpr = jax.make_jaxpr(lambda A: A)(1.0)  # dummy jaxpr, needed for construction.
+    builder._allocate_translation_ctx(name=sdfg_name, jaxpr=jaxpr)
     assert len(builder._ctx_stack) == 1
     assert builder.is_root_translator()
 
@@ -202,7 +204,8 @@ def test_builder_nested(translation_builder: translator.JaxprTranslationBuilder)
     assert translation_builder.sdfg.number_of_edges() == 1
 
     # Now we go one subcontext deeper; note we do this manually which should not be done.
-    translation_builder._allocate_translation_ctx("builder")
+    jaxpr = jax.make_jaxpr(lambda A: A)(1.0)  # dummy jaxpr, needed for construction.
+    translation_builder._allocate_translation_ctx(name="builder", jaxpr=jaxpr)
     assert len(translation_builder._ctx_stack) == 2
     assert translation_builder.sdfg.name == "builder"
     assert translation_builder.sdfg.number_of_nodes() == 1
@@ -466,7 +469,8 @@ def test_builder_constants(translation_builder: translator.JaxprTranslationBuild
 
     # We have to manually allocate the builder context.
     #  You should not do that.
-    translation_builder._allocate_translation_ctx(name="Manual_test")
+    jaxpr = jax.make_jaxpr(lambda A: A)(1.0)  # dummy jaxpr, needed for construction.
+    translation_builder._allocate_translation_ctx(name="Manual_test", jaxpr=jaxpr)
 
     # No create the constants.
     translation_builder._create_constants(jaxpr)
