@@ -21,11 +21,11 @@ if TYPE_CHECKING:
 __all__ = ["mkarray"]
 
 
-def mkarray(shape: Sequence[int] | int, dtype: type = np.float64) -> np.ndarray:
+def mkarray(shape: Sequence[int] | int, dtype: type = np.float64, order: str = "C") -> np.ndarray:
     """Generates a NumPy ndarray with shape `shape`.
 
-    The function uses the generator that is managed by the `_reset_random_seed()` fixture.
-    Thus inside a function the value will be deterministic.
+    The function uses the generator that is managed by the `_reset_random_seed()`
+    fixture. Thus inside a function the value will be deterministic.
 
     Args:
         shape:      The shape to use.
@@ -41,10 +41,14 @@ def mkarray(shape: Sequence[int] | int, dtype: type = np.float64) -> np.ndarray:
         shape = (shape,)
 
     if dtype == np.bool_:
-        return np.random.random(shape) > 0.5  # noqa: NPY002
-    if np.issubdtype(dtype, np.integer):
+        res = np.random.random(shape) > 0.5  # noqa: NPY002
+    elif np.issubdtype(dtype, np.integer):
         iinfo: np.iinfo = np.iinfo(dtype)
-        return np.random.randint(low=iinfo.min, high=iinfo.max, size=shape, dtype=dtype)  # noqa: NPY002
-    if np.issubdtype(dtype, np.complexfloating):
-        return np.array(mkarray(shape, np.float64) + 1.0j * mkarray(shape, np.float64), dtype=dtype)
-    return np.array(np.random.random(shape), dtype=dtype)  # noqa: NPY002
+        res = np.random.randint(  # type: ignore[assignment]  # noqa: NPY002
+            low=iinfo.min, high=iinfo.max, size=shape, dtype=dtype
+        )
+    elif np.issubdtype(dtype, np.complexfloating):
+        res = mkarray(shape, np.float64) + 1.0j * mkarray(shape, np.float64)
+    else:
+        res = np.random.random(shape)  # type: ignore[assignment]  # noqa: NPY002
+    return np.array(res, order=order, dtype=dtype)  # type: ignore[call-overload]

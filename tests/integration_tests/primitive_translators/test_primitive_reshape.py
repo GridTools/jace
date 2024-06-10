@@ -42,9 +42,7 @@ def _test_impl_reshaping(
     assert np.all(res == ref)
 
 
-@pytest.fixture(
-    params=["C", pytest.param("F", marks=pytest.mark.skip("Non C order is not supported"))]
-)
+@pytest.fixture(params=["C", "F"])
 def mem_order(request) -> str:
     """Gets the memory order that we want."""
     return request.param

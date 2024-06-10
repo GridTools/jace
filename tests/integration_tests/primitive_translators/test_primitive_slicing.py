@@ -69,9 +69,6 @@ def test_slice_strides(A_20x20x20: np.ndarray) -> None:
     assert np.all(ref == res)
 
 
-@pytest.mark.skip(
-    "In unoptimized mode there is an error, that is caused because we have an array insteadof a scalar."
-)
 def test_dynamic_slice_full_dynamic(
     A_4x4x4x4: np.ndarray, full_dynamic_start_idx: tuple[int, int, int, int]
 ) -> None:
@@ -84,9 +81,6 @@ def test_dynamic_slice_full_dynamic(
     assert np.all(ref == res)
 
 
-@pytest.mark.skip(
-    "In unoptimized mode there is an error, that is caused because we have an array insteadof a scalar."
-)
 def test_dynamic_slice_partially_dynamic(A_4x4x4x4: np.ndarray) -> None:
     def testee(A: np.ndarray, s1: int, s2: int) -> jax.Array:
         return jax.lax.dynamic_slice(A, (s1, 1, s2, 2), (2, 2, 2, 2))
@@ -97,9 +91,6 @@ def test_dynamic_slice_partially_dynamic(A_4x4x4x4: np.ndarray) -> None:
     assert np.all(ref == res)
 
 
-@pytest.mark.skip(
-    "In unoptimized mode there is an error, that is caused because we have an array insteadof a scalar."
-)
 def test_dynamic_slice_full_literal(A_4x4x4x4: np.ndarray) -> None:
     def testee(A: np.ndarray) -> jax.Array:
         return jax.lax.dynamic_slice(A, (0, 1, 0, 2), (2, 2, 2, 2))
