@@ -156,7 +156,7 @@ class _AbstractCallArgument:
                 value = value.__array__()  # Passing `copy=False` leads to error in NumPy.
             shape = value.shape
             dtype = util.translate_dtype(value.dtype)
-            strides = getattr(value, "strides", None)
+            strides = util.get_strides_for_dace(value)
             # Is `CPU_Heap` always okay? There would also be `CPU_Pinned`.
             storage = (
                 dace.StorageType.GPU_Global

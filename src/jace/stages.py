@@ -138,12 +138,6 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"]):
         if len(kwargs) != 0:
             raise NotImplementedError("Currently only positional arguments are supported.")
 
-        # TODO(phimuell): Currently the SDFG that we build only supports `C_CONTIGUOUS` memory
-        #  order. Since we support the paradigm that "everything passed to `lower()` should also
-        #  be accepted as argument to call the result", we forbid other memory orders here.
-        if not all((not util.is_array(arg)) or util.is_c_contiguous(arg) for arg in args):
-            raise NotImplementedError("Currently can not yet handle strides beside 'C_CONTIGUOUS'.")
-
         # In Jax `float32` is the main datatype, and they go to great lengths to avoid some
         #  aggressive [type promotion](https://jax.readthedocs.io/en/latest/type_promotion.html).
         #  However, in this case we will have problems when we call the SDFG, for some reasons
@@ -199,6 +193,11 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"]):
         undefined behavior. Although `JaCeWrapped` is composable with Jax
         transformations `JaCeLowered` is not. A user should never create such
         an object, instead `JaCeWrapped.lower()` should be used.
+        The storage location and stride of an input (in addition to its shape
+        and data type) are hard coded into the SDFG. Thus, if a certain stride
+        was used for lowering a computation, that stride must also be used
+        when the SDFG is called. If the just in time compilation mode is used
+        JaCe will take care of this.
     """
 
     _translated_sdfg: translator.TranslatedJaxprSDFG
@@ -304,6 +303,10 @@ class JaCeCompiled:
     This is the last stage of the jit chain. A user should never create a
     `JaCeCompiled` instance, instead `JaCeLowered.compile()` should be used.
 
+    In order to execute the stored computation properly, an input's stride,
+    storage location, shape and datatype has to match the argument that was
+    used for lowering, i.e. was passed to the `lower()` function.
+
     Args:
         csdfg: The compiled SDFG object.
         inp_names: Names of the SDFG variables used as inputs.
@@ -314,6 +317,7 @@ class JaCeCompiled:
 
     Todo:
         - Handle pytrees.
+        - Automatic strides adaption.
     """
 
     _csdfg: dace_helper.CompiledSDFG

@@ -15,7 +15,6 @@ import time
 from typing import TYPE_CHECKING, Any
 
 import dace
-import numpy as np
 from dace import data as dace_data
 
 # The compiled SDFG is not available in the dace namespace or anywhere else
@@ -38,7 +37,7 @@ def compile_jax_sdfg(tsdfg: translator.TranslatedJaxprSDFG) -> dace_helper.Compi
     """Compiles the SDFG embedded in `tsdfg` and return the resulting `CompiledSDFG` object."""
     if any(  # We do not support the DaCe return mechanism
         array_name.startswith("__return")
-        for array_name in tsdfg.sdfg.arrays.keys()  # noqa: SIM118  # we can not use `in` because we are also interested in `__return_`!
+        for array_name in tsdfg.sdfg.arrays.keys()  # noqa: SIM118  # We can not use `in` because we are not interested in `my_mangled_variable__return_zulu`!
     ):
         raise ValueError("Only support SDFGs without '__return' members.")
 
@@ -95,12 +94,7 @@ def run_jax_sdfg(
     Note:
         There is no pytree mechanism jet, thus the return values are returned
         inside a `tuple` or in case of one value, directly, in the order
-        determined by Jax. Furthermore, DaCe does not support scalar return
-        values, thus they are silently converted into arrays of length 1, the
-        same holds for inputs.
-
-    Todo:
-        - Implement non C strides.
+        determined by Jax. As Jax JaCe does not return scalars, but only arrays.
     """
     sdfg: dace.SDFG = csdfg.sdfg
 
@@ -116,10 +110,8 @@ def run_jax_sdfg(
     # Build the argument list that we will pass to the compiled object.
     sdfg_call_args: dict[str, Any] = {}
     for in_name, in_val in zip(inp_names, call_args, strict=True):
-        if util.is_scalar(in_val):
-            # Currently the translator makes scalar into arrays, this has to be reflected here
-            in_val = np.array([in_val])
-        elif util.is_jax_array(in_val):
+        # TODO(phimuell): Implement a stride matching process.
+        if util.is_jax_array(in_val):
             # TODO(phimuell): Add test for this.
             if not util.is_fully_addressable(in_val):
                 raise ValueError(f"Passed a not fully addressable Jax array as '{in_name}'")

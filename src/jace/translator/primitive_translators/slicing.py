@@ -97,10 +97,8 @@ class DynamicSlicingTranslator(translator.PrimitiveTranslator):
         assert in_var_names[0]
         assert len(in_var_names) == len(util.get_jax_var_shape(eqn.invars[0])) + 1
 
-        raise NotImplementedError("This translator needs true scalars to correctly work.")
-
         # This is the sizes of the slice window.
-        window_sizes: Sequence[int] = eqn.params["slice_sizes"]  # type: ignore[unreachable]
+        window_sizes: Sequence[int] = eqn.params["slice_sizes"]
 
         # The first input to the primitive is the array we slice from, the others are the start
         #  indices of the slice window, each is a scalar, maybe literals.

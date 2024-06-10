@@ -29,14 +29,14 @@ class JaxprTranslationBuilder:
 
     The SDFG created by this class has a very particular form, which we call
     canonical. The main features of such an SDFG are:
-    - the SDFG is a list of states, ideally each state corresponds to single Jax primitive,
+    - the SDFG is a list of states, ideally each state corresponds to one Jax primitive,
     - it has a single source and sink state.
     - all variable names are derived from Jax names,
     - there are only transient variables inside the SDFG,
-    - It lacks the special `__return` variable,
+    - it lacks the special `__return` variable,
     - the `arg_names` parameter is not set,
-    - scalar variables that are used as return value are SDFG scalars, thus they
-        can not directly be used to return something.
+    - for all scalar values a ` Scalar` SDFG variable is used, thus they cannot
+        be used to return anything.
 
     For these reasons the SDFG is not directly usable, and further manipulations
     have to be performed. Especially, DaCe's validation function will fail and
@@ -110,7 +110,6 @@ class JaxprTranslationBuilder:
         Args:
             name: Use this name for the SDFG instead some generated one.
         """
-
         if len(jaxpr.effects) != 0:
             raise NotImplementedError("'Jaxpr' with side effects are not supported.")
 
@@ -267,8 +266,8 @@ class JaxprTranslationBuilder:
             jax_var: The Jax variable.
             sdfg_name: The name of the corresponding SDFG variable.
         """
-        assert sdfg_name
-
+        if not sdfg_name:
+            raise ValueError("Supplied 'sdfg_name' is empty.")
         if jax_var in self._jax_name_map:
             raise ValueError(
                 f"Cannot change the mapping of '{jax_var}' from"
@@ -305,7 +304,6 @@ class JaxprTranslationBuilder:
             name_prefix: If given it will be used as prefix for the name.
             update_var_mapping: Update the internal variable mapping; by default `False`.
         """
-
         if isinstance(arg, jax_core.Literal):
             raise ValueError(f"Can not generate an SDFG variable for literal '{arg}'.")
 
@@ -436,7 +434,6 @@ class JaxprTranslationBuilder:
         Notes:
             The function will populate the `inp_names` member of the current context.
         """
-        assert self.is_allocated(), "Builder is not allocated, can not create constants."
         assert self._ctx.inp_names is None
 
         # Handle the initial input arguments
@@ -458,7 +455,6 @@ class JaxprTranslationBuilder:
         The function will create an SDFG variable and add them as constant to
         the SDFG. Their value is deepcopied.
         """
-        assert self.is_allocated(), "Builder is not allocated, can not create constants."
         if len(jaxpr.consts) == 0:
             return
 
