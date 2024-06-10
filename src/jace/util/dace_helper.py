@@ -40,9 +40,11 @@ def compile_jax_sdfg(tsdfg: translator.TranslatedJaxprSDFG) -> dace_helper.Compi
         for array_name in tsdfg.sdfg.arrays.keys()  # noqa: SIM118  # We can not use `in` because we are not interested in `my_mangled_variable__return_zulu`!
     ):
         raise ValueError("Only support SDFGs without '__return' members.")
+    if tsdfg.sdfg.free_symbols:  # This is a simplification that makes our life simple.
+        raise NotImplementedError(f"No free symbols allowed, found: {tsdfg.sdfg.free_symbols}")
 
     # To ensure that the SDFG is compiled and to get rid of a warning we must modify
-    #  some settings of the SDFG. To fake an immutable SDFG, we will restore them later.
+    #  some settings of the SDFG. But we also have to fake an immutable SDFG
     sdfg = tsdfg.sdfg
     org_sdfg_name = sdfg.name
     org_recompile = sdfg._recompile
@@ -102,17 +104,12 @@ def run_jax_sdfg(
         raise NotImplementedError("No kwargs are supported yet.")
     if len(inp_names) != len(call_args):
         raise RuntimeError("Wrong number of arguments.")
-    if sdfg.free_symbols:  # This is a simplification that makes our life simple.
-        raise NotImplementedError(
-            f"No externally defined symbols are allowed, found: {sdfg.free_symbols}"
-        )
 
     # Build the argument list that we will pass to the compiled object.
     sdfg_call_args: dict[str, Any] = {}
     for in_name, in_val in zip(inp_names, call_args, strict=True):
         # TODO(phimuell): Implement a stride matching process.
         if util.is_jax_array(in_val):
-            # TODO(phimuell): Add test for this.
             if not util.is_fully_addressable(in_val):
                 raise ValueError(f"Passed a not fully addressable Jax array as '{in_name}'")
             in_val = in_val.__array__()
@@ -137,7 +134,7 @@ def run_jax_sdfg(
         dace.Config.set("compiler", "allow_view_arguments", value=True)
         csdfg(**sdfg_call_args)
 
-    # Handling the output (pytrees are missing)
+    # TODO(phimuell): Handle pytrees
     if not out_names:
         return None
     ret_val: tuple[Any] = tuple(sdfg_call_args[out_name] for out_name in out_names)

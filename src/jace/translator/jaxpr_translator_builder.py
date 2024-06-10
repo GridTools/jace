@@ -114,10 +114,10 @@ class JaxprTranslationBuilder:
             raise NotImplementedError("'Jaxpr' with side effects are not supported.")
 
         # NOTE: If `self` is already allocated, i.e. has an ongoing translation process,
-        #       the `_allocate_translation_ctx()` function will start a new context.
-        #       Thus the builder will start to translate a second (nested) SDFG.
-        #       Also note that there is no mechanism that forces the integration of the nested
-        #       SDFG/Jaxpr, this must be done manually.
+        #  the `_allocate_translation_ctx()` function will start a new context. Thus the
+        #  builder will start to translate a second (nested) SDFG. Also note that there
+        #  is no mechanism that forces the integration of the nested SDFG/Jaxpr,
+        #  this must be done manually.
         self._allocate_translation_ctx(name=name, jaxpr=jaxpr)
         self._create_constants(jaxpr=jaxpr)
         self._create_initial_input(jaxpr=jaxpr)
