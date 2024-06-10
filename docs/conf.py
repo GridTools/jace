@@ -25,15 +25,32 @@ extensions = [
     "sphinx_copybutton",
 ]
 
-source_suffix = [".rst", ".md"]
-exclude_patterns = ["_build", "**.ipynb_checkpoints", "Thumbs.db", ".DS_Store", ".env", ".venv"]
+source_suffix = [
+    ".rst",
+    ".md",
+]
+exclude_patterns = [
+    "_build",
+    "**.ipynb_checkpoints",
+    "Thumbs.db",
+    ".DS_Store",
+    ".env",
+    ".venv",
+]
 
 html_theme = "furo"
 
-myst_enable_extensions = ["colon_fence"]
+myst_enable_extensions = [
+    "colon_fence",
+]
 
-intersphinx_mapping = {"python": ("https://docs.python.org/3", None)}
+intersphinx_mapping = {
+    "python": ("https://docs.python.org/3", None),
+}
 
-nitpick_ignore = [("py:class", "_io.StringIO"), ("py:class", "_io.BytesIO")]
+nitpick_ignore = [
+    ("py:class", "_io.StringIO"),
+    ("py:class", "_io.BytesIO"),
+]
 
 always_document_param_types = True
