@@ -1,10 +1,12 @@
 [build-system]
 build-backend = "setuptools.build_meta"
-requires = ["setuptools>=61"]
+requires = [
+  "setuptools>=61",
+]
 
 [project]
 authors = [
-  {name = "ETH Zurich", email = "gridtools@cscs.ch"}
+  {name = "ETH Zurich", email = "gridtools@cscs.ch"},
 ]
 classifiers = [
   "Development Status :: 1 - Planning",
@@ -19,12 +21,12 @@ classifiers = [
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Topic :: Scientific/Engineering",
-  "Typing :: Typed"
+  "Typing :: Typed",
 ]
 dependencies = [
   "dace>=0.15",
   "jax[cpu]>=0.4.24",
-  "numpy>=1.26.0"
+  "numpy>=1.26.0",
 ]
 description = "JAX jit using DaCe (Data Centric Parallel Programming)"
 name = "JaCe"
@@ -37,7 +39,7 @@ license.file = "LICENSE"
 cuda12 = [
   "cupy-cuda12x>=12.1.0",
   "jax[cuda12]>=0.4.24",
-  "optuna>=3.4.0"
+  "optuna>=3.4.0",
 ]
 
 [project.urls]
@@ -49,7 +51,7 @@ Homepage = "https://github.com/GridTools/JaCe"
 [tool.coverage]
 report.exclude_also = [
   '\.\.\.',
-  'if typing.TYPE_CHECKING:'
+  'if typing.TYPE_CHECKING:',
 ]
 run.source = ["jace"]
 
@@ -76,21 +78,22 @@ warn_unused_ignores = true
 disallow_incomplete_defs = false
 disallow_untyped_defs = false
 ignore_missing_imports = true
-module = ["tests.*", "dace.*", "jax.*", "jaxlib.*"]
+module = [
+  "tests.*",
+  "dace.*",
+  "jax.*",
+  "jaxlib.*",
+]
 
 # -- pytest  --
 [tool.pytest]
 
 [tool.pytest.ini_options]
 addopts = ["-ra", "--showlocals", "--strict-markers", "--strict-config"]
-filterwarnings = [
-  "error"
-]
+filterwarnings = ["error"]
 log_cli_level = "INFO"
 minversion = "6.0"
-testpaths = [
-  "tests"
-]
+testpaths = ["tests"]
 xfail_strict = true
 
 # -- ruff --
@@ -104,16 +107,24 @@ src = ["src"]
 docstring-code-format = true
 
 [tool.ruff.lint]
+extend-safe-fixes = ["D", "TCH"]
 extend-select = [
   "A",  # flake8-builtins
   "B",  # flake8-bugbear
   "I",  # isort
   "G",  # flake8-logging-format
+  "N",  # pep8-naming
+  "W",  # pycodestyle-warning
   "C4",  # flake8-comprehensions
+  "C90",  # mccabe
+  "D",  # pydocstyle
+  "D213",  # multi-line-summary-second-line (off by default in pydocstyle "google' convention)
   "PT",  # flake8-pytest-style
+  "TD",  # flake8-todo
   "UP",  # pyupgrade       # TODO: in evaluation
   "ARG",  # flake8-unused-arguments
   "ERA",  # eradicate
+  "FLY",  # flynt
   "ICN",  # flake8-import-conventions
   "PGH",  # pygrep-hooks
   "PIE",  # flake8-pie
@@ -121,46 +132,80 @@ extend-select = [
   "RET",  # flake8-return   # TODO: in evaluation
   "RUF",  # Ruff-specific
   "SIM",  # flake8-simplify # TODO: in evaluation
+  "SLOT",  # flake8-slots
   "T10",  # flake8-debugger
-  "T20",  # flake8-print    # TODO: in evaluation
+  "T20",  # flake8-print
   "TCH",  # flake8-type-checking  # TODO: in evaluation
-  "NPY"  # NumPy specific rules
+  "NPY",  # NumPy specific rules
 ]
 ignore = [
-  'B905',  # [zip-without-explicit-strict]
-  'E501',  # [line-too-long]
-  'UP038'  # [non-pep604-isinstance]
+  "B905",  # [zip-without-explicit-strict]
+  "D105",  # undocumented-magic-method
+  "D107",  # [undocumented-public-init]
+  "D212",  # [multi-line-summary-first-line]
+  "E501",  # [line-too-long]
+  "TCH003",  # [typing-only-standard-library-import]
+  "TD003",  # [missing-todo-link]
+  "UP038",  # [non-pep604-isinstance]
 ]
+task-tags = ["TODO"]
 # ignore-init-module-imports = true  # deprecated in preview mode
 unfixable = []
 
 [tool.ruff.lint.isort]
 combine-as-imports = true
-known-first-party = ['jace']
+known-first-party = ["jace"]
 known-third-party = [
-  'cupy',
-  'dace',
-  'jax',
-  'numpy',
-  'pytest',
-  'typing_extensions'
+  "cupy",
+  "dace",
+  "jax",
+  "numpy",
+  "pytest",
+  "typing_extensions",
 ]
 lines-after-imports = 2
 order-by-type = true
 required-imports = ["from __future__ import annotations"]
 section-order = [
-  'future',
-  'standard-library',
-  'third-party',
-  'first-party',
-  'tests',
-  'local-folder'
+  "future",
+  "standard-library",
+  "third-party",
+  "first-party",
+  "tests",
+  "local-folder",
 ]
 
 [tool.ruff.lint.isort.sections]
-tests = ["tests", "unit_tests", "integration_tests"]
+tests = [
+  "tests",
+  "unit_tests",
+  "integration_tests",
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 12
 
 [tool.ruff.lint.per-file-ignores]
-"!tests/**.py" = ["PT"]  # Ignore `flake8-pytest-style` everywhere except in `tests/`
-"noxfile.py" = ["T20"]  # Ignore `flake8-print`
-"tests/**" = ["T10", "T20"]  # Ignore `flake8-debugger` and `flake8-print`
+"!tests/**.py" = ["PT"]  # Ignore `flake8-pytest-style` outside `tests/`
+"docs/**" = [
+  "D",  # pydocstyle
+  "T10",  # flake8-debugger
+  "T20",  # flake8-print
+]
+"noxfile.py" = [
+  "D",  # pydocstyle
+  "T20",  # flake8-print
+]
+"tests/**" = [
+  "D",  # pydocstyle
+  "T10",  # flake8-debugger
+  "T20",  # flake8-print
+]
+
+[tool.ruff.lint.pycodestyle]
+ignore-overlong-task-comments = true
+max-doc-length = 88
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+ignore-decorators = ["typing.overload"]

@@ -2,30 +2,32 @@ default_language_version:
   python: python3.10
 
 ci:
-  autoupdate_commit_msg: "chore: update pre-commit hooks"
-  autofix_commit_msg: "style: pre-commit fixes"
+  autoupdate_commit_msg: 'chore: update pre-commit hooks'
+  autofix_commit_msg: 'style: pre-commit fixes'
 
 repos:
 - repo: https://github.com/macisamuele/language-formatters-pre-commit-hooks
-  rev: v2.6.0
+  rev: v2.13.0
   hooks:
   - id: pretty-format-ini
     args: [--autofix]
   - id: pretty-format-toml
-    args: [--autofix]
+    args: [--autofix, --indent, '2', --trailing-commas]
     additional_dependencies:
     - setuptools>=69.2.0
   - id: pretty-format-yaml
-    args: [--autofix, --preserve-quotes, --indent, "2"]
+    args: [--autofix, --indent, '2', --line-width, '100']
     additional_dependencies:
     - setuptools>=69.2.0
 
-- repo: https://github.com/pre-commit/mirrors-prettier
-  rev: "v3.1.0"
+- repo: https://github.com/executablebooks/mdformat
+  rev: 0.7.17
   hooks:
-  - id: prettier
-    types_or: [markdown, html, css, scss, javascript, json]
-    args: [--prose-wrap=preserve]
+  - id: mdformat
+    args: [--number]
+    additional_dependencies:
+    - mdformat-gfm
+    - mdformat-black
 
 - repo: https://github.com/Lucas-C/pre-commit-hooks
   rev: v1.1.9
@@ -33,10 +35,10 @@ repos:
   - id: insert-license
     exclude: ^\..*$
     types: [python]
-    args: [--comment-style, "|#|", --license-filepath, ./LICENSE_HEADER.txt]
+    args: [--comment-style, '|#|', --license-filepath, ./LICENSE_HEADER.txt]
 
 - repo: https://github.com/pre-commit/pre-commit-hooks
-  rev: "v4.6.0"
+  rev: v4.6.0
   hooks:
   - id: check-added-large-files
   - id: check-case-conflict
@@ -47,7 +49,7 @@ repos:
   - id: end-of-file-fixer
   - id: mixed-line-ending
   - id: name-tests-test
-    args: ["--pytest-test-first"]
+    args: [--pytest-test-first]
   - id: requirements-txt-fixer
   - id: trailing-whitespace
 
@@ -55,7 +57,7 @@ repos:
   rev: v0.4.6
   hooks:
   - id: ruff
-    args: ["--fix", "--show-fixes", "--preview"]
+    args: [--fix, --show-fixes, --preview]
   - id: ruff-format
 
 - repo: https://github.com/pre-commit/mirrors-mypy
@@ -70,12 +72,12 @@ repos:
     - numpy==1.26.4
     - pytest==8.2.1
 - repo: https://github.com/codespell-project/codespell
-  rev: "v2.2.6"
+  rev: v2.2.6
   hooks:
   - id: codespell
 
 - repo: https://github.com/shellcheck-py/shellcheck-py
-  rev: "v0.10.0.1"
+  rev: v0.10.0.1
   hooks:
   - id: shellcheck
 
@@ -88,13 +90,13 @@ repos:
     exclude: .pre-commit-config.yaml
 
 - repo: https://github.com/abravalheri/validate-pyproject
-  rev: "v0.16"
+  rev: v0.16
   hooks:
   - id: validate-pyproject
-    additional_dependencies: ["validate-pyproject-schema-store[all]"]
+    additional_dependencies: ['validate-pyproject-schema-store[all]']
 
 - repo: https://github.com/python-jsonschema/check-jsonschema
-  rev: "0.28.1"
+  rev: 0.28.1
   hooks:
   - id: check-dependabot
   - id: check-github-workflows
