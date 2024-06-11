@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import functools
+import inspect
 from typing import TYPE_CHECKING, Any, Literal, overload
 
 from jax import grad, jacfwd, jacrev
@@ -69,6 +70,11 @@ def jit(
         )
 
     def wrapper(f: Callable) -> stages.JaCeWrapped:
+        if any(
+            param.default is not param.empty for param in inspect.signature(f).parameters.values()
+        ):
+            raise NotImplementedError("Default values are not yet supported.")
+
         # TODO: Improve typing, such that signature is attached to the `JaCeWrapped`.
         jace_wrapper = stages.JaCeWrapped(
             fun=f,

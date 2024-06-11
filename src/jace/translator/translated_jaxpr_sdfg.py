@@ -8,8 +8,13 @@
 from __future__ import annotations
 
 import dataclasses
+from typing import TYPE_CHECKING
 
 import dace
+
+
+if TYPE_CHECKING:
+    from jax import tree_util as jax_tree
 
 
 @dataclasses.dataclass(kw_only=True, frozen=True)
@@ -38,11 +43,13 @@ class TranslatedJaxprSDFG:
         sdfg: The encapsulated SDFG object.
         inp_names: A list of the SDFG variables that are used as input
         out_names: A list of the SDFG variables that are used as output.
+        outtree: A pytree describing how to unflatten the output.
     """
 
     sdfg: dace.SDFG
     inp_names: tuple[str, ...]
     out_names: tuple[str, ...]
+    outtree: jax_tree.PyTreeDef
 
     def validate(self) -> bool:
         """Validate the underlying SDFG."""

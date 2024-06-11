@@ -20,11 +20,11 @@ import abc
 import collections
 import dataclasses
 import functools
-from collections.abc import Callable, Hashable
+from collections.abc import Callable, Hashable, Sequence
 from typing import TYPE_CHECKING, Any, Concatenate, Generic, ParamSpec, TypeAlias, TypeVar, cast
 
 import dace
-from jax import core as jax_core
+from jax import core as jax_core, tree_util as jax_tree
 
 from jace import util
 
@@ -68,7 +68,7 @@ class CachingStage(Generic[NextStage]):
 
     @abc.abstractmethod
     def _make_call_description(
-        self: CachingStage, *args: Any, **kwargs: Any
+        self: CachingStage, args_tree: jax_tree.PyTreeDef, flat_args: Sequence[Any]
     ) -> StageTransformationSpec:
         """Generates the key that is used to store/locate the call in the cache."""
         ...
@@ -95,7 +95,8 @@ def cached_transition(
 
     @functools.wraps(transition)
     def transition_wrapper(self: CachingStageType, *args: P.args, **kwargs: P.kwargs) -> NextStage:
-        key: StageTransformationSpec = self._make_call_description(*args, **kwargs)
+        flat_args, args_tree = jax_tree.tree_flatten((args, kwargs))
+        key = self._make_call_description(flat_args=flat_args, args_tree=args_tree)
         if key in self._cache:
             return self._cache[key]
         next_stage = transition(self, *args, **kwargs)
@@ -192,22 +193,26 @@ class StageTransformationSpec:
     State transition functions are annotated with `@cached_transition` and their
     result may be cached. They key to locate them inside the cache is represented
     by this class and computed by the `CachingStage._make_call_description()`
-    function. The actual key is consists of two parts, `stage_id` and `call_args`.
+    function. The actual key is consists of three parts, `stage_id`, `call_args`
+    and `args_tree`.
 
     Args:
         stage_id: Origin of the call, for which the id of the stage object should
             be used.
-        call_args: Description of the arguments of the call. There are two ways
-            to describe the arguments:
+        call_args: Flat representation of the arguments of the call. Each element
+            describes a single argument. To describe an argument there are two ways:
             - Abstract description: In this way, the actual value of the argument
                 is irrelevant, only the structure of them are important, similar
                 to the tracers used in Jax.
             - Concrete description: Here one caches on the actual value of the
                 argument. The only requirement is that they can be hashed.
+        args_tree: A pytree structure that describes how the input was flatten.
+                In Jax the hash of a pytree, takes its structure into account.
     """
 
     stage_id: int
     call_args: CallArgsSpec
+    args_tree: jax_tree.PyTreeDef
 
 
 # Denotes the stage that is stored inside the cache.

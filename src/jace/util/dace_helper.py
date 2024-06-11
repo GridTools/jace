@@ -16,16 +16,14 @@ from typing import TYPE_CHECKING, Any
 
 import dace
 from dace import data as dace_data
-
-# The compiled SDFG is not available in the dace namespace or anywhere else
-#  Thus we import it here directly
 from dace.codegen.compiled_sdfg import CompiledSDFG
+from jax import tree_util as jax_tree
 
 from jace import util
 
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Sequence
 
     from jace import translator
     from jace.util import dace_helper
@@ -76,8 +74,8 @@ def run_jax_sdfg(
     csdfg: dace_helper.CompiledSDFG,
     inp_names: Sequence[str],
     out_names: Sequence[str],
-    call_args: Sequence[Any],
-    call_kwargs: Mapping[str, Any],
+    flat_call_args: Sequence[Any],
+    outtree: jax_tree.PyTreeDef,
 ) -> tuple[Any, ...] | Any:
     """Run the compiled SDFG.
 
@@ -90,24 +88,18 @@ def run_jax_sdfg(
         csdfg: The `CompiledSDFG` object.
         inp_names: List of names of the input arguments.
         out_names: List of names of the output arguments.
-        call_args: All positional arguments of the call.
-        call_kwargs: All keyword arguments of the call.
+        flat_call_args: Flattened input arguments.
+        outtree: A pytree describing how to unflatten the output.
 
-    Note:
-        There is no pytree mechanism jet, thus the return values are returned
-        inside a `tuple` or in case of one value, directly, in the order
-        determined by Jax. As Jax JaCe does not return scalars, but only arrays.
+    Notes:
+        Currently the strides of the input arguments must match the ones that
+        were used for lowering.
     """
-    sdfg: dace.SDFG = csdfg.sdfg
-
-    if len(call_kwargs) != 0:
-        raise NotImplementedError("No kwargs are supported yet.")
-    if len(inp_names) != len(call_args):
+    if len(inp_names) != len(flat_call_args):
         raise RuntimeError("Wrong number of arguments.")
 
-    # Build the argument list that we will pass to the compiled object.
     sdfg_call_args: dict[str, Any] = {}
-    for in_name, in_val in zip(inp_names, call_args, strict=True):
+    for in_name, in_val in zip(inp_names, flat_call_args, strict=True):
         # TODO(phimuell): Implement a stride matching process.
         if util.is_jax_array(in_val):
             if not util.is_fully_addressable(in_val):
@@ -115,17 +107,17 @@ def run_jax_sdfg(
             in_val = in_val.__array__()
         sdfg_call_args[in_name] = in_val
 
-    for out_name, sdfg_array in ((out_name, sdfg.arrays[out_name]) for out_name in out_names):
+    arrays = csdfg.sdfg.arrays
+    for out_name, sdfg_array in ((out_name, arrays[out_name]) for out_name in out_names):
         if out_name in sdfg_call_args:
             if util.is_jax_array(sdfg_call_args[out_name]):
-                # Jax arrays are immutable, so they can not be return values too.
-                raise ValueError("Passed a Jax array as output.")
+                raise ValueError("Passed an immutable Jax array as output.")
         else:
             sdfg_call_args[out_name] = dace_data.make_array_from_descriptor(sdfg_array)
 
     assert len(sdfg_call_args) == len(csdfg.argnames), (
         "Failed to construct the call arguments,"
-        f" expected {len(csdfg.argnames)} but got {len(call_args)}."
+        f" expected {len(csdfg.argnames)} but got {len(flat_call_args)}."
         f"\nExpected: {csdfg.argnames}\nGot: {list(sdfg_call_args.keys())}"
     )
 
@@ -134,8 +126,6 @@ def run_jax_sdfg(
         dace.Config.set("compiler", "allow_view_arguments", value=True)
         csdfg(**sdfg_call_args)
 
-    # TODO(phimuell): Handle pytrees
     if not out_names:
         return None
-    ret_val: tuple[Any] = tuple(sdfg_call_args[out_name] for out_name in out_names)
-    return ret_val[0] if len(out_names) == 1 else ret_val
+    return jax_tree.tree_unflatten(outtree, (sdfg_call_args[out_name] for out_name in out_names))

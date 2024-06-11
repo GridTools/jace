@@ -193,16 +193,16 @@ def test_disabled_x64() -> None:
     with disable_x64():
         jaxpr = jax.make_jaxpr(testee)(A, B)
 
+    _, flat_in_vals, outtree = ptrans.trace_and_flatten_function(
+        fun=testee, trace_call_args=(A, B), trace_call_kwargs={}, trace_options={}
+    )
     builder = translator.JaxprTranslationBuilder(
         primitive_translators=translator.get_registered_primitive_translators()
     )
     trans_ctx: translator.TranslationContext = builder.translate_jaxpr(jaxpr)
 
     tsdfg: translator.TranslatedJaxprSDFG = ptrans.postprocess_jaxpr_sdfg(
-        trans_ctx=trans_ctx,
-        fun=testee,
-        call_args=(A, B),  # Already linearised, since we only accept positional args.
-        intree=None,  # Not yet implemented.
+        trans_ctx=trans_ctx, fun=testee, call_args=flat_in_vals, outtree=outtree
     )
 
     # Because x64 is disabled Jax traces the input as float32, even if we have passed

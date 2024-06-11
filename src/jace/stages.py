@@ -28,9 +28,10 @@ the first one.
 from __future__ import annotations
 
 import copy
+import inspect
 from typing import TYPE_CHECKING, Any
 
-import jax as _jax
+from jax import tree_util as jax_tree
 
 from jace import optimization, translator, util
 from jace.optimization import CompilerOptions
@@ -79,7 +80,6 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"]):
         jit_options: Options to influence the jit process.
 
     Todo:
-        - Support pytrees.
         - Support keyword arguments and default values of the wrapped function.
         - Support static arguments.
 
@@ -98,6 +98,9 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"]):
         primitive_translators: Mapping[str, translator.PrimitiveTranslator],
         jit_options: Mapping[str, Any],
     ) -> None:
+        assert all(
+            param.default is param.empty for param in inspect.signature(fun).parameters.values()
+        )
         super().__init__()
         # We have to shallow copy both the translator and the jit options.
         #  This prevents that any modifications affect `self`.
@@ -138,27 +141,21 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"]):
         if len(kwargs) != 0:
             raise NotImplementedError("Currently only positional arguments are supported.")
 
-        # In Jax `float32` is the main datatype, and they go to great lengths to avoid some
-        #  aggressive [type promotion](https://jax.readthedocs.io/en/latest/type_promotion.html).
-        #  However, in this case we will have problems when we call the SDFG, for some reasons
-        #  `CompiledSDFG` does not work in that case correctly, thus we enable it for the tracing.
-        with _jax.experimental.enable_x64():
-            builder = translator.JaxprTranslationBuilder(
-                primitive_translators=self._primitive_translators
-            )
-            jaxpr = _jax.make_jaxpr(self._fun)(*args)
-            trans_ctx: translator.TranslationContext = builder.translate_jaxpr(jaxpr)
-
-        # Perform the post processing and turn it into a `TranslatedJaxprSDFG` that can be
-        #  compiled and called later.
-        # NOTE: `tsdfg` was deepcopied as a side effect of post processing.
+        jaxpr, flat_in_vals, outtree = ptrans.trace_and_flatten_function(
+            fun=self._fun,
+            trace_call_args=args,
+            trace_call_kwargs=kwargs,
+            trace_options=self._jit_options,
+        )
+        builder = translator.JaxprTranslationBuilder(
+            primitive_translators=self._primitive_translators
+        )
+        trans_ctx: translator.TranslationContext = builder.translate_jaxpr(jaxpr)
         tsdfg: translator.TranslatedJaxprSDFG = ptrans.postprocess_jaxpr_sdfg(
-            trans_ctx=trans_ctx,
-            fun=self.wrapped_fun,
-            call_args=args,  # Already linearised, since we only accept positional args.
-            intree=None,  # Not yet implemented.
+            trans_ctx=trans_ctx, fun=self.wrapped_fun, call_args=flat_in_vals, outtree=outtree
         )
 
+        # NOTE: `tsdfg` is deepcopied as a side effect of post processing.
         return JaCeLowered(tsdfg)
 
     @property
@@ -166,13 +163,17 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"]):
         """Returns the wrapped function."""
         return self._fun
 
-    def _make_call_description(self, *args: Any) -> tcache.StageTransformationSpec:
+    def _make_call_description(
+        self, args_tree: jax_tree.PyTreeDef, flat_args: Sequence[Any]
+    ) -> tcache.StageTransformationSpec:
         """This function computes the key for the `JaCeWrapped.lower()` call inside the cache.
 
         The function will compute a full abstract description on its argument.
         """
-        call_args = tuple(tcache._AbstractCallArgument.from_value(x) for x in args)
-        return tcache.StageTransformationSpec(stage_id=id(self), call_args=call_args)
+        call_args = tuple(tcache._AbstractCallArgument.from_value(x) for x in flat_args)
+        return tcache.StageTransformationSpec(
+            stage_id=id(self), call_args=tuple(call_args), args_tree=args_tree
+        )
 
 
 class JaCeLowered(tcache.CachingStage["JaCeCompiled"]):
@@ -230,6 +231,7 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"]):
             csdfg=dace_helper.compile_jax_sdfg(tsdfg),
             inp_names=tsdfg.inp_names,
             out_names=tsdfg.out_names,
+            outtree=tsdfg.outtree,
         )
 
     def compiler_ir(self, dialect: str | None = None) -> translator.TranslatedJaxprSDFG:
@@ -257,22 +259,30 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"]):
         return self.compiler_ir().sdfg
 
     def _make_call_description(
-        self, compiler_options: CompilerOptions | None = None
+        self, args_tree: jax_tree.PyTreeDef, flat_args: Sequence[Any]
     ) -> tcache.StageTransformationSpec:
         """This function computes the key for the `self.compile()` call inside the cache.
 
-        The key that is computed by this function is based on the concrete
-        values of the passed compiler options.
+        Contrary to the `JaCeWrapped.lower()` function the call description
+        depends on the concrete values of the arguments and takes the global
+        compile options into consideration.
         """
-        options = self._make_compiler_options(compiler_options)
-        call_args = tuple(sorted(options.items(), key=lambda x: x[0]))
-        return tcache.StageTransformationSpec(stage_id=id(self), call_args=call_args)
+        unflatted_args, unflatted_kwargs = jax_tree.tree_unflatten(args_tree, flat_args)
+        assert (not len(unflatted_kwargs)) and (len(unflatted_args) == 1)
+        options = self._make_compiler_options(unflatted_args[0])
+
+        # The values are stored inside `call_args` and `args_tree` stores the key.
+        call_args, args_tree = jax_tree.tree_flatten(options)
+        return tcache.StageTransformationSpec(
+            stage_id=id(self), call_args=tuple(call_args), args_tree=args_tree
+        )
 
     def _make_compiler_options(self, compiler_options: CompilerOptions | None) -> CompilerOptions:
         """Return the compilation options that should be used for compilation.
 
         See `JaCeLowered.compile()` to see how to influence them.
         """
+        assert isinstance(compiler_options, dict)
         return get_active_compiler_options() | (compiler_options or {})
 
 
@@ -311,30 +321,33 @@ class JaCeCompiled:
         csdfg: The compiled SDFG object.
         inp_names: Names of the SDFG variables used as inputs.
         out_names: Names of the SDFG variables used as outputs.
+        outtree: A pytree describing how to unflatten the output.
 
     Note:
         The class assumes ownership of its input arguments.
 
     Todo:
-        - Handle pytrees.
         - Automatic strides adaption.
     """
 
     _csdfg: dace_helper.CompiledSDFG
     _inp_names: tuple[str, ...]
     _out_names: tuple[str, ...]
+    _outtree: jax_tree.PyTreeDef
 
     def __init__(
-        self, csdfg: dace_helper.CompiledSDFG, inp_names: Sequence[str], out_names: Sequence[str]
+        self,
+        csdfg: dace_helper.CompiledSDFG,
+        inp_names: Sequence[str],
+        out_names: Sequence[str],
+        outtree: jax_tree.PyTreeDef,
     ) -> None:
-        # NOTE: We only check that we have output, we do not care about the input, since the
-        #  function `def foo(): return 1.0` is still a pure function, but we require that we have
-        #  output.
-        if not out_names:
-            raise ValueError("A jited function needs at least one output.")
+        if not (out_names or inp_names):
+            raise ValueError("No input nor output.")
         self._csdfg = csdfg
         self._inp_names = tuple(inp_names)
         self._out_names = tuple(out_names)
+        self._outtree = outtree
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         """Calls the embedded computation.
@@ -342,7 +355,11 @@ class JaCeCompiled:
         The arguments must be the same as for the wrapped function, but with
         all static arguments removed.
         """
-        return dace_helper.run_jax_sdfg(self._csdfg, self._inp_names, self._out_names, args, kwargs)
+        flat_in_vals = jax_tree.tree_leaves((args, kwargs))
+        assert len(flat_in_vals) == len(self._inp_names), "Static arguments."
+        return dace_helper.run_jax_sdfg(
+            self._csdfg, self._inp_names, self._out_names, flat_in_vals, self._outtree
+        )
 
 
 #: Known compilation stages in JaCe.
