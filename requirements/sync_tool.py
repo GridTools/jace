@@ -75,7 +75,7 @@ class Requirement(NamedTuple):
     def from_spec(cls, req: RequirementSpec) -> Requirement:
         return Requirement(req.as_text(), req)
 
-    def dump(self, *, template: str | None = None) -> str:
+    def as_text(self, *, template: str | None = None) -> str:
         template = template or "{req.text}"
         return template.format(req=self)
 
@@ -120,7 +120,7 @@ def load_from_toml(filename: str, key: str) -> list[Requirement]:
 
 
 def dump(requirements: Iterable[Requirement], *, template: str | None = None) -> None:
-    return [req.dump(template=template) for req in requirements]
+    return [req.as_text(template=template) for req in requirements]
 
 
 def dump_to_requirements(
@@ -154,7 +154,7 @@ def dump_to_yaml(requirements_map: Mapping[str, DumpSpec], filename: str) -> Non
             case str():
                 processor.set_value(yamlpath.YAMLPath(key_path), value)
             case Requirement():
-                processor.set_value(yamlpath.YAMLPath(key_path), value.dump(template=template))
+                processor.set_value(yamlpath.YAMLPath(key_path), value.as_text(template=template))
             case Iterable():
                 for _ in processor.delete_nodes(yamlpath.YAMLPath(key_path)):
                     pass
