@@ -126,8 +126,11 @@ extend-select = [
   "ERA",  # eradicate
   "FLY",  # flynt
   "ICN",  # flake8-import-conventions
+  "NPY",  # NumPy specific rules
+  "PERF",  # Perflint
   "PGH",  # pygrep-hooks
   "PIE",  # flake8-pie
+  "PL",  # pylint
   "PTH",  # flake8-use-pathlib
   "RET",  # flake8-return   # TODO(egparedes): in evaluation
   "RUF",  # Ruff-specific
@@ -136,11 +139,11 @@ extend-select = [
   "T10",  # flake8-debugger
   "T20",  # flake8-print
   "TCH",  # flake8-type-checking  # TODO(egparedes): in evaluation
-  "NPY",  # NumPy specific rules
+  "TRY",  # tryceratops
 ]
 ignore = [
   "B905",  # [zip-without-explicit-strict]
-  "D105",  # undocumented-magic-method
+  "D105",  # [undocumented-magic-method]
   "D107",  # [undocumented-public-init]
   "D212",  # [multi-line-summary-first-line]
   "D402",  # [no-signature]
@@ -187,7 +190,7 @@ tests = [
 max-complexity = 12
 
 [tool.ruff.lint.per-file-ignores]
-"!tests/**.py" = ["PT"]  # Ignore `flake8-pytest-style` outside `tests/`
+"!tests/**.py" = ["PT"]  # Ignore flake8-pytest-style outside 'tests/'
 "docs/**" = [
   "D",  # pydocstyle
   "T10",  # flake8-debugger
@@ -200,6 +203,7 @@ max-complexity = 12
 "tests/**" = [
   "D",  # pydocstyle
   "N",  # TODO(egparedes): remove ignore as soon as all tests are properly named
+  "PLR2004",  # [magic-value-comparison]
   "T10",  # flake8-debugger
   "T20",  # flake8-print
 ]
