@@ -16,13 +16,13 @@ fastrlock==0.8.2
     # via cupy-cuda12x
 greenlet==3.0.3
     # via sqlalchemy
-jax[cpu,cuda12]==0.4.28
+jax[cpu,cuda12]==0.4.29
     # via
     #   -r requirements/base.in
     #   -r requirements/cuda12.in
-jax-cuda12-pjrt==0.4.28
+jax-cuda12-pjrt==0.4.29
     # via jax-cuda12-plugin
-jax-cuda12-plugin==0.4.28
+jax-cuda12-plugin==0.4.29
     # via jax
 mako==1.3.5
     # via alembic
@@ -35,11 +35,9 @@ nvidia-cuda-cupti-cu12==12.5.39
     # via jax
 nvidia-cuda-nvcc-cu12==12.5.40
     # via jax
-nvidia-cuda-nvrtc-cu12==12.5.40
-    # via nvidia-cudnn-cu12
 nvidia-cuda-runtime-cu12==12.5.39
     # via jax
-nvidia-cudnn-cu12==8.9.7.29
+nvidia-cudnn-cu12==9.1.1.17
     # via jax
 nvidia-cufft-cu12==11.2.3.18
     # via jax

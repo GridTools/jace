@@ -17,6 +17,8 @@
 # ]
 # ///
 
+"""Script to synchronize requirements across tools."""
+
 from __future__ import annotations
 
 import pathlib
@@ -37,6 +39,8 @@ from packaging import (
 
 # -- Classes --
 class RequirementSpec(NamedTuple):
+    """A parsed requirement specification."""
+
     package: pkg_requirements.Requirement
     specifiers: pkg_specifiers.SpecifierSet | None = None
     marker: pkg_markers.Marker | None = None
@@ -58,6 +62,8 @@ class RequirementSpec(NamedTuple):
 
 
 class Requirement(NamedTuple):
+    """An item in a list of requirements and its parsed specification."""
+
     text: str
     spec: RequirementSpec
 
@@ -85,19 +91,17 @@ DumpSpec: TypeAlias = (
 
 
 # -- Functions --
-def make_requirements_map(
-    requirements: Iterable[Requirement],
-) -> dict[str, Requirement]:
+def make_requirements_map(requirements: Iterable[Requirement]) -> dict[str, Requirement]:
     return {req.spec.package.name: req for req in requirements}
 
 
 def load_from_requirements(filename: str) -> list[Requirement]:
     requirements = []
-    with pathlib.Path(filename).open() as f:
-        for line in f:
-            if (end := line.find("#")) != -1:
-                line = line[:end]
-            line = line.strip()
+    with pathlib.Path(filename).open(encoding="locale") as f:
+        for raw_line in f:
+            if (end := raw_line.find("#")) != -1:
+                raw_line = raw_line[:end]  # noqa: PLW2901 [redefined-loop-name]
+            line = raw_line.strip()
             if line and not line.startswith("-"):
                 requirements.append(Requirement.from_text(line))
 
@@ -105,7 +109,7 @@ def load_from_requirements(filename: str) -> list[Requirement]:
 
 
 def load_from_toml(filename: str, key: str) -> list[Requirement]:
-    with pathlib.Path(filename).open() as f:
+    with pathlib.Path(filename).open(encoding="locale") as f:
         toml_data = tomlkit.loads(f.read())
 
     section = toml_data
@@ -127,12 +131,13 @@ def dump_to_requirements(
     header: str | None = None,
     footer: str | None = None,
 ) -> None:
-    with pathlib.Path(filename).open("w") as f:
+    with pathlib.Path(filename).open("w", encoding="locale") as f:
         if header:
             f.write(f"{header}\n")
         f.write("\n".join(dump(requirements, template=template)))
         if footer:
             f.write(f"{footer}\n")
+        f.write("\n")
 
 
 def dump_to_yaml(requirements_map: Mapping[str, DumpSpec], filename: str) -> None:

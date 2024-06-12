@@ -1,3 +1,5 @@
+"""Nox session definitions."""
+
 from __future__ import annotations
 
 import argparse
@@ -24,7 +26,7 @@ def lint(session: nox.Session) -> None:
 @nox.session
 def tests(session: nox.Session) -> None:
     """Run the unit and regular tests."""
-    session.install(".[test]")
+    session.install("-e", ".", "-r", "requirements/dev.txt")
     session.run("pytest", *session.posargs)
 
 
@@ -40,8 +42,7 @@ def docs(session: nox.Session) -> None:
         session.error("Must not specify non-HTML builder with --serve")
 
     extra_installs = ["sphinx-autobuild"] if args.serve else []
-
-    session.install("-e.[docs]", *extra_installs)
+    session.install("-e", ".", "-r", "requirements/dev.txt", *extra_installs)
     session.chdir("docs")
 
     if args.builder == "linkcheck":
@@ -92,9 +93,7 @@ def build(session: nox.Session) -> None:
 
 @nox.session
 def requirements(session: nox.Session) -> None:
-    """
-    Freeze dependencies from input specs and synchronize across tools.
-    """
+    """Freeze dependencies from input specs and synchronize across tools."""
     requirements_path = DIR / "requirements"
     req_sync_tool = requirements_path / "sync_tool.py"
 
