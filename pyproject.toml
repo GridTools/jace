@@ -239,4 +239,4 @@ convention = "google"
 ignore-decorators = ["typing.overload"]
 
 [tool.ruff.lint.pylint]
-max-positional-args = 6
+max-args = 6

@@ -29,7 +29,7 @@ We deviate from the [Google Python Style Guide][google-style-guide] only in the 
 
 - According to subsection [_3.19.12 Imports For Typing_](https://google.github.io/styleguide/pyguide.html#31912-imports-for-typing), symbols from `typing` and `collections.abc` modules used in type annotations _"can be imported directly to keep common annotations concise and match standard typing practices"_. Following the same spirit, we allow symbols to be imported directly from third-party or internal modules when they only contain a collection of frequently used typying definitions.
 
-### Language usage recommendations
+### Python usage recommendations
 
 - `pass` vs `...` (`Ellipsis`)
 
