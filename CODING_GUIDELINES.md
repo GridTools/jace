@@ -12,12 +12,15 @@ We deviate from the [Google Python Style Guide][google-style-guide] only in the 
 
 - According to subsection [_2.19 Power Features_](https://google.github.io/styleguide/pyguide.html#219-power-features), direct use of _power features_ (e.g. custom metaclasses, import hacks, reflection) should be avoided, but standard library classes that internally use these power features are accepted. Following the same spirit, we allow the use of power features in infrastructure code with similar functionality and scope as the Python standard library.
 
+- For readability purposes, when a docstring contains more than the required summary line, we prefer indenting the first line at the same cursor position as the first opening quote, although this is not explicitly considered in the doctring conventions described in subsection [_3.8.1 Docstrings_](https://google.github.io/styleguide/pyguide.html#381-docstrings). Example:
+
   ```python
   # single line docstring
   """A one-line summary of the module or program, terminated by a period."""
 
   # multi-line docstring
-  """ A one-line summary of the module or program, terminated by a period.
+  """
+  A one-line summary of the module or program, terminated by a period.
 
   Leave one blank line. The rest of this docstring should contain an
   overall description of the module or program.
@@ -26,7 +29,7 @@ We deviate from the [Google Python Style Guide][google-style-guide] only in the 
 
 - According to subsection [_3.19.12 Imports For Typing_](https://google.github.io/styleguide/pyguide.html#31912-imports-for-typing), symbols from `typing` and `collections.abc` modules used in type annotations _"can be imported directly to keep common annotations concise and match standard typing practices"_. Following the same spirit, we allow symbols to be imported directly from third-party or internal modules when they only contain a collection of frequently used typying definitions.
 
-### Common questions
+### Python usage recommendations
 
 - `pass` vs `...` (`Ellipsis`)
 
@@ -141,9 +144,7 @@ and, if needed, a brief comment for future reference:
 
 ```python
 ...
-return (
-    undeclared_symbol  # noqa: F821 [undefined-name] on purpose to trigger black-magic
-)
+return undeclared  # noqa: F821 [undefined-name] on purpose to trigger black-magic
 ```
 
 ## Testing

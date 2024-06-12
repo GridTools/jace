@@ -5,7 +5,7 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""JaCe - JAX Just-In-Time compilation using DaCe."""
+"""JaCe: JAX jit using DaCe (Data Centric Parallel Programming)."""
 
 from __future__ import annotations
 

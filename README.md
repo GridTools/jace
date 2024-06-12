@@ -19,10 +19,6 @@ The DaCe project aims to build new representations for programs and algorithms, 
 
 <!-- SPHINX-START -->
 
-<!-- prettier-ignore-start -->
-
-<!-- prettier-ignore-end -->
-
 [actions-badge]: https://github.com/GridTools/JaCe/workflows/CI/badge.svg
 [actions-link]: https://github.com/GridTools/JaCe/actions
 [conda-badge]: https://img.shields.io/conda/vn/conda-forge/JaCe
