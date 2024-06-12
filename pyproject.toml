@@ -119,6 +119,7 @@ xfail_strict = true
 # -- ruff --
 [tool.ruff]
 line-length = 100
+preview = true
 respect-gitignore = true
 show-fixes = true
 src = ["src"]
