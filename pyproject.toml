@@ -121,7 +121,7 @@ extend-select = [
   "D213",  # multi-line-summary-second-line (off by default in pydocstyle "google' convention)
   "PT",  # flake8-pytest-style
   "TD",  # flake8-todo
-  "UP",  # pyupgrade       # TODO: in evaluation
+  "UP",  # pyupgrade       # TODO(egparedes): in evaluation
   "ARG",  # flake8-unused-arguments
   "ERA",  # eradicate
   "FLY",  # flynt
@@ -129,13 +129,13 @@ extend-select = [
   "PGH",  # pygrep-hooks
   "PIE",  # flake8-pie
   "PTH",  # flake8-use-pathlib
-  "RET",  # flake8-return   # TODO: in evaluation
+  "RET",  # flake8-return   # TODO(egparedes): in evaluation
   "RUF",  # Ruff-specific
-  "SIM",  # flake8-simplify # TODO: in evaluation
+  "SIM",  # flake8-simplify # TODO(egparedes): in evaluation
   "SLOT",  # flake8-slots
   "T10",  # flake8-debugger
   "T20",  # flake8-print
-  "TCH",  # flake8-type-checking  # TODO: in evaluation
+  "TCH",  # flake8-type-checking  # TODO(egparedes): in evaluation
   "NPY",  # NumPy specific rules
 ]
 ignore = [
@@ -143,6 +143,7 @@ ignore = [
   "D105",  # undocumented-magic-method
   "D107",  # [undocumented-public-init]
   "D212",  # [multi-line-summary-first-line]
+  "D402",  # [no-signature]
   "E501",  # [line-too-long]
   "TCH003",  # [typing-only-standard-library-import]
   "TD003",  # [missing-todo-link]
@@ -198,6 +199,7 @@ max-complexity = 12
 ]
 "tests/**" = [
   "D",  # pydocstyle
+  "N",  # TODO(egparedes): remove ignore as soon as all tests are properly named
   "T10",  # flake8-debugger
   "T20",  # flake8-print
 ]
