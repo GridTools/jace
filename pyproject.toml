@@ -174,7 +174,6 @@ ignore = [
   "TRY003",  # [raise-vanilla-args]  # TODO(egparedes): reevaluate if it should be activated
   "UP038",  # [non-pep604-isinstance]
 ]
-task-tags = ["TODO"]
 # ignore-init-module-imports = true  # deprecated in preview mode
 unfixable = []
 
@@ -239,4 +238,4 @@ convention = "google"
 ignore-decorators = ["typing.overload"]
 
 [tool.ruff.lint.pylint]
-max-positional-args = 6
+max-args = 6
