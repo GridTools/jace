@@ -17,7 +17,6 @@ from typing import TYPE_CHECKING, Any
 import dace
 from dace import data as dace_data
 from dace.codegen.compiled_sdfg import CompiledSDFG
-from jax import tree_util as jax_tree
 
 from jace import util
 
@@ -25,13 +24,14 @@ from jace import util
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    import numpy as np
+
     from jace import translator
-    from jace.util import dace_helper
 
 __all__ = ["CompiledSDFG", "compile_jax_sdfg", "run_jax_sdfg"]
 
 
-def compile_jax_sdfg(tsdfg: translator.TranslatedJaxprSDFG) -> dace_helper.CompiledSDFG:
+def compile_jax_sdfg(tsdfg: translator.TranslatedJaxprSDFG) -> CompiledSDFG:
     """Compiles the SDFG embedded in `tsdfg` and return the resulting `CompiledSDFG` object."""
     if any(  # We do not support the DaCe return mechanism
         array_name.startswith("__return")
@@ -60,7 +60,7 @@ def compile_jax_sdfg(tsdfg: translator.TranslatedJaxprSDFG) -> dace_helper.Compi
             dace.Config.set("default_build_folder", value=pathlib.Path(".jacecache").resolve())
             sdfg._recompile = True
             sdfg._regenerate_code = True
-            csdfg: dace_helper.CompiledSDFG = sdfg.compile()
+            csdfg: CompiledSDFG = sdfg.compile()
 
     finally:
         sdfg.name = org_sdfg_name
@@ -71,31 +71,42 @@ def compile_jax_sdfg(tsdfg: translator.TranslatedJaxprSDFG) -> dace_helper.Compi
 
 
 def run_jax_sdfg(
-    csdfg: dace_helper.CompiledSDFG,
+    csdfg: CompiledSDFG,
     inp_names: Sequence[str],
     out_names: Sequence[str],
     flat_call_args: Sequence[Any],
-    outtree: jax_tree.PyTreeDef,
-) -> tuple[Any, ...] | Any:
+) -> list[np.ndarray]:
     """Run the compiled SDFG.
 
     The function assumes that the SDFG was finalized and then compiled by
-    `compile_jax_sdfg()`. For running the SDFG you also have to pass the input
-    names (`inp_names`) and output names (`out_names`) that were inside the
-    `TranslatedJaxprSDFG` from which `csdfg` was compiled from.
+    `compile_jax_sdfg()`. All arguments except `csdfg` must come from the
+    `TranslatedJaxprSDFG` object that was used to compile SDFG.
+
+    Returns:
+        The function will return a flattened version of the output. To
+        reconstruct the actual return type/value of the original computation
+        the `outtree` that is stored inside the `TranslatedJaxprSDFG` object
+        that was used to compile the SDFG can be used.
 
     Args:
         csdfg: The `CompiledSDFG` object.
-        inp_names: List of names of the input arguments.
-        out_names: List of names of the output arguments.
+        inp_names: Names of the SDFG variables used as inputs.
+        out_names: Names of the SDFG variables used as outputs.
         flat_call_args: Flattened input arguments.
-        outtree: A pytree describing how to unflatten the output.
 
     Notes:
         Currently the strides of the input arguments must match the ones that
-        were used for lowering.
+        were used for lowering the SDFG.
+        In DaCe the return values are allocated on a per `CompiledSDFG` basis.
+        Thus every call to a compiled SDFG will override the value of the last
+        call, in JaCe the memory is allocated on every call. In addition
+        scalars are returned as arrays of length one.
+
+    Todo:
+        - Once we supported GPU change type annotation.
     """
     if len(inp_names) != len(flat_call_args):
+        # Either error or static arguments are not removed.
         raise RuntimeError("Wrong number of arguments.")
 
     sdfg_call_args: dict[str, Any] = {}
@@ -126,6 +137,4 @@ def run_jax_sdfg(
         dace.Config.set("compiler", "allow_view_arguments", value=True)
         csdfg(**sdfg_call_args)
 
-    if not out_names:
-        return None
-    return jax_tree.tree_unflatten(outtree, (sdfg_call_args[out_name] for out_name in out_names))
+    return [sdfg_call_args[out_name] for out_name in out_names]

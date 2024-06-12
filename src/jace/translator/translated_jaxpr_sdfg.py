@@ -21,14 +21,14 @@ if TYPE_CHECKING:
 class TranslatedJaxprSDFG:
     """Encapsulates the translated SDFG together with the metadata that is needed to run it.
 
-    Contrary to the SDFG that is encapsulated inside the `TranslationContext`
+    Contrary to the SDFG that is encapsulated inside an `TranslationContext`
     object, `self` carries a proper SDFG, however:
     - It does not have `__return*` variables, instead all return arguments are
         passed by arguments.
     - All input arguments are passed through arguments mentioned in `inp_names`,
         while the outputs are passed through `out_names`.
     - Only variables listed as in/outputs are non transient.
-    - The order inside `inp_names` and `out_names` is the same as in the translated Jaxpr.
+    - The order inside `inp_names` and `out_names` is the same as in the original Jaxpr.
     - If inputs are also used as outputs they appear in both `inp_names` and `out_names`.
     - Its `arg_names` is set to  `inp_names + out_names`, but arguments that are
         input and outputs are only listed as inputs.
@@ -41,9 +41,14 @@ class TranslatedJaxprSDFG:
 
     Attributes:
         sdfg: The encapsulated SDFG object.
-        inp_names: A list of the SDFG variables that are used as input
-        out_names: A list of the SDFG variables that are used as output.
+        inp_names: Names of the SDFG variables used as inputs.
+        out_names: Names of the SDFG variables used as outputs.
         outtree: A pytree describing how to unflatten the output.
+
+    Todo:
+        After the SDFG is compiled a lot of code looks strange, because there is
+        no container to store the compiled SDFG and the metadata. This class
+        should be extended to address this need.
     """
 
     sdfg: dace.SDFG

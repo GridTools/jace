@@ -34,10 +34,10 @@ def postprocess_jaxpr_sdfg(
     call_args: Sequence[Any],
     outtree: jax_tree.PyTreeDef,
 ) -> translator.TranslatedJaxprSDFG:
-    """Perform the final post processing steps on the `TranslationContext` _in place_.
+    """Perform the final post processing steps on the `TranslationContext` _in place_ and return a `TranslatedJaxprSDFG` object.
 
-    The function will perform post processing stages on the context in place.
-    However, the function will return a decoupled `TranslatedJaxprSDFG` object.
+    While the function performs the post processing on the context in place,
+    the returned `TranslatedJaxprSDFG` will be decoupled from the input.
 
     Args:
         trans_ctx: The `TranslationContext` obtained from the `translate_jaxpr()` function.
@@ -49,10 +49,7 @@ def postprocess_jaxpr_sdfg(
         - Fixing the scalar input problem on GPU.
         - Fixing stride problem of the input.
     """
-    # Currently we do nothing except finalizing.
     trans_ctx.validate()
-
-    # Handle inputs
     create_input_output_stages(trans_ctx=trans_ctx, call_args=call_args)
 
     return finalize_translation_context(trans_ctx, outtree=outtree, validate=True)
@@ -63,9 +60,14 @@ def create_input_output_stages(
 ) -> None:
     """Creates an input and output state inside the SDFG in place.
 
+    See `_create_input_state()` and `_create_output_state()` for more information.
+
     Args:
         trans_ctx: The translation context that should be modified.
-        call_args: the call arguments that should be used.
+        call_args: The flattened call arguments that should be used.
+
+    Note:
+        The output SDFG will still be canonical.
     """
     _create_input_state(trans_ctx, call_args)
     _create_output_state(trans_ctx)
@@ -75,15 +77,12 @@ def _create_output_state(trans_ctx: translator.TranslationContext) -> None:
     """Creates the output processing stage for the SDFG in place.
 
     The function will create a new terminal state, in which all outputs, denoted
-    in `trans_ctx.out_names` will be written in new SDFG variables. However,
-    instead of scalars the function will generate arrays of length one. This is
-    needed because DaCe can only return arrays at the moment, it is also
-    consistent with what Jax does.
+    in `trans_ctx.out_names`, will be written into new SDFG variables.
+    In case the output variable is a scalar, the output will be replaced by an
+    array of length one.
 
     Notes:
-        All output variables follow the pattern `__jace_output_{i}`, where `i`
-        is a zero based counter. Furthermore, all output variables are transients
-        since `TranslationContext` is supposed to hold canonical SDFGs only.
+        This is consistent with Jax' behaviour.
     """
     assert trans_ctx.inp_names is not None and trans_ctx.out_names is not None
 
@@ -98,16 +97,20 @@ def _create_output_state(trans_ctx: translator.TranslationContext) -> None:
     for i, org_output_name in enumerate(trans_ctx.out_names):
         new_output_name = output_pattern.format(i)
         org_output_desc: dace.data.Data = sdfg.arrays[org_output_name]
+        assert org_output_desc.transient
+        assert (
+            new_output_name not in sdfg.arrays
+        ), f"Final output variable '{new_output_name}' is already present."
 
         if isinstance(org_output_desc, dace.data.Scalar):
             _, new_output_desc = sdfg.add_array(
                 new_output_name,
                 dtype=org_output_desc.dtype,
                 shape=(1,),
-                transient=True,
-                strides=None,  # explicit C stride
+                transient=True,  # Needed for an canonical SDFG
             )
             memlet = dace.Memlet.simple(new_output_name, subset_str="0", other_subset_str="0")
+
         else:
             new_output_desc = org_output_desc.clone()
             sdfg.add_datadesc(new_output_name, new_output_desc)
@@ -128,15 +131,17 @@ def _create_output_state(trans_ctx: translator.TranslationContext) -> None:
 def _create_input_state(trans_ctx: translator.TranslationContext, call_args: Sequence[Any]) -> None:
     """Creates the input processing state for the SDFG in place.
 
-    The function creates a new set of variables that are exposed as inputs, whose
-    names follows the pattern `__jace_input_{i}`, where `i` is a zero based
-    counter. These new variables will have the same strides as the input array.
-    Furthermore, they will have the correct storage locations and scalars in
-    GPU mode will be handled correctly.
+    The function creates a new set of variables that are exposed as inputs.
+    If an input argument is an array, the new variable will have the same
+    strides and storage location the actual input value, that is passed
+    inside `call_args`.
+    If the input is a scalar and GPU mode is activated, the function will add
+    the necessary connections to transfer it to the device.
 
     Args:
         trans_ctx: The translation context that should be modified.
-        call_args: the call arguments that should be used.
+        call_args: The flattened call arguments for which the input
+            state should be specialized.
 
     Todo:
         Handle transfer of scalar input in GPU mode.
@@ -169,10 +174,12 @@ def _create_input_state(trans_ctx: translator.TranslationContext, call_args: Seq
                 shape=org_input_desc.shape,
                 dtype=org_input_desc.dtype,
                 strides=util.get_strides_for_dace(call_arg),
-                transient=True,
-                storage=dace.StorageType.GPU_Global
-                if util.is_on_device(call_arg)
-                else dace.StorageType.CPU_Heap,
+                transient=True,  # For canonical SDFG.
+                storage=(
+                    dace.StorageType.GPU_Global
+                    if util.is_on_device(call_arg)
+                    else dace.StorageType.CPU_Heap
+                ),
             )
             memlet = dace.Memlet.from_array(new_input_name, new_input_desc)
 
@@ -205,7 +212,7 @@ def finalize_translation_context(
 
     Args:
         trans_ctx: The context that should be finalized.
-        outtree: A pytree describing how to restore the output.
+        outtree: A pytree describing how to unflatten the output.
         validate: Call the validate function after the finalizing.
     """
     trans_ctx.validate()
@@ -213,6 +220,8 @@ def finalize_translation_context(
         raise ValueError("Input names are not specified.")
     if trans_ctx.out_names is None:
         raise ValueError("Output names are not specified.")
+    if not (trans_ctx.out_names or trans_ctx.inp_names):
+        raise ValueError("No input nor output.")
 
     # We guarantee decoupling
     tsdfg = translator.TranslatedJaxprSDFG(
@@ -236,7 +245,6 @@ def finalize_translation_context(
 
     if validate:
         tsdfg.validate()
-
     return tsdfg
 
 
@@ -246,22 +254,34 @@ def trace_and_flatten_function(
     trace_call_kwargs: Mapping[str, Any],
     trace_options: Mapping[str, Any],
 ) -> tuple[jax.core.ClosedJaxpr, list[Any], jax_tree.PyTreeDef]:
-    """Traces `fun` and generates the Jaxpr as well as the input and output tree.
+    """Traces `fun` and generates the Jaxpr and compute some related meta data.
 
-    The function will perform the tracing using `trace_options`, which are the
-    same as supported by `jace.jit`. Furthermore the tracing is done with
-    x64 enabled.
+    For tracing the computation `fun` the function uses the `trace_call_args`
+    and `trace_call_kwargs` arguments, both should not be flattened yet.
 
     Returns:
         The function will return a tuple of length three.
-        1) The Jaxpr that was generated by tracing using the supplied arguments
+        1) The Jaxpr that was generated by Jax using the supplied arguments
             and options.
         2) The flattened input values.
         3) A pytree describing the output structure.
 
+    Args:
+        fun: The original Python computation.
+        trace_call_args: The positional arguments that should be used for
+            tracing the computation.
+        trace_call_kwargs: The keyword arguments that should be for tracing
+            the computation.
+        trace_options: The options used for tracing, the same arguments that
+            are supported by `jace.jit`.
+
     Todo:
         - Handle default arguments of `fun`.
         - Handle static arguments.
+        - Turn `trace_options` into a `TypedDict` and sync with `jace.jit`.
+
+    Note:
+        - The tracing is done with x64 enabled.
     """
     if trace_options:
         raise NotImplementedError(

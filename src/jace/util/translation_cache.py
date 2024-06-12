@@ -38,24 +38,19 @@ _TRANSLATION_CACHES: dict[type[CachingStage], StageCache] = {}
 
 
 # Denotes the stage that follows the current one.
-#  Used by the `NextStage` Mixin.
+#  Used by the `CachingStage` mixin.
 NextStage = TypeVar("NextStage", bound="stages.Stage")
 
 
 class CachingStage(Generic[NextStage]):
     """Annotates a stage whose transition to the next stage is cacheable.
 
-    To make the transition of a stage cacheable, the stage must be derived from
-    this class, and its initialization must call `CachingStage.__init__()`.
-    Furthermore, its transition function must be annotated by the
-    `@cached_transition` decorator.
-
-    A class must implement the `_make_call_description()` to compute an abstract
-    description of the call. This is needed to operate the cache to store the
-    stage transitions.
-
-    Notes:
-        The `__init__()` function must explicitly be called to fully setup `self`.
+    To make a transition cacheable, a stage must:
+    - be derived from this class.
+    - its `__init__()` function must explicitly call `CachingStage.__init__()`.
+    - the transition function must be annotated by `@cached_transition`.
+    - it must implement the `_make_call_description()` to create the key.
+    - the stage object must be immutable.
 
     Todo:
         - Handle eviction from the cache due to collecting of unused predecessor stages.
@@ -68,9 +63,20 @@ class CachingStage(Generic[NextStage]):
 
     @abc.abstractmethod
     def _make_call_description(
-        self: CachingStage, args_tree: jax_tree.PyTreeDef, flat_args: Sequence[Any]
+        self: CachingStage, intree: jax_tree.PyTreeDef, flat_call_args: Sequence[Any]
     ) -> StageTransformationSpec:
-        """Generates the key that is used to store/locate the call in the cache."""
+        """Computes the key used to represent the call.
+
+        This function is used by the `@cached_transition` decorator to perform
+        the lookup inside the cache. It should return a description of the call
+        that is encapsulated inside a `StageTransformationSpec` object, see
+        there for more information.
+
+        Args:
+            intree: Pytree object describing how the input arguments were flattened.
+            flat_call_args: The flattened arguments that were passed to the
+                annotated function.
+        """
         ...
 
 
@@ -85,9 +91,11 @@ def cached_transition(
 ) -> Callable[Concatenate[CachingStage[NextStage], P], NextStage]:
     """Decorator for making the transition function of the stage cacheable.
 
-    In order to work, the stage must be derived from `CachingStage`. For computing
-    the key of a call the function will use the `_make_call_description()`
-    function of the cache.
+    See the description of `CachingStage` for the requirements.
+    The function will use `_make_call_description()` to decide if the call is
+    already known and if so it will return the cached object. If the call is
+    not known it will call the wrapped transition function and record its
+    return value inside the cache, before returning it.
 
     Todo:
         - Implement a way to temporary disable the cache.
@@ -95,13 +103,11 @@ def cached_transition(
 
     @functools.wraps(transition)
     def transition_wrapper(self: CachingStageType, *args: P.args, **kwargs: P.kwargs) -> NextStage:
-        flat_args, args_tree = jax_tree.tree_flatten((args, kwargs))
-        key = self._make_call_description(flat_args=flat_args, args_tree=args_tree)
-        if key in self._cache:
-            return self._cache[key]
-        next_stage = transition(self, *args, **kwargs)
-        self._cache[key] = next_stage
-        return next_stage
+        flat_call_args, intree = jax_tree.tree_flatten((args, kwargs))
+        key = self._make_call_description(flat_call_args=flat_call_args, intree=intree)
+        if key not in self._cache:
+            self._cache[key] = transition(self, *args, **kwargs)
+        return self._cache[key]
 
     return cast(TransitionFunction, transition_wrapper)
 
@@ -129,14 +135,15 @@ class _AbstractCallArgument:
     which is similar to tracers in Jax. This class represents the second way.
     To create an instance you should use `_AbstractCallArgument.from_value()`.
 
-    Its description is limited to scalars and arrays. To describe more complex
-    types, they should be processed by pytrees first.
-
     Attributes:
         shape: In case of an array its shape, in case of a scalar the empty tuple.
         dtype: The DaCe type of the argument.
         strides: The strides of the argument, or `None` if they are unknown or a scalar.
         storage: The storage type where the argument is stored.
+
+    Note:
+        This class is only able to describe scalars and arrays, thus it should
+        only be used after the arguments were flattened.
     """
 
     shape: tuple[int, ...]
@@ -158,7 +165,7 @@ class _AbstractCallArgument:
             shape = value.shape
             dtype = util.translate_dtype(value.dtype)
             strides = util.get_strides_for_dace(value)
-            # Is `CPU_Heap` always okay? There would also be `CPU_Pinned`.
+            # TODO(phimuell): `CPU_Heap` vs. `CPU_Pinned`.
             storage = (
                 dace.StorageType.GPU_Global
                 if util.is_on_device(value)
@@ -179,48 +186,47 @@ class _AbstractCallArgument:
         raise TypeError(f"Can not make 'an abstract description from '{type(value).__name__}'.")
 
 
-#: This type is the abstract description of a function call.
-#:  It is part of the key used in the cache.
-CallArgsSpec: TypeAlias = tuple[
-    _AbstractCallArgument | Hashable | tuple[str, _AbstractCallArgument | Hashable], ...
-]
+#: Type to describe a single argument either in an abstract or concrete way.
+CallArgsSpec: TypeAlias = tuple[_AbstractCallArgument | Hashable]
 
 
 @dataclasses.dataclass(frozen=True)
 class StageTransformationSpec:
-    """Represents the entire call to a state transformation function of a stage.
+    """Represents an entire call to a state transformation inside the cache.
 
     State transition functions are annotated with `@cached_transition` and their
-    result may be cached. They key to locate them inside the cache is represented
+    result is cached. They key to locate them inside the cache is represented
     by this class and computed by the `CachingStage._make_call_description()`
     function. The actual key is consists of three parts, `stage_id`, `call_args`
-    and `args_tree`.
+    and `intree`, see below for more.
 
     Args:
         stage_id: Origin of the call, for which the id of the stage object should
             be used.
-        call_args: Flat representation of the arguments of the call. Each element
+        flat_call_args: Flat representation of the arguments of the call. Each element
             describes a single argument. To describe an argument there are two ways:
             - Abstract description: In this way, the actual value of the argument
-                is irrelevant, only the structure of them are important, similar
-                to the tracers used in Jax.
-            - Concrete description: Here one caches on the actual value of the
-                argument. The only requirement is that they can be hashed.
-        args_tree: A pytree structure that describes how the input was flatten.
-                In Jax the hash of a pytree, takes its structure into account.
+                is irrelevant, its structure is important, similar to the tracers
+                used in Jax. To represent it, use `_AbstractCallArgument`.
+            - Concrete description: Here the actual value of the argument is
+                considered, this is similar to how static arguments in Jax works.
+                The only requirement is that they can be hashed.
+        intree: A pytree structure that describes how the input was flatten.
     """
 
     stage_id: int
-    call_args: CallArgsSpec
-    args_tree: jax_tree.PyTreeDef
+    flat_call_args: CallArgsSpec
+    intree: jax_tree.PyTreeDef
 
 
-# Denotes the stage that is stored inside the cache.
+#: Denotes the stage that is stored inside the cache.
 StageType = TypeVar("StageType", bound="stages.Stage")
 
 
 class StageCache(Generic[StageType]):
-    """Simple LRU cache to cache the results of the stage transition function.
+    """Simple LRU cache to store the results of the stage transition function.
+
+    There is one cache per stage (type) and not per instance.
 
     Args:
         capacity: The size of the cache, defaults to 256.
@@ -276,7 +282,7 @@ class StageCache(Generic[StageType]):
         return self._capacity
 
     def front(self) -> tuple[StageTransformationSpec, StageType]:
-        """Returns the front, i.e. newest entry in the cache."""
+        """Returns the front of the cache, i.e. its newest entry."""
         return next(reversed(self._memory.items()))
 
     def __repr__(self) -> str:
