@@ -21,24 +21,26 @@ from jace.translator import (
     get_registered_primitive_translators,
     make_primitive_translator,
     register_primitive_translator,
-    set_active_primitive_translators_to,
 )
 
 
 @pytest.fixture(autouse=True)
 def _conserve_builtin_translators():
     """Restores the set of registered subtranslators after a test."""
-    initial_translators = get_registered_primitive_translators()
+    initial_translators = translator.primitive_translator._PRIMITIVE_TRANSLATORS_REGISTRY.copy()
     yield
-    set_active_primitive_translators_to(initial_translators)
+    translator.primitive_translator._PRIMITIVE_TRANSLATORS_REGISTRY.clear()
+    translator.primitive_translator._PRIMITIVE_TRANSLATORS_REGISTRY.update(initial_translators)
 
 
 @pytest.fixture()
 def no_builtin_translators():  # noqa: PT004  # This is how you should do it: https://docs.pytest.org/en/7.1.x/how-to/fixtures.html#use-fixtures-in-classes-and-modules-with-usefixtures
     """This fixture can be used if the test does not want any builtin translators."""
-    initial_translators = translator.set_active_primitive_translators_to({})
+    initial_translators = translator.primitive_translator._PRIMITIVE_TRANSLATORS_REGISTRY.copy()
+    translator.primitive_translator._PRIMITIVE_TRANSLATORS_REGISTRY.clear()
     yield
-    translator.set_active_primitive_translators_to(initial_translators)
+    translator.primitive_translator._PRIMITIVE_TRANSLATORS_REGISTRY.clear()
+    translator.primitive_translator._PRIMITIVE_TRANSLATORS_REGISTRY.update(initial_translators)
 
 
 # These are definitions of some Subtranslators that can be used to test things.
@@ -115,32 +117,6 @@ def test_subtranslatior_managing_isolation():
     initial_primitives["add"] = fake_add_translator
     assert org_add_prim is not fake_add_translator
     assert get_registered_primitive_translators()["add"] is org_add_prim
-
-
-def test_subtranslatior_managing_swap():
-    """Tests the `set_active_primitive_translators_to()` functionality."""
-
-    # Allows to compare the structure of dicts.
-    def same_structure(d1: dict, d2: dict) -> bool:
-        return d1.keys() == d2.keys() and all(id(d2[k]) == id(d1[k]) for k in d1)
-
-    initial_primitives = get_registered_primitive_translators()
-    assert "add" in initial_primitives
-
-    # Now mutate the dict a little bit, shallow copy it first.
-    mutated_primitives = initial_primitives.copy()
-    mutated_primitives["add"] = fake_add_translator
-    assert mutated_primitives.keys() == initial_primitives.keys()
-    assert same_structure(initial_primitives, get_registered_primitive_translators())
-    assert not same_structure(mutated_primitives, initial_primitives)
-    assert not same_structure(mutated_primitives, get_registered_primitive_translators())
-
-    # Now change the initial one with the mutated one.
-    #  The object is copied but should still have the same structure.
-    old_active = set_active_primitive_translators_to(mutated_primitives)
-    assert mutated_primitives is not translator.primitive_translator._PRIMITIVE_TRANSLATORS_REGISTRY
-    assert same_structure(old_active, initial_primitives)
-    assert same_structure(mutated_primitives, get_registered_primitive_translators())
 
 
 @pytest.mark.usefixtures("no_builtin_translators")

@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Literal, Protocol, cast, overload, runtime_che
 
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Mapping, MutableMapping, Sequence
+    from collections.abc import Callable, Sequence
 
     import dace
     from jax import core as jax_core
@@ -217,19 +217,3 @@ def get_registered_primitive_translators() -> dict[str, translator.PrimitiveTran
     object is decoupled from the registry.
     """
     return _PRIMITIVE_TRANSLATORS_REGISTRY.copy()
-
-
-def set_active_primitive_translators_to(
-    new_translators: Mapping[str, translator.PrimitiveTranslator],
-) -> MutableMapping[str, translator.PrimitiveTranslator]:
-    """Exchange the global translator registry state of JaCe with `new_translators`.
-
-    The function will return the state of the global translator registry prior
-    to this call. Any changes to `new_translators` after calling this function
-    will have no effect on the global translator registry and vice versa.
-    """
-    global _PRIMITIVE_TRANSLATORS_REGISTRY
-    assert all(getattr(trans, "primitive", prim) for prim, trans in new_translators.items())
-    previous_translators = _PRIMITIVE_TRANSLATORS_REGISTRY
-    _PRIMITIVE_TRANSLATORS_REGISTRY = dict(new_translators)
-    return previous_translators
