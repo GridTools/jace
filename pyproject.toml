@@ -48,12 +48,32 @@ Changelog = "https://github.com/GridTools/JaCe/releases"
 Discussions = "https://github.com/GridTools/JaCe/discussions"
 Homepage = "https://github.com/GridTools/JaCe"
 
+# -- coverage --
 [tool.coverage]
-report.exclude_also = [
+
+[tool.coverage.html]
+show_contexts = true
+
+[tool.coverage.report]
+exclude_also = [
   '\.\.\.',
+  'if TYPE_CHECKING:',
   'if typing.TYPE_CHECKING:',
+  'def __repr__',
+  '@overload',
+  'raise AssertionError',
+  'raise NotImplementedError',
+  'if 0:',
+  'if __name__ == .__main__.:',
+  '@(abc\\.)?abstractmethod',
+  '@(abc\\.)?abstract',
+  'class .*\bProtocol\):',
 ]
-run.source = ["jace"]
+
+[tool.coverage.run]
+branch = true
+dynamic_context = "test_function"
+source = ["jace"]
 
 # -- mypy  --
 [tool.mypy]
@@ -121,7 +141,7 @@ extend-select = [
   "D213",  # multi-line-summary-second-line (off by default in pydocstyle "google' convention)
   "PT",  # flake8-pytest-style
   "TD",  # flake8-todo
-  "UP",  # pyupgrade       # TODO(egparedes): in evaluation
+  "UP",  # pyupgrade
   "ARG",  # flake8-unused-arguments
   "ERA",  # eradicate
   "FLY",  # flynt
@@ -132,13 +152,13 @@ extend-select = [
   "PIE",  # flake8-pie
   "PL",  # pylint
   "PTH",  # flake8-use-pathlib
-  "RET",  # flake8-return   # TODO(egparedes): in evaluation
+  "RET",  # flake8-return
   "RUF",  # Ruff-specific
-  "SIM",  # flake8-simplify # TODO(egparedes): in evaluation
+  "SIM",  # flake8-simplify
   "SLOT",  # flake8-slots
   "T10",  # flake8-debugger
   "T20",  # flake8-print
-  "TCH",  # flake8-type-checking  # TODO(egparedes): in evaluation
+  "TCH",  # flake8-type-checking
   "TRY",  # tryceratops
 ]
 ignore = [
