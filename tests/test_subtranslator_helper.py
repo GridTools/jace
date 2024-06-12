@@ -103,7 +103,7 @@ def test_subtranslatior_managing():
 
 
 def test_subtranslatior_managing_isolation():
-    """Tests if `get_registered_primitive_translators()` protects the internal registry."""
+    """Tests if `get_registered_primitive_translators()` decouples."""
     assert (
         get_registered_primitive_translators()
         is not translator.primitive_translator._PRIMITIVE_TRANSLATORS_REGISTRY
@@ -169,7 +169,6 @@ def test_subtranslatior_managing_overwriting_2():
     @make_primitive_translator("add")
     def still_useless_but_a_bit_less(*args: Any, **kwargs: Any) -> None:  # noqa: ARG001
         trans_cnt[0] += 1
-        return
 
     @jace.jit
     def foo(A):

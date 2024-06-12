@@ -26,9 +26,6 @@ def _clear_translation_cache():
     """Decorator that clears the translation cache.
 
     Ensures that a function finds an empty cache and clears up afterwards.
-
-    Todo:
-        Ask Enrique how I can make that fixture apply everywhere not just in the file but the whole test suite.
     """
     tcache.clear_translation_cache()
     yield
@@ -55,7 +52,7 @@ def test_caching_same_sizes() -> None:
     A = np.arange(12, dtype=np.float64).reshape((4, 3))
     B = np.full((4, 3), 10, dtype=np.float64)
 
-    # The second batch of argument, it is the same size (structurally) but different values.
+    # The second batch of argument, same structure but different values.
     AA = A + 1.0362
     BB = B + 0.638956
 
@@ -164,7 +161,7 @@ def test_caching_different_structure() -> None:
 
 
 def test_caching_compilation() -> None:
-    """Tests the compilation cache, this is just very simple, since it uses the same code paths as lowering."""
+    """Tests the compilation cache, this is just very simple."""
 
     @jace.jit
     def jaceWrapped(A: np.ndarray, B: np.ndarray) -> np.ndarray:
@@ -192,8 +189,8 @@ def test_caching_compilation() -> None:
     # Now we disable all optimizations
     unoptiCompiled = jaceLowered.compile(optimization.NO_OPTIMIZATIONS)
 
-    # Because of the way how things work the optimized must have more than the unoptimized.
-    #  If there is sharing, then this would not be the case.
+    # Because of the way how things work the optimized must have more than the
+    #  unoptimized. If there is sharing, then this would not be the case.
     assert unoptiCompiled is not optiCompiled
     assert optiCompiled._csdfg.sdfg.number_of_nodes() == 1
     assert optiCompiled._csdfg.sdfg.number_of_nodes() < unoptiCompiled._csdfg.sdfg.number_of_nodes()

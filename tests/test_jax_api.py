@@ -174,11 +174,10 @@ def test_grad_control_flow():
 
 @pytest.mark.skip(reason="Running JaCe with disabled 'x64' support does not work.")
 def test_disabled_x64():
-    """Tests the behaviour of the tool chain if we explicitly disable x64 support in Jax.
+    """Tests the behaviour of the tool chain if x64 is disabled.
 
     If you want to test, if this restriction still applies, you can enable the test.
     """
-    from jax.experimental import disable_x64
 
     def testee(A: np.ndarray, B: np.float64) -> np.ndarray:
         return A + B
@@ -187,7 +186,7 @@ def test_disabled_x64():
     B = np.float64(10.0)
 
     # Run them with disabled x64 support
-    with disable_x64():
+    with jax.experimental.disable_x64():
         # JaCe
         jace_testee = jace.jit(testee)
         jace_lowered = jace_testee.lower(A, B)

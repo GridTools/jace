@@ -48,16 +48,18 @@ def jit(
     primitive_translators: Mapping[str, translator.PrimitiveTranslator] | None = None,
     **kwargs: Any,
 ) -> stages.JaCeWrapped | Callable[[Callable], stages.JaCeWrapped]:
-    """JaCe's replacement for `jax.jit` (just-in-time) wrapper.
+    """
+    JaCe's replacement for `jax.jit` (just-in-time) wrapper.
 
     It works the same way as `jax.jit` does, but instead of using XLA the
     computation is lowered to DaCe. In addition it accepts some JaCe specific
     arguments.
 
     Args:
-        primitive_translators: Use these primitive translators for the lowering
-            to SDFG. If not specified the translators in the global registry are
-            used.
+        fun: Function to wrap.
+        primitive_translators: Use these primitive translators for the lowering to SDFG.
+            If not specified the translators in the global registry are used.
+        kwargs: Jit arguments.
 
     Notes:
         After constructions any change to `primitive_translators` has no effect.
@@ -69,7 +71,7 @@ def jit(
         )
 
     def wrapper(f: Callable) -> stages.JaCeWrapped:
-        # TODO: Improve typing, such that signature is attached to the `JaCeWrapped`.
+        # TODO(egparedes): Improve typing.
         jace_wrapper = stages.JaCeWrapped(
             fun=f,
             primitive_translators=(

@@ -34,7 +34,6 @@ __all__ = [
     "VALID_SDFG_OBJ_NAME",
     "VALID_SDFG_VAR_NAME",
     "JaCeVar",
-    "dataclass_with_default_init",
     "get_jax_var_dtype",
     "get_jax_var_name",
     "get_jax_var_shape",

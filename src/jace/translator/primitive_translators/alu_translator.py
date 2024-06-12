@@ -6,6 +6,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 """This module contains the `ALUTranslator` which translates all arithmetic and logic primitives."""
+# ruff: noqa: W505 PLR0912 C901 PLR0914 PLR0915 D417
 
 from __future__ import annotations
 
@@ -24,7 +25,8 @@ if TYPE_CHECKING:
 
 
 class ALUTranslator(translator.PrimitiveTranslator):
-    """This translator handles all arithmetic and logical operations.
+    """
+    This translator handles all arithmetic and logical operations.
 
     This translator will be reworked soon, it just exists that the initial PR can do anything at all!!
     """
@@ -48,7 +50,8 @@ class ALUTranslator(translator.PrimitiveTranslator):
         eqn: jax_core.JaxprEqn,
         eqn_state: dace.SDFGState,
     ) -> None:
-        """Perform the translation.
+        """
+        Perform the translation.
 
         Deepening on the shapes of the input the function will either create a Tasklet or a mapped Tasklet.
         The translator is able to handle broadcasting with NumPy rules.
@@ -194,14 +197,14 @@ class ALUTranslator(translator.PrimitiveTranslator):
     def _write_tasklet_code(
         self, in_var_names: Sequence[str | None], eqn: jax_core.JaxprEqn
     ) -> str:
-        """This function generates the Tasklet code based on a primitive.
+        """
+        This function generates the Tasklet code based on a primitive.
 
         The function will also perform literal substitution and parameter handling.
 
         Args:
             in_var_names:   The list of SDFG variables used as input.
         """
-
         t_code = self._prim_tmpl
 
         # Now we handle Literal substitution
@@ -228,7 +231,8 @@ class ALUTranslator(translator.PrimitiveTranslator):
 
 
 def _list_to_dict(inp: Sequence[tuple[None | Any, Any]]) -> dict[Any, Any]:
-    """This method turns a `list` of pairs into a `dict` and applies a `None` filter.
+    """
+    This method turns a `list` of pairs into a `dict` and applies a `None` filter.
 
     The function will only include pairs whose key, i.e. first element is not `None`.
     """

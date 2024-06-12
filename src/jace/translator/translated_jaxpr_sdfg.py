@@ -5,6 +5,8 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
+"""Container for storing a translated SDFG."""
+
 from __future__ import annotations
 
 import dataclasses
@@ -14,7 +16,8 @@ import dace
 
 @dataclasses.dataclass(kw_only=True, frozen=True)
 class TranslatedJaxprSDFG:
-    """Encapsulates the translated SDFG together with the metadata that is needed to run it.
+    """
+    Encapsulates a translated SDFG with additional the metadata.
 
     Contrary to the SDFG that is encapsulated inside the `TranslationContext`
     object, `self` carries a proper SDFG, however:
@@ -23,8 +26,8 @@ class TranslatedJaxprSDFG:
     - All input arguments are passed through arguments mentioned in `inp_names`,
         while the outputs are passed through `out_names`.
     - Only variables listed as in/outputs are non transient.
-    - The order inside `inp_names` and `out_names` is the same as in the translated Jaxpr.
-    - If inputs are also used as outputs they appear in both `inp_names` and `out_names`.
+    - The order inside `inp_names` and `out_names` is the same as in the original Jaxpr.
+    - If an input is used as outputs it appears in both `inp_names` and `out_names`.
     - Its `arg_names` is set to  `inp_names + out_names`, but arguments that are
         input and outputs are only listed as inputs.
 

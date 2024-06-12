@@ -27,13 +27,12 @@ if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
     from jace import translator
-    from jace.util import dace_helper
 
 __all__ = ["CompiledSDFG", "compile_jax_sdfg", "run_jax_sdfg"]
 
 
-def compile_jax_sdfg(tsdfg: translator.TranslatedJaxprSDFG) -> dace_helper.CompiledSDFG:
-    """Compiles the SDFG embedded in `tsdfg` and return the resulting `CompiledSDFG` object."""
+def compile_jax_sdfg(tsdfg: translator.TranslatedJaxprSDFG) -> CompiledSDFG:
+    """Compiles the embedded SDFG and return the resulting `CompiledSDFG` object."""
     if any(  # We do not support the DaCe return mechanism
         array_name.startswith("__return")
         for array_name in tsdfg.sdfg.arrays.keys()  # noqa: SIM118  # we can not use `in` because we are also interested in `__return_`!
@@ -48,15 +47,16 @@ def compile_jax_sdfg(tsdfg: translator.TranslatedJaxprSDFG) -> dace_helper.Compi
     org_regenerate_code = sdfg._regenerate_code
 
     try:
-        # We need to give the SDFG another name, this is needed to prevent a DaCe error/warning.
-        #  This happens if we compile the same lowered SDFG multiple times with different options.
+        # We need to give the SDFG another name, this is needed to prevent a DaCe
+        #  error/warning. This happens if we compile the same lowered SDFG multiple
+        #  times with different options.
         sdfg.name = f"{sdfg.name}__comp_{int(time.time() * 1000)}"
 
         with dace.config.temporary_config():
             sdfg._recompile = True
             sdfg._regenerate_code = True
             dace.Config.set("compiler", "use_cache", value=False)
-            csdfg: dace_helper.CompiledSDFG = sdfg.compile()
+            csdfg: CompiledSDFG = sdfg.compile()
 
     finally:
         sdfg.name = org_sdfg_name
@@ -67,13 +67,14 @@ def compile_jax_sdfg(tsdfg: translator.TranslatedJaxprSDFG) -> dace_helper.Compi
 
 
 def run_jax_sdfg(
-    csdfg: dace_helper.CompiledSDFG,
+    csdfg: CompiledSDFG,
     inp_names: Sequence[str],
     out_names: Sequence[str],
     call_args: Sequence[Any],
     call_kwargs: Mapping[str, Any],
 ) -> tuple[Any, ...] | Any:
-    """Run the compiled SDFG.
+    """
+    Run the compiled SDFG.
 
     The function assumes that the SDFG was finalized and then compiled by
     `compile_jax_sdfg()`. For running the SDFG you also have to pass the input
@@ -112,8 +113,9 @@ def run_jax_sdfg(
     sdfg_call_args: dict[str, Any] = {}
     for in_name, in_val in zip(inp_names, call_args, strict=True):
         if util.is_scalar(in_val):
-            # Currently the translator makes scalar into arrays, this has to be reflected here
-            in_val = np.array([in_val])
+            # Currently the translator makes scalar into arrays, this has to be
+            #  reflected here
+            in_val = np.array([in_val])  # noqa: PLW2901  # Loop variable is intentionally modified.
         sdfg_call_args[in_name] = in_val
 
     for out_name, sdfg_array in ((out_name, sdfg.arrays[out_name]) for out_name in out_names):

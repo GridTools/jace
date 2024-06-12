@@ -5,7 +5,8 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""This module contains the functionality related to the compilation cache of the stages.
+"""
+This module contains the functionality related to the compilation cache of the stages.
 
 The cache currently caches the lowering, i.e. the result of `JaCeWrapped.lower()`
 and the compilation, i.e. `JaCeLowered.compile()`. The caches are on a per stage
@@ -43,7 +44,8 @@ NextStage = TypeVar("NextStage", bound="stages.Stage")
 
 
 class CachingStage(Generic[NextStage]):
-    """Annotates a stage whose transition to the next stage is cacheable.
+    """
+    Annotates a stage whose transition to the next stage is cacheable.
 
     To make the transition of a stage cacheable, the stage must be derived from
     this class, and its initialization must call `CachingStage.__init__()`.
@@ -83,7 +85,8 @@ CachingStageType = TypeVar("CachingStageType", bound=CachingStage)
 def cached_transition(
     transition: Callable[Concatenate[CachingStageType, P], NextStage],
 ) -> Callable[Concatenate[CachingStage[NextStage], P], NextStage]:
-    """Decorator for making the transition function of the stage cacheable.
+    """
+    Decorator for making the transition function of the stage cacheable.
 
     In order to work, the stage must be derived from `CachingStage`. For computing
     the key of a call the function will use the `_make_call_description()`
@@ -121,7 +124,8 @@ def get_cache(stage: CachingStage) -> StageCache:
 
 @dataclasses.dataclass(frozen=True)
 class _AbstractCallArgument:
-    """Class to represent a single argument to the transition function in an abstract way.
+    """
+    Class to represent a single argument to the transition function in an abstract way.
 
     As noted in `StageTransformationSpec` there are two ways to describe an
     argument, either by using its concrete value or an abstract description,
@@ -187,7 +191,8 @@ CallArgsSpec: TypeAlias = tuple[
 
 @dataclasses.dataclass(frozen=True)
 class StageTransformationSpec:
-    """Represents the entire call to a state transformation function of a stage.
+    """
+    Represents the entire call to a state transformation function of a stage.
 
     State transition functions are annotated with `@cached_transition` and their
     result may be cached. They key to locate them inside the cache is represented
@@ -215,7 +220,8 @@ StageType = TypeVar("StageType", bound="stages.Stage")
 
 
 class StageCache(Generic[StageType]):
-    """Simple LRU cache to cache the results of the stage transition function.
+    """
+    Simple LRU cache to cache the results of the stage transition function.
 
     Args:
         size: The size of the cache, defaults to 256.
@@ -248,7 +254,8 @@ class StageCache(Generic[StageType]):
             self._memory[key] = res
 
     def popitem(self, key: StageTransformationSpec | None) -> None:
-        """Evict `key` from `self`.
+        """
+        Evict `key` from `self`.
 
         If `key` is `None` the oldest entry is evicted.
         """
@@ -260,8 +267,8 @@ class StageCache(Generic[StageType]):
             self._memory.move_to_end(key, last=False)
             self._memory.popitem(last=False)
 
-    def clear(self) -> None:
+    def clear(self) -> None:  # noqa: D102  # Missing description.
         self._memory.clear()
 
     def __repr__(self) -> str:
-        return f"StageCache({len(self._memory)} / {self._size} || {', '.join( '[' + repr(k) + ']' for k in self._memory)})"
+        return f"StageCache({len(self._memory)} / {self._size} || {', '.join('[' + repr(k) + ']' for k in self._memory)})"

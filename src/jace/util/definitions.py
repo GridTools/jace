@@ -5,6 +5,8 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
+"""Definitions of patterns for valid names."""
+
 from __future__ import annotations
 
 import re
@@ -21,8 +23,8 @@ VALID_SDFG_OBJ_NAME: re.Pattern = re.compile("[a-zA-Z_][a-zA-Z0-9_]*")
 # fmt: off
 #: This is a set of all names that are invalid SDFG names.
 FORBIDDEN_SDFG_VAR_NAMES: Final[set[str]] = {
-    # These should be most of the C++ keywords, it is more important to have the short ones.
-    #  Taken from 'https://learn.microsoft.com/en-us/cpp/cpp/keywords-cpp?view=msvc-170'
+    # These should be most of the C++ keywords, it is more important to have the short
+    #  ones. Taken from 'https://learn.microsoft.com/en-us/cpp/cpp/keywords-cpp?view=msvc-170'
     "alignas", "alignof", "and", "asm", "auto", "bitand", "bitor", "bool", "break", "case",
     "catch", "char", "class", "compl", "concept", "const", "consteval", "constexpr",
     "constinit", "continue", "decltype", "default", "delete", "directive", "do", "double",

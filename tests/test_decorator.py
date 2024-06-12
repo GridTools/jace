@@ -16,6 +16,7 @@ import numpy as np
 import pytest
 
 import jace
+from jace.util import translation_cache as tcache
 
 
 @pytest.fixture(autouse=True)
@@ -27,7 +28,6 @@ def _clear_translation_cache():
     Todo:
         Should be used _everywhere_.
     """
-    from jace.util import translation_cache as tcache
 
     tcache.clear_translation_cache()
     yield

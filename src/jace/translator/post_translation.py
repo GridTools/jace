@@ -5,7 +5,8 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""This module contains all functions that are related to post processing the SDFG.
+"""
+This module contains all functions that are related to post processing the SDFG.
 
 Most of them operate on `TranslatedJaxprSDFG` objects.
 Currently they mostly exist for the sake of existing.
@@ -29,13 +30,14 @@ def postprocess_jaxpr_sdfg(
     call_args: Sequence[Any],  # noqa: ARG001  # Currently unused
     intree: None,  # noqa: ARG001  # Currently unused
 ) -> translator.TranslatedJaxprSDFG:
-    """Perform the final post processing steps on the `TranslationContext` _in place_.
+    """
+    Perform the final post processing steps on the `TranslationContext` _in place_.
 
     The function will perform post processing stages on the context in place.
     However, the function will return a decoupled `TranslatedJaxprSDFG` object.
 
     Args:
-        trans_ctx: The `TranslationContext` obtained from the `translate_jaxpr()` function.
+        trans_ctx: The `TranslationContext` obtained from a `translate_jaxpr()` call.
         fun: The original function that was translated.
         call_args: The linearized input arguments.
         intree: The pytree describing the inputs.
@@ -58,7 +60,8 @@ def postprocess_jaxpr_sdfg(
 def finalize_translation_context(
     trans_ctx: translator.TranslationContext, validate: bool = True
 ) -> translator.TranslatedJaxprSDFG:
-    """Finalizes the supplied translation context `trans_ctx`.
+    """
+    Finalizes the supplied translation context `trans_ctx`.
 
     The function will process the SDFG that is encapsulated inside the context,
     i.e. a canonical one, into a proper SDFG, as it is described in
@@ -94,8 +97,9 @@ def finalize_translation_context(
         tsdfg.sdfg.arrays[glob_name].transient = False
         sdfg_arg_names.append(glob_name)
 
-    # This forces the signature of the SDFG to include all arguments in order they appear.
-    #  If an argument is used as input and output then it is only listed as input.
+    # This forces the signature of the SDFG to include all arguments in order they
+    #  appear. If an argument is used as input and output then it is only listed as
+    #  input.
     tsdfg.sdfg.arg_names = sdfg_arg_names
 
     if validate:
