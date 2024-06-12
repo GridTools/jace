@@ -30,10 +30,14 @@ repos:
     - mdformat-black
 
 - repo: https://github.com/Lucas-C/pre-commit-hooks
-  rev: v1.1.9
+  rev: v1.5.5
   hooks:
   - id: insert-license
-    exclude: ^\..*$
+    exclude: |
+      (?x)^(
+          ^\..*$ |
+          noxfile.py
+      )$
     types: [python]
     args: [--comment-style, '|#|', --license-filepath, ./LICENSE_HEADER.txt]
 
@@ -54,7 +58,7 @@ repos:
   - id: trailing-whitespace
 
 - repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: v0.4.6
+  rev: v0.4.8
   hooks:
   - id: ruff
     args: [--fix, --show-fixes, --preview]
@@ -72,7 +76,7 @@ repos:
     - numpy==1.26.4
     - pytest==8.2.1
 - repo: https://github.com/codespell-project/codespell
-  rev: v2.2.6
+  rev: v2.3.0
   hooks:
   - id: codespell
 
@@ -90,13 +94,13 @@ repos:
     exclude: .pre-commit-config.yaml
 
 - repo: https://github.com/abravalheri/validate-pyproject
-  rev: v0.16
+  rev: v0.18
   hooks:
   - id: validate-pyproject
     additional_dependencies: ['validate-pyproject-schema-store[all]']
 
 - repo: https://github.com/python-jsonschema/check-jsonschema
-  rev: 0.28.1
+  rev: 0.28.5
   hooks:
   - id: check-dependabot
   - id: check-github-workflows
