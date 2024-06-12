@@ -144,9 +144,7 @@ and, if needed, a brief comment for future reference:
 
 ```python
 ...
-return (
-    undeclared_symbol  # noqa: F821 [undefined-name] on purpose to trigger black-magic
-)
+return undeclared  # noqa: F821 [undefined-name] on purpose to trigger black-magic
 ```
 
 ## Testing
