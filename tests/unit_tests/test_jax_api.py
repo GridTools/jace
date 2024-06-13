@@ -267,3 +267,20 @@ def test_jax_array_as_input() -> None:
     assert res.shape == ref.shape
     assert res.dtype == ref.dtype
     assert np.allclose(res, ref)
+
+
+def test_jax_pytree() -> None:
+    """Perform if pytrees are handled correctly."""
+
+    def testee(A: dict[str, np.ndarray]) -> dict[str, jax.Array]:
+        mod_a = {k: jnp.sin(v) for k, v in A.items()}
+        mod_a["__additional"] = jnp.asin(A["a1"])
+        return mod_a
+
+    A = {f"a{i}": testutil.mkarray((10, 10)) for i in range(4)}
+    ref = testee(A)
+    res = jace.jit(testee)(A)
+
+    assert len(res) == len(ref)
+    assert type(res) == type(ref)
+    assert (np.allclose(res[k], ref[k]) for k in ref)
