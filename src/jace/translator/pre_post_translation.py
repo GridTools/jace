@@ -5,12 +5,7 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""
-This module contains all functions that are related to post processing the SDFG.
-
-Most of them operate on `TranslatedJaxprSDFG` objects.
-Currently they mostly exist for the sake of existing.
-"""
+"""Functions for the pre and post processing during the translation."""
 
 from __future__ import annotations
 
@@ -41,8 +36,8 @@ def postprocess_jaxpr_sdfg(
     """
     Final post processing steps on the `TranslationContext`.
 
-    While the function performs the post processing on the context in place,
-    the returned `TranslatedJaxprSDFG` will be decoupled from the input.
+    While the function performs the post processing on the context in place, the
+    returned `TranslatedJaxprSDFG` will be decoupled from the input.
 
     Args:
         trans_ctx: The `TranslationContext` obtained from a `translate_jaxpr()` call.
@@ -72,7 +67,7 @@ def create_input_output_stages(
         call_args: The flattened call arguments that should be used.
 
     Note:
-        The output SDFG will still be canonical.
+        The processed SDFG will remain canonical.
     """
     _create_input_state(trans_ctx, call_args)
     _create_output_state(trans_ctx)
@@ -83,12 +78,12 @@ def _create_output_state(trans_ctx: translator.TranslationContext) -> None:
     Creates the output processing stage for the SDFG in place.
 
     The function will create a new terminal state, in which all outputs, denoted
-    in `trans_ctx.out_names`, will be written into new SDFG variables.
-    In case the output variable is a scalar, the output will be replaced by an
-    array of length one.
+    in `trans_ctx.out_names`, will be written into new SDFG variables. In case the
+    output variable is a scalar, the output will be replaced by an array of length one.
+    This behaviour is consistent with Jax.
 
-    Notes:
-        This is consistent with Jax' behaviour.
+    Args:
+        trans_ctx: The translation context to process.
     """
     assert trans_ctx.inp_names is not None and trans_ctx.out_names is not None
 
@@ -138,12 +133,11 @@ def _create_input_state(trans_ctx: translator.TranslationContext, call_args: Seq
     """
     Creates the input processing state for the SDFG in place.
 
-    The function creates a new set of variables that are exposed as inputs.
-    If an input argument is an array, the new variable will have the same
-    strides and storage location the actual input value, that is passed
-    inside `call_args`.
-    If the input is a scalar and GPU mode is activated, the function will add
-    the necessary connections to transfer it to the device.
+    The function will create a new set of variables that are exposed as inputs. If an
+    input argument is an array, the new variable will have the same strides and storage
+    location the actual input value, that is passed inside `call_args`. If the input is
+    a scalar and GPU mode is activated, the function will add the necessary connections
+    to transfer it to the device.
 
     Args:
         trans_ctx: The translation context that should be modified.
@@ -210,14 +204,14 @@ def finalize_translation_context(
     """
     Finalizes the supplied translation context `trans_ctx`.
 
-    The function will process the SDFG that is encapsulated inside the context,
-    i.e. a canonical one, into a proper SDFG, as it is described in
-    `TranslatedJaxprSDFG`. It is important to realize that this function does
-    not perform any optimization of the underlying SDFG itself, instead it
-    prepares an SDFG such that it can be passed to the optimization pipeline.
+    The function will process the SDFG that is encapsulated inside the context, i.e. a
+    canonical one, into a proper SDFG, as it is described in `TranslatedJaxprSDFG`. It
+    is important to realize that this function does not perform any optimization of the
+    underlying SDFG itself, instead it prepares an SDFG such that it can be passed to
+    the optimization pipeline.
 
-    The function will not mutate the passed translation context and the output
-    is always decoupled from its output.
+    The returned object is fully decoupled from its input and `trans_ctx` is not
+    modified.
 
     Args:
         trans_ctx: The context that should be finalized.
@@ -259,24 +253,24 @@ def trace_and_flatten_function(
     trace_options: Mapping[str, Any],
 ) -> tuple[jax.core.ClosedJaxpr, list[Any], jax_tree.PyTreeDef]:
     """
-    Traces `fun` and generates the Jaxpr and compute some related meta data.
+    Traces `fun` and generates the Jaxpr and some related meta data.
 
     For tracing the computation `fun` the function uses the `trace_call_args`
-    and `trace_call_kwargs` arguments, both should not be flattened yet.
+    and `trace_call_kwargs` arguments, both should not be flattened. Furthermore,
+    the tracing is done in enabled x64 mode.
 
     Returns:
         The function will return a tuple of length three.
-        1) The Jaxpr that was generated by Jax using the supplied arguments
-            and options.
-        2) The flattened input values.
-        3) A pytree describing the output structure.
+        1) The Jaxpr that was generated by Jax using the supplied arguments and options.
+        2) The flattened input.
+        3) A pytree describing the output.
 
     Args:
         fun: The original Python computation.
         trace_call_args: The positional arguments that should be used for
             tracing the computation.
-        trace_call_kwargs: The keyword arguments that should be for tracing
-            the computation.
+        trace_call_kwargs: The keyword arguments that should be used for
+            tracing the computation.
         trace_options: The options used for tracing, the same arguments that
             are supported by `jace.jit`.
 
@@ -284,9 +278,6 @@ def trace_and_flatten_function(
         - Handle default arguments of `fun`.
         - Handle static arguments.
         - Turn `trace_options` into a `TypedDict` and sync with `jace.jit`.
-
-    Note:
-        - The tracing is done with x64 enabled.
     """
     if trace_options:
         raise NotImplementedError(
