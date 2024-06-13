@@ -513,9 +513,8 @@ def test_builder_scalar_return_value() -> None:
     assert lower_cnt[0] == 1
 
 
-@pytest.mark.skip(reason="Currently 'scalar' return values, are actually shape '(1,)' arrays.")
 def test_builder_scalar_return_type() -> None:
-    """Tests if the type is the same, in case of scalar return."""
+    """As Jax we always return an array, even for a scalar."""
 
     @jace.jit
     def wrapped(A: np.float64) -> np.float64:
@@ -523,8 +522,9 @@ def test_builder_scalar_return_type() -> None:
 
     A = np.float64(1.0)
     res = wrapped(A)
-    assert type(res) is np.float64, f"Expected type 'np.float64', but got '{type(res).__name__}'."
-    assert res == np.float64(0.0)
+    assert res.shape == (1,)
+    assert res.dtype == np.float64
+    assert res[0] == np.float64(1.0)
 
 
 def test_builder_multiple_return_values() -> None:
