@@ -50,16 +50,10 @@ __all__ = [
     "JaCeLowered",
     "JaCeWrapped",
     "Stage",
+    "finalize_compilation_options",
+    "get_active_compiler_options",
+    "update_active_compiler_options",
 ]
-
-_JACELOWERED_ACTIVE_COMPILE_OPTIONS: CompilerOptions = optimization.DEFAULT_OPTIMIZATIONS.copy()
-"""Global set of currently active compilation/optimization options.
-
-These options are used by `JaCeLowered.compile()` to determine which options
-are forwarded to the underlying `jace_optimize()` function. It is initialized
-to `jace.optimization.DEFAULT_OPTIMIZATIONS` and can be managed through the
-`update_active_compiler_options()` function.
-"""
 
 #: Known compilation stages in JaCe.
 Stage = Union["JaCeWrapped", "JaCeLowered", "JaCeCompiled"]
@@ -230,21 +224,17 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"]):
         """
         Optimize and compile the lowered SDFG using `compiler_options`.
 
-        Before the SDFG is compiled, it will be optimized using `jace_optimize()`.
-        There are two different sources of these options. The first one is the
-        global set of currently active compiler options. The second one is the
-        options that are passed to this function, which takes precedence. Thus,
-        the `compiler_options` argument of this function describes the difference
-        from the currently active global options.
+        To perform the optimizations `jace_optimize()` is used. The options that are
+        passed to it it are obtained by passing `compiler_options` to
+        `finalize_compilation_options()` first, see there for more information.
 
-        See Also:
-            `get_active_compiler_options()` to inspect the set of currently active
-            options and `update_active_compiler_options()` to modify them.
+        Args:
+            compiler_options: The optimization options to use.
         """
         # We **must** deepcopy before we do any optimization, because all optimizations
         #  are in place, to properly cache stages, stages needs to be immutable.
         tsdfg: translator.TranslatedJaxprSDFG = copy.deepcopy(self._translated_sdfg)
-        optimization.jace_optimize(tsdfg=tsdfg, **self._make_compiler_options(compiler_options))
+        optimization.jace_optimize(tsdfg=tsdfg, **finalize_compilation_options(compiler_options))
 
         return JaCeCompiled(
             csdfg=dace_helper.compile_jax_sdfg(tsdfg),
@@ -292,43 +282,13 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"]):
         global options. Furthermore, the key will depend on the concrete values.
         """
         unflatted_args, unflatted_kwargs = jax_tree.tree_unflatten(intree, flat_call_args)
-        assert (not len(unflatted_kwargs)) and (len(unflatted_args) == 1)
+        assert (not len(unflatted_kwargs)) and (len(unflatted_args) <= 1)
 
-        options = self._make_compiler_options(unflatted_args[0])
+        options = finalize_compilation_options(unflatted_args[0] if unflatted_args else {})
         flat_options, optiontree = jax_tree.tree_flatten(options)
         return tcache.StageTransformationSpec(
             stage_id=id(self), flat_call_args=tuple(flat_options), intree=optiontree
         )
-
-    @staticmethod
-    def _make_compiler_options(compiler_options: CompilerOptions | None) -> CompilerOptions:
-        """Return the compilation options that should be used for compilation."""
-        assert isinstance(compiler_options, dict)
-        return get_active_compiler_options() | (compiler_options or {})
-
-
-def update_active_compiler_options(new_active_options: CompilerOptions) -> CompilerOptions:
-    """
-    Updates the set of active compiler options.
-
-    Merges the options passed as `new_active_options` with the currently active
-    compiler options. This set is used by `JaCeLowered.compile()` to determine
-    which options should be used.
-    The function will return the set of options that was active before the call.
-
-    To obtain the set of currently active options use `get_active_compiler_options()`.
-
-    Todo:
-        Make a proper context manager.
-    """
-    previous_active_options = _JACELOWERED_ACTIVE_COMPILE_OPTIONS.copy()
-    _JACELOWERED_ACTIVE_COMPILE_OPTIONS.update(new_active_options)
-    return previous_active_options
-
-
-def get_active_compiler_options() -> CompilerOptions:
-    """Returns the set of currently active compiler options."""
-    return _JACELOWERED_ACTIVE_COMPILE_OPTIONS.copy()
 
 
 class JaCeCompiled:
@@ -391,3 +351,59 @@ class JaCeCompiled:
             self._csdfg, self._inp_names, self._out_names, flat_in_vals
         )
         return jax_tree.tree_unflatten(self._outtree, flat_output)
+
+
+# <--------------------------- Compilation/Optimization options management
+
+_JACELOWERED_ACTIVE_COMPILE_OPTIONS: CompilerOptions = optimization.DEFAULT_OPTIMIZATIONS.copy()
+"""Global set of currently active compilation/optimization options.
+
+These options are used by `JaCeLowered.compile()` to determine which options are
+forwarded to the underlying `jace_optimize()` function. It is initialized to
+`jace.optimization.DEFAULT_OPTIMIZATIONS` and can be managed through the
+`update_active_compiler_options()` function. For obtaining the options that should
+finally be used the `finalize_compilation_options()` function can be used.
+"""
+
+
+def update_active_compiler_options(new_active_options: CompilerOptions) -> CompilerOptions:
+    """
+    Updates the set of active compiler options.
+
+    Merges the options passed as `new_active_options` with the currently active
+    compiler options. This set is used by `JaCeLowered.compile()` to determine
+    which options should be used.
+    The function will return the set of options that was active before the call.
+
+    To obtain the set of currently active options use `get_active_compiler_options()`.
+
+    Todo:
+        Make a proper context manager.
+    """
+    previous_active_options = _JACELOWERED_ACTIVE_COMPILE_OPTIONS.copy()
+    _JACELOWERED_ACTIVE_COMPILE_OPTIONS.update(new_active_options)
+    return previous_active_options
+
+
+def get_active_compiler_options() -> CompilerOptions:
+    """Returns the set of currently active compiler options."""
+    return _JACELOWERED_ACTIVE_COMPILE_OPTIONS.copy()
+
+
+def finalize_compilation_options(compiler_options: CompilerOptions | None) -> CompilerOptions:
+    """
+    Returns the final compilation options.
+
+    There are two different sources of these options. The first one is the global set
+    of currently active compiler options. The second one is the options that are passed
+    to this function, which takes precedence. Thus, the `compiler_options` argument of
+    this function describes the difference from the currently active global options.
+
+    Args:
+        compiler_options: The local compilation options.
+
+    See Also:
+        `get_active_compiler_options()` to inspect the set of currently active options
+        and `update_active_compiler_options()` to modify them.
+    """
+    return get_active_compiler_options() | (compiler_options or {})
