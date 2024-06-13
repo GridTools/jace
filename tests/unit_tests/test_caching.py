@@ -33,7 +33,7 @@ def test_caching_working() -> None:
         lowering_cnt[0] += 1
         return jnp.sin(A)
 
-    A = testutil.mkarray((10, 10))
+    A = testutil.make_array((10, 10))
     ref = np.sin(A)
     res_ids: set[int] = set()
     # We have to store the array, because numpy does reuse the memory.
@@ -67,8 +67,8 @@ def test_caching_same_sizes() -> None:
         return testee(A, B)
 
     # First batch of arguments.
-    A = testutil.mkarray((4, 3))
-    B = testutil.mkarray((4, 3))
+    A = testutil.make_array((4, 3))
+    B = testutil.make_array((4, 3))
 
     # The second batch of argument, same structure, but different values.
     AA = A + 1.0362
@@ -106,12 +106,12 @@ def test_caching_different_sizes() -> None:
         return A * B
 
     # First size of arguments
-    A = testutil.mkarray((4, 3))
-    B = testutil.mkarray((4, 3))
+    A = testutil.make_array((4, 3))
+    B = testutil.make_array((4, 3))
 
     # Second size of arguments
-    C = testutil.mkarray((4, 4))
-    D = testutil.mkarray((4, 4))
+    C = testutil.make_array((4, 4))
+    D = testutil.make_array((4, 4))
 
     # Now lower the function once for each.
     lowered1 = wrapped.lower(A, B)
@@ -141,10 +141,10 @@ def test_caching_different_structure() -> None:
         lowering_cnt[0] += 1
         return A * 4.0, B + 2.0
 
-    A = testutil.mkarray((4, 30), dtype=np.float64)
-    B = testutil.mkarray((4, 3), dtype=np.float64)
-    C = testutil.mkarray((4, 3), dtype=np.int64)
-    D = testutil.mkarray((6, 3), dtype=np.int64)
+    A = testutil.make_array((4, 30), dtype=np.float64)
+    B = testutil.make_array((4, 3), dtype=np.float64)
+    C = testutil.make_array((4, 3), dtype=np.int64)
+    D = testutil.make_array((6, 3), dtype=np.int64)
 
     # These are the known lowered instances.
     lowerings: dict[tuple[int, int], stages.JaCeLowered] = {}
@@ -188,8 +188,8 @@ def test_caching_compilation() -> None:
         return A + B + C + D + E
 
     # These are the argument
-    A = testutil.mkarray((4, 3))
-    B = testutil.mkarray((4, 3))
+    A = testutil.make_array((4, 3))
+    B = testutil.make_array((4, 3))
 
     # Now we lower it.
     jaceLowered = jaceWrapped.lower(A, B)
@@ -266,7 +266,7 @@ def test_caching_dtype() -> None:
     shape = (10, 10)
 
     for i, dtype in enumerate(dtypes):
-        A = testutil.mkarray(shape, dtype=dtype)
+        A = testutil.make_array(shape, dtype=dtype)
 
         # First lowering
         assert lowering_cnt[0] == i
@@ -393,7 +393,7 @@ def test_caching_strides() -> None:
         return A + 10.0
 
     shape = (10, 100, 1000)
-    C = testutil.mkarray(shape, order="C")
+    C = testutil.make_array(shape, order="C")
     F = np.array(C, copy=True, order="F")
 
     # First we compile run it with C strides.
@@ -431,7 +431,7 @@ def test_caching_jax_numpy_array() -> None:
         _ = wrapped(for_calling)
         assert lowering_cnt[0] == 1, "Expected no further lowering."
 
-    A_numpy = testutil.mkarray((10, 10))
+    A_numpy = testutil.make_array((10, 10))
     A_jax = jnp.array(A_numpy, copy=True)
     assert A_numpy.dtype == A_jax.dtype
 

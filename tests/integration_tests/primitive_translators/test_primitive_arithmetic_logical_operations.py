@@ -86,7 +86,7 @@ def logical_ops(request) -> tuple[Callable, tuple[np.ndarray, ...]]:
     """Returns a logical operation function and inputs."""
     return (
         request.param[0],
-        tuple(testutil.mkarray((2, 2), request.param[2]) for _ in range(request.param[1])),
+        tuple(testutil.make_array((2, 2), request.param[2]) for _ in range(request.param[1])),
     )
 
 
@@ -130,7 +130,7 @@ def alt_unary_ops(request, dtype: type) -> tuple[Callable, np.ndarray]:
     Some of the unary operations are combined to ensure that they will succeed.
     An example is `asin()` which only takes values in the range `[-1, 1]`.
     """
-    return (request.param, testutil.mkarray((2, 2), dtype))
+    return (request.param, testutil.make_array((2, 2), dtype))
 
 
 @pytest.fixture(
@@ -150,7 +150,7 @@ def alt_binary_ops_float(request) -> tuple[Callable, tuple[np.ndarray, np.ndarra
     # Getting 0 in the division test is unlikely.
     return (  # type: ignore[return-value]  # Type confusion.
         request.param,
-        tuple(testutil.mkarray((2, 2), np.float64) for _ in range(2)),
+        tuple(testutil.make_array((2, 2), np.float64) for _ in range(2)),
     )
 
 
@@ -168,7 +168,7 @@ def alt_binary_compare_ops(request) -> tuple[Callable, tuple[np.ndarray, np.ndar
     """Comparison operations, operates on integers."""
     return (
         request.param,
-        tuple(np.abs(testutil.mkarray((20, 20), np.int32)) % 30 for _ in range(2)),
+        tuple(np.abs(testutil.make_array((20, 20), np.int32)) % 30 for _ in range(2)),
     )
 
 
@@ -181,7 +181,7 @@ def alt_binary_compare_ops(request) -> tuple[Callable, tuple[np.ndarray, np.ndar
 )
 def broadcast_input(request) -> tuple[np.ndarray, np.ndarray]:
     """Inputs to be used for the broadcast test."""
-    return tuple(testutil.mkarray(shape) for shape in request.param)  # type: ignore[return-value] # can not deduce that it is only size 2.
+    return tuple(testutil.make_array(shape) for shape in request.param)  # type: ignore[return-value] # can not deduce that it is only size 2.
 
 
 def _perform_alt_test(testee: Callable, *args: Any) -> None:
@@ -216,7 +216,7 @@ def test_mapped_unary_array() -> None:
     def testee(A: np.ndarray) -> jax.Array:
         return jnp.sin(A)
 
-    A = testutil.mkarray((100, 10, 3))
+    A = testutil.make_array((100, 10, 3))
 
     _perform_alt_test(testee, A)
 
@@ -253,8 +253,8 @@ def test_mapped_binary_array() -> None:
     def testee(A: np.ndarray, B: np.ndarray) -> np.ndarray:
         return A + B
 
-    A = testutil.mkarray((100, 10, 3))
-    B = testutil.mkarray((100, 10, 3))
+    A = testutil.make_array((100, 10, 3))
+    B = testutil.make_array((100, 10, 3))
     _perform_alt_test(testee, A, B)
 
 
@@ -262,7 +262,7 @@ def test_mapped_binary_array_scalar() -> None:
     def testee(A: np.ndarray | np.float64, B: np.float64 | np.ndarray) -> np.ndarray:
         return A + B  # type: ignore[return-value]  # It is always an array.
 
-    A = testutil.mkarray((100, 22))
+    A = testutil.make_array((100, 22))
     B = np.float64(1.34)
     _perform_alt_test(testee, A, B)
     _perform_alt_test(testee, B, A)
@@ -275,7 +275,7 @@ def test_mapped_binary_array_partial_literal() -> None:
     def testeeL(A: np.ndarray) -> np.ndarray:
         return 1.52 + A
 
-    A = testutil.mkarray((100, 22))
+    A = testutil.make_array((100, 22))
     _perform_alt_test(testeeR, A)
     _perform_alt_test(testeeL, A)
 
@@ -284,7 +284,7 @@ def test_mapped_binary_array_constants() -> None:
     def testee(A: np.ndarray) -> np.ndarray:
         return A + jnp.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]])
 
-    A = testutil.mkarray((3, 3))
+    A = testutil.make_array((3, 3))
     _perform_alt_test(testee, A)
 
 
@@ -357,5 +357,5 @@ def test_alt_unary_integer_power() -> None:
     def testee(A: np.ndarray) -> np.ndarray:
         return A**3
 
-    A = testutil.mkarray((10, 2, 3))
+    A = testutil.make_array((10, 2, 3))
     _perform_alt_test(testee, A)

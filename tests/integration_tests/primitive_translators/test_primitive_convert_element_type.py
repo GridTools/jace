@@ -59,7 +59,7 @@ def dst_type(request) -> type:
 def _convert_element_type_impl(input_type: type, output_type: type) -> None:
     """Implementation of the tests of the convert element types primitive."""
     lowering_cnt = [0]
-    A: np.ndarray = testutil.mkarray((10, 10), input_type)
+    A: np.ndarray = testutil.make_array((10, 10), input_type)
     ref: np.ndarray = np.array(A, copy=True, dtype=output_type)
 
     @jace.jit

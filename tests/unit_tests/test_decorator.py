@@ -32,8 +32,8 @@ def test_decorator_individually() -> None:
         lowering_cnt[0] += 1
         return testee_(A, B)
 
-    A = testutil.mkarray((4, 3))
-    B = testutil.mkarray((4, 3))
+    A = testutil.make_array((4, 3))
+    B = testutil.make_array((4, 3))
 
     lowered = testee.lower(A, B)
     compiled = lowered.compile()
@@ -58,8 +58,8 @@ def test_decorator_one_go() -> None:
         lowering_cnt[0] += 1
         return testee_(A, B)
 
-    A = testutil.mkarray((4, 3))
-    B = testutil.mkarray((4, 3))
+    A = testutil.make_array((4, 3))
+    B = testutil.make_array((4, 3))
 
     ref = testee_(A, B)
     res = testee(A, B)

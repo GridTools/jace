@@ -31,8 +31,8 @@ def test_mismatch_in_datatype_calling() -> None:
         return -A
 
     # Different types.
-    A1 = testutil.mkarray((4, 3), dtype=np.float32)
-    A2 = testutil.mkarray((4, 3), dtype=np.int64)
+    A1 = testutil.make_array((4, 3), dtype=np.float32)
+    A2 = testutil.make_array((4, 3), dtype=np.int64)
 
     # Lower and compilation for first type
     callee = testee.lower(A1).compile()

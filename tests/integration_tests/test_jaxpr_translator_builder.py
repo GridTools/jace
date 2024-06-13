@@ -505,7 +505,7 @@ def test_builder_scalar_return_value() -> None:
         lower_cnt[0] += 1
         return scalar_ops(A)
 
-    vals = testutil.mkarray(100)
+    vals = testutil.make_array(100)
     for i in range(vals.size):
         res = wrapped(vals[i])
         ref = scalar_ops(vals[i])
@@ -537,8 +537,8 @@ def test_builder_multiple_return_values() -> None:
     def wrapped(A: np.ndarray, B: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         return A + B, A - B
 
-    A = testutil.mkarray((2, 2))
-    B = testutil.mkarray((2, 2))
+    A = testutil.make_array((2, 2))
+    B = testutil.make_array((2, 2))
 
     lowered = wrapped.lower(A, B)
     compiled = lowered.compile()
@@ -570,8 +570,8 @@ def test_builder_direct_return() -> None:
     def wrapped(A: np.ndarray, B: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         return A + B, B, A
 
-    A = testutil.mkarray((2, 2))
-    B = testutil.mkarray((2, 2))
+    A = testutil.make_array((2, 2))
+    B = testutil.make_array((2, 2))
 
     ref0 = A + B
     res = wrapped(A, B)
@@ -592,7 +592,7 @@ def test_builder_literal_return_value() -> None:
     def testee(A: np.ndarray) -> tuple[np.ndarray, np.float64, np.ndarray]:
         return (A + 1.0, np.float64(1.0), A - 1.0)
 
-    A = testutil.mkarray((2, 2))
+    A = testutil.make_array((2, 2))
     ref = testee(A)
     res = jace.jit(testee)(A)
 
@@ -608,9 +608,9 @@ def test_builder_unused_arg() -> None:
     def testee(A: np.ndarray, B: np.ndarray) -> np.ndarray:  # noqa: ARG001  # Explicitly unused.
         return A + 3.0
 
-    A = testutil.mkarray((10, 10))
-    B = testutil.mkarray((11, 11))
-    C = testutil.mkarray((20, 20))
+    A = testutil.make_array((10, 10))
+    B = testutil.make_array((11, 11))
+    C = testutil.make_array((20, 20))
 
     wrapped = jace.jit(testee)
     lowered = wrapped.lower(A, B)
@@ -646,7 +646,7 @@ def test_builder_F_strides() -> None:
     def testee(A: np.ndarray) -> np.ndarray:
         return A + 10.0
 
-    A = testutil.mkarray((4, 3), order="F")
+    A = testutil.make_array((4, 3), order="F")
     ref = testee(A)
     res = jace.jit(testee)(A)
 

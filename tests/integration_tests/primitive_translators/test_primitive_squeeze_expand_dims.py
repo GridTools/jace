@@ -39,7 +39,7 @@ def _roundtrip_implementation(shape: Sequence[int], axis: int | Sequence[int]) -
         shape:  Shape of the input array.
         axes:   A series of axis that should be tried.
     """
-    A = testutil.mkarray(shape)
+    A = testutil.make_array(shape)
     A_org = A.copy()
 
     for ops in [jnp.expand_dims, jnp.squeeze]:

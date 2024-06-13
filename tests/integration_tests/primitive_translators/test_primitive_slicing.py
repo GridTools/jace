@@ -20,12 +20,12 @@ from tests import util as testutil
 
 @pytest.fixture()
 def A_20x20x20() -> np.ndarray:
-    return testutil.mkarray((20, 20, 20))
+    return testutil.make_array((20, 20, 20))
 
 
 @pytest.fixture()
 def A_4x4x4x4() -> np.ndarray:
-    return testutil.mkarray((4, 4, 4, 4))
+    return testutil.make_array((4, 4, 4, 4))
 
 
 @pytest.fixture(

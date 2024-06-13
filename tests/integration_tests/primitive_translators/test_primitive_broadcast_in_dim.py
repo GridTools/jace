@@ -75,7 +75,7 @@ def test_bid_vector(vector_shape: Sequence[int]) -> None:
     def testee(A: np.ndarray) -> jax.Array:
         return jnp.broadcast_to(A, (10, 10))
 
-    A = testutil.mkarray(vector_shape)
+    A = testutil.make_array(vector_shape)
     ref = testee(A)
     res = jace.jit(testee)(A)
     assert res.shape == ref.shape

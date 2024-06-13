@@ -21,7 +21,7 @@ def test_copy() -> None:
     def testee(A: np.ndarray) -> jax.Array:
         return jnp.copy(A)
 
-    A = testutil.mkarray((10, 10, 10))
+    A = testutil.make_array((10, 10, 10))
     res = testee(A)
     assert A.dtype == res.dtype
     assert A.shape == res.shape

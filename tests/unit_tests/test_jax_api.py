@@ -27,8 +27,8 @@ def test_jit() -> None:
     def testee(A: np.ndarray, B: np.ndarray) -> np.ndarray:
         return A + B
 
-    A = testutil.mkarray((4, 3))
-    B = testutil.mkarray((4, 3))
+    A = testutil.make_array((4, 3))
+    B = testutil.make_array((4, 3))
 
     jax_testee = jax.jit(testee)
     jace_testee = jace.jit(testee)
@@ -90,7 +90,7 @@ def test_composition_with_jax() -> None:
     def jax_fun(A, B, C):
         return jace.jit(base_fun)(A, B, C)
 
-    A, B, C = (testutil.mkarray((10, 3, 50)) for _ in range(3))
+    A, B, C = (testutil.make_array((10, 3, 50)) for _ in range(3))
 
     assert np.allclose(jace_fun(A, B, C), jax_fun(A, B, C))
 
@@ -115,7 +115,7 @@ def test_composition_with_jax_2() -> None:
     def f3_jace(A, B, C, D):
         return f3_jax(A, B, C, D)
 
-    A, B, C, D = (testutil.mkarray((10, 3, 50)) for _ in range(4))
+    A, B, C, D = (testutil.make_array((10, 3, 50)) for _ in range(4))
 
     ref = ((A + B) - C) * D
     res_jax = f3_jax(A, B, C, D)
@@ -140,7 +140,7 @@ def test_grad_annotation_direct() -> None:
         return jace.grad(jace.grad(f))(x)
 
     # These are the random numbers where we test
-    Xs = (testutil.mkarray(10) - 0.5) * 10
+    Xs = (testutil.make_array(10) - 0.5) * 10
 
     for i in range(Xs.shape[0]):
         x = Xs[i]
@@ -183,7 +183,7 @@ def test_disabled_x64() -> None:
     def testee(A: np.ndarray, B: np.float64) -> np.ndarray:
         return A + B
 
-    A = testutil.mkarray((4, 3))
+    A = testutil.make_array((4, 3))
     B = np.float64(10.0)
 
     # Run them with disabled x64 support
@@ -259,7 +259,7 @@ def test_jax_array_as_input() -> None:
     def testee(A: jax.Array) -> jax.Array:
         return jnp.sin(A + 1.0)
 
-    A = jnp.array(testutil.mkarray((10, 19)))
+    A = jnp.array(testutil.make_array((10, 19)))
 
     ref = testee(A)
     res = jace.jit(testee)(A)
@@ -277,7 +277,7 @@ def test_jax_pytree() -> None:
         mod_a["__additional"] = jnp.asin(A["a1"])
         return mod_a
 
-    A = {f"a{i}": testutil.mkarray((10, 10)) for i in range(4)}
+    A = {f"a{i}": testutil.make_array((10, 10)) for i in range(4)}
     ref = testee(A)
     res = jace.jit(testee)(A)
 

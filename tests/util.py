@@ -20,10 +20,12 @@ if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
 
-__all__ = ["mkarray"]
+__all__ = ["make_array"]
 
 
-def mkarray(shape: Sequence[int] | int, dtype: type = np.float64, order: str = "C") -> np.ndarray:
+def make_array(
+    shape: Sequence[int] | int, dtype: type = np.float64, order: str = "C"
+) -> np.ndarray:
     """Generates a NumPy ndarray with shape `shape`.
 
     The function uses the generator that is managed by the `_reset_random_seed()`
@@ -38,7 +40,7 @@ def mkarray(shape: Sequence[int] | int, dtype: type = np.float64, order: str = "
     """
 
     if shape == ():
-        return mkarray((1,), dtype)[0]
+        return make_array((1,), dtype)[0]
     if isinstance(shape, int):
         shape = (shape,)
 
@@ -50,7 +52,7 @@ def mkarray(shape: Sequence[int] | int, dtype: type = np.float64, order: str = "
             low=iinfo.min, high=iinfo.max, size=shape, dtype=dtype
         )
     elif np.issubdtype(dtype, np.complexfloating):
-        res = mkarray(shape, np.float64) + 1.0j * mkarray(shape, np.float64)
+        res = make_array(shape, np.float64) + 1.0j * make_array(shape, np.float64)
     else:
         res = np.random.random(shape)  # type: ignore[assignment]  # noqa: NPY002
     return np.array(res, order=order, dtype=dtype)  # type: ignore[call-overload]

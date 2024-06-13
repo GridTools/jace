@@ -35,9 +35,9 @@ def test_select_n_where() -> None:
         return jnp.where(P, T, F)
 
     shape = (10, 10)
-    pred = testutil.mkarray(shape, np.bool_)
-    tbranch = testutil.mkarray(shape)
-    fbranch = testutil.mkarray(shape)
+    pred = testutil.make_array(shape, np.bool_)
+    tbranch = testutil.make_array(shape)
+    fbranch = testutil.make_array(shape)
     _perform_test(testee, pred, tbranch, fbranch)
 
 
@@ -52,8 +52,8 @@ def test_select_n_where_literal() -> None:
         return jnp.where(P, 8, 9)
 
     shape = ()
-    pred = testutil.mkarray(shape, np.bool_)
-    tbranch = testutil.mkarray(shape, np.int_)
+    pred = testutil.make_array(shape, np.bool_)
+    tbranch = testutil.make_array(shape, np.int_)
     fbranch = tbranch + 1
 
     _perform_test(testee1, pred, fbranch)
