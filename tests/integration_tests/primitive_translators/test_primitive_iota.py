@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import jax
 import numpy as np
+import pytest
 from jax import numpy as jnp
 
 import jace
@@ -23,16 +24,15 @@ def test_iota_arange() -> None:
     assert np.all(ref == res)
 
 
-def test_iota_broadcast() -> None:
+@pytest.mark.parametrize("d", [0, 1, 2, 3])
+def test_iota_broadcast(d) -> None:
     shape = (2, 2, 2, 2)
 
-    for d in range(len(shape)):
-        # Must be inside the loop to bypass caching.
-        def testee(A: np.int32) -> jax.Array:
-            return jax.lax.broadcasted_iota("int32", shape, d) + A  # noqa: B023  # Variable capturing.
+    def testee(A: np.int32) -> jax.Array:
+        return jax.lax.broadcasted_iota("int32", shape, d) + A
 
-        ref = testee(np.int32(0))
-        res = jace.jit(testee)(np.int32(0))
+    ref = testee(np.int32(0))
+    res = jace.jit(testee)(np.int32(0))
 
-        assert res.shape == shape
-        assert np.all(ref == res), f"Expected: {ref.tolist()}; Got: {res.tolist()}"
+    assert res.shape == shape
+    assert np.all(ref == res), f"Expected: {ref.tolist()}; Got: {res.tolist()}"
