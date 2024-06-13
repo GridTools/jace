@@ -15,7 +15,7 @@ from typing_extensions import Unpack
 
 
 if TYPE_CHECKING:
-    from jace import translator
+    import jace
 
 
 class CompilerOptions(TypedDict, total=False):
@@ -48,7 +48,7 @@ NO_OPTIMIZATIONS: Final[CompilerOptions] = {
 }
 
 
-def jace_optimize(tsdfg: translator.TranslatedJaxprSDFG, **kwargs: Unpack[CompilerOptions]) -> None:  # noqa: D417  # Missing description for kwargs
+def jace_optimize(tsdfg: jace.TranslatedJaxprSDFG, **kwargs: Unpack[CompilerOptions]) -> None:  # noqa: D417  # Missing description for kwargs
     """
     Performs optimization of the translated SDFG _in place_.
 

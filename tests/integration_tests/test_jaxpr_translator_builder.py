@@ -547,9 +547,9 @@ def test_builder_multiple_return_values() -> None:
     res = compiled(A, B)
 
     assert len(lowered._translated_sdfg.inp_names) == 2
-    assert len(compiled._inp_names) == 2
+    assert len(compiled._csdfg.inp_names) == 2
     assert len(lowered._translated_sdfg.out_names) == 2
-    assert len(compiled._out_names) == 2
+    assert len(compiled._csdfg.out_names) == 2
     assert isinstance(res, tuple), f"Expected 'tuple', but got '{type(res).__name__}'."
     assert len(res) == 2
     assert np.allclose(ref, res)
@@ -621,7 +621,7 @@ def test_builder_unused_arg() -> None:
     res2 = compiled(A, C)  # wrong call to show that nothing is affected.
 
     assert len(lowered._translated_sdfg.inp_names) == 2
-    assert len(compiled._inp_names) == 2
+    assert len(compiled._csdfg.inp_names) == 2
     assert np.all(res1 == res2)
     assert np.allclose(ref, res1)
 

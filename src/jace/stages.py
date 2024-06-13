@@ -33,10 +33,11 @@ from typing import TYPE_CHECKING, Any, Union
 
 from jax import tree_util as jax_tree
 
+import jace
 from jace import optimization, translator, util
 from jace.optimization import CompilerOptions
 from jace.translator import pre_post_translation as ptrans
-from jace.util import dace_helper, translation_cache as tcache
+from jace.util import translation_cache as tcache
 
 
 if TYPE_CHECKING:
@@ -158,12 +159,14 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"]):
             primitive_translators=self._primitive_translators
         )
         trans_ctx: translator.TranslationContext = builder.translate_jaxpr(jaxpr)
-        tsdfg: translator.TranslatedJaxprSDFG = ptrans.postprocess_jaxpr_sdfg(
-            trans_ctx=trans_ctx, fun=self.wrapped_fun, call_args=flat_call_args, outtree=outtree
+        tsdfg: jace.TranslatedJaxprSDFG = ptrans.postprocess_jaxpr_sdfg(
+            trans_ctx=trans_ctx,
+            fun=self.wrapped_fun,
+            call_args=flat_call_args,
         )
 
         # NOTE: `tsdfg` is deepcopied as a side effect of post processing.
-        return JaCeLowered(tsdfg)
+        return JaCeLowered(tsdfg, outtree)
 
     @property
     def wrapped_fun(self) -> Callable:
@@ -205,7 +208,8 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"]):
     how to control the process.
 
     Args:
-        tsdfg:  The lowered SDFG with metadata.
+        tsdfg: The lowered SDFG with metadata.
+        outtree: The pytree describing how to unflatten the output.
 
     Note:
         `self` will manage the passed `tsdfg` object. Modifying it results is
@@ -213,11 +217,17 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"]):
         transformations `JaCeLowered` is not.
     """
 
-    _translated_sdfg: translator.TranslatedJaxprSDFG
+    _translated_sdfg: jace.TranslatedJaxprSDFG
+    _outtree: jax_tree.PyTreeDef
 
-    def __init__(self, tsdfg: translator.TranslatedJaxprSDFG) -> None:
+    def __init__(
+        self,
+        tsdfg: jace.TranslatedJaxprSDFG,
+        outtree: jax_tree.PyTreeDef,
+    ) -> None:
         super().__init__()
         self._translated_sdfg = tsdfg
+        self._outtree = outtree
 
     @tcache.cached_transition
     def compile(self, compiler_options: CompilerOptions | None = None) -> JaCeCompiled:
@@ -233,17 +243,15 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"]):
         """
         # We **must** deepcopy before we do any optimization, because all optimizations
         #  are in place, to properly cache stages, stages needs to be immutable.
-        tsdfg: translator.TranslatedJaxprSDFG = copy.deepcopy(self._translated_sdfg)
+        tsdfg: jace.TranslatedJaxprSDFG = copy.deepcopy(self._translated_sdfg)
         optimization.jace_optimize(tsdfg=tsdfg, **finalize_compilation_options(compiler_options))
 
         return JaCeCompiled(
-            csdfg=dace_helper.compile_jax_sdfg(tsdfg),
-            inp_names=tsdfg.inp_names,
-            out_names=tsdfg.out_names,
-            outtree=tsdfg.outtree,
+            csdfg=jace.compile_jaxpr_sdfg(tsdfg),
+            outtree=self._outtree,
         )
 
-    def compiler_ir(self, dialect: str | None = None) -> translator.TranslatedJaxprSDFG:
+    def compiler_ir(self, dialect: str | None = None) -> jace.TranslatedJaxprSDFG:
         """
         Returns the internal SDFG.
 
@@ -315,23 +323,15 @@ class JaCeCompiled:
         - Automatic strides adaption.
     """
 
-    _csdfg: dace_helper.CompiledSDFG
-    _inp_names: tuple[str, ...]
-    _out_names: tuple[str, ...]
+    _csdfg: jace.CompiledJaxprSDFG
     _outtree: jax_tree.PyTreeDef
 
     def __init__(
         self,
-        csdfg: dace_helper.CompiledSDFG,
-        inp_names: Sequence[str],
-        out_names: Sequence[str],
+        csdfg: jace.CompiledJaxprSDFG,
         outtree: jax_tree.PyTreeDef,
     ) -> None:
-        if not (out_names or inp_names):
-            raise ValueError("No input nor output.")
         self._csdfg = csdfg
-        self._inp_names = tuple(inp_names)
-        self._out_names = tuple(out_names)
         self._outtree = outtree
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
@@ -345,11 +345,10 @@ class JaCeCompiled:
             Furthermore, all arguments must have strides and storage locations
             that is compatible with the ones that were used for lowering.
         """
-        flat_in_vals = jax_tree.tree_leaves((args, kwargs))
-        assert len(flat_in_vals) == len(self._inp_names), "Static arguments."
-        flat_output = dace_helper.run_jax_sdfg(
-            self._csdfg, self._inp_names, self._out_names, flat_in_vals
-        )
+        flat_call_args = jax_tree.tree_leaves((args, kwargs))
+        flat_output = self._csdfg(flat_call_args)
+        if flat_output is None:
+            return None
         return jax_tree.tree_unflatten(self._outtree, flat_output)
 
 

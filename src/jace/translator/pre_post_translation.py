@@ -22,19 +22,22 @@ import dace
 import jax
 from jax import tree_util as jax_tree
 
-from jace import translator, util
+import jace
+from jace import util
 
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, Sequence
+
+    from jace import translator
 
 
 def postprocess_jaxpr_sdfg(
     trans_ctx: translator.TranslationContext,
     fun: Callable,  # noqa: ARG001  # Currently unused
     call_args: Sequence[Any],
-    outtree: jax_tree.PyTreeDef,
-) -> translator.TranslatedJaxprSDFG:
+    validate: bool = True,
+) -> jace.TranslatedJaxprSDFG:
     """
     Final post processing steps on the `TranslationContext`.
 
@@ -45,16 +48,15 @@ def postprocess_jaxpr_sdfg(
         trans_ctx: The `TranslationContext` obtained from a `translate_jaxpr()` call.
         fun: The original function that was translated.
         call_args: The flattened input arguments.
-        outtree: A pytree describing how to unflatten the output.
+        validate: Perform validation.
 
     Todo:
         - Fixing the scalar input problem on GPU.
         - Fixing stride problem of the input.
     """
-    trans_ctx.validate()
+    trans_ctx.validate()  # Always validate, it is cheap.
     create_input_output_stages(trans_ctx=trans_ctx, call_args=call_args)
-
-    return finalize_translation_context(trans_ctx, outtree=outtree, validate=True)
+    return finalize_translation_context(trans_ctx, validate=validate)
 
 
 def create_input_output_stages(
@@ -202,8 +204,9 @@ def _create_input_state(trans_ctx: translator.TranslationContext, call_args: Seq
 
 
 def finalize_translation_context(
-    trans_ctx: translator.TranslationContext, outtree: jax_tree.PyTreeDef, validate: bool = True
-) -> translator.TranslatedJaxprSDFG:
+    trans_ctx: translator.TranslationContext,
+    validate: bool = True,
+) -> jace.TranslatedJaxprSDFG:
     """
     Finalizes the supplied translation context `trans_ctx`.
 
@@ -218,7 +221,6 @@ def finalize_translation_context(
 
     Args:
         trans_ctx: The context that should be finalized.
-        outtree: A pytree describing how to unflatten the output.
         validate: Call the validate function after the finalizing.
     """
     trans_ctx.validate()
@@ -230,11 +232,10 @@ def finalize_translation_context(
         raise ValueError("No input nor output.")
 
     # We guarantee decoupling
-    tsdfg = translator.TranslatedJaxprSDFG(
+    tsdfg = jace.TranslatedJaxprSDFG(
         sdfg=copy.deepcopy(trans_ctx.sdfg),
         inp_names=trans_ctx.inp_names,
         out_names=trans_ctx.out_names,
-        outtree=outtree,
     )
 
     # Make inputs and outputs to globals.

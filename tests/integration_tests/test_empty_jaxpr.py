@@ -60,7 +60,7 @@ def test_empty_unused_argument() -> None:
     res = compiled(A, B)
 
     assert len(lowered._translated_sdfg.inp_names) == 2
-    assert len(compiled._inp_names) == 2
+    assert len(compiled._csdfg.inp_names) == 2
     assert isinstance(res, np.ndarray)
     assert np.all(res == A)
     assert res.__array_interface__["data"][0] != A.__array_interface__["data"][0]
