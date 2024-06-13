@@ -4,7 +4,8 @@
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
-"""Reimplementation of the `jax.stages` module.
+"""
+Reimplementation of the `jax.stages` module.
 
 This module reimplements the public classes of that Jax module.
 However, because JaCe uses DaCe as backend they differ is some small aspects.
@@ -65,7 +66,8 @@ Stage = Union["JaCeWrapped", "JaCeLowered", "JaCeCompiled"]
 
 
 class JaCeWrapped(tcache.CachingStage["JaCeLowered"]):
-    """A function ready to be specialized, lowered, and compiled.
+    """
+    A function ready to be specialized, lowered, and compiled.
 
     This class represents the output of functions such as `jace.jit()` and is
     the first stage in the translation/compilation chain of JaCe. A user should
@@ -80,9 +82,8 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"]):
 
     Args:
         fun: The function that is wrapped.
-        primitive_translators: The list of primitive translators that should
-            be used for the lowering to SDFG.
-        jit_options: Options to control the lowering process.
+        primitive_translators: Primitive translators that that should be used.
+        jit_options: Options to influence the jit process.
 
     Todo:
         - Support keyword arguments and default values of the wrapped function.
@@ -116,7 +117,8 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"]):
         self._fun = fun
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        """Executes the wrapped function.
+        """
+        Executes the wrapped function, lowering and compiling as needed in one step.
 
         This function will lower and compile in one go.
         The function accepts the same arguments as the original computation.
@@ -136,9 +138,8 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"]):
 
     @tcache.cached_transition
     def lower(self, *args: Any, **kwargs: Any) -> JaCeLowered:
-        """Lower the wrapped computation for the given arguments.
-
-        This function accepts the same arguments as the original computation does.
+        """
+        Lower the wrapped computation for the given arguments.
 
         Performs the first two steps of the AOT steps described above, i.e.
         trace the wrapped function with the given arguments and stage it out
@@ -178,7 +179,8 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"]):
     def _make_call_description(
         self, intree: jax_tree.PyTreeDef, flat_call_args: Sequence[Any]
     ) -> tcache.StageTransformationSpec:
-        """Generates the key used to cache lowering calls.
+        """
+        Computes the key for the `JaCeWrapped.lower()` call inside the cache.
 
         For all non static arguments the function will generate an abstract
         description of an argument and for all static arguments the concrete
@@ -196,7 +198,8 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"]):
 
 
 class JaCeLowered(tcache.CachingStage["JaCeCompiled"]):
-    """Represents the original computation as an SDFG.
+    """
+    Represents the original computation as an SDFG.
 
     This class is the output type of `JaCeWrapped.lower()` and represents the
     originally wrapped computation as an SDFG. This stage is followed by the
@@ -224,7 +227,8 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"]):
 
     @tcache.cached_transition
     def compile(self, compiler_options: CompilerOptions | None = None) -> JaCeCompiled:
-        """Optimize and compile the lowered SDFG and return a `JaCeCompiled` object.
+        """
+        Optimize and compile the lowered SDFG using `compiler_options`.
 
         Before the SDFG is compiled, it will be optimized using `jace_optimize()`.
         There are two different sources of these options. The first one is the
@@ -233,12 +237,12 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"]):
         the `compiler_options` argument of this function describes the difference
         from the currently active global options.
 
-        See also:
+        See Also:
             `get_active_compiler_options()` to inspect the set of currently active
             options and `update_active_compiler_options()` to modify them.
         """
-        # We **must** deepcopy before we do any optimization, because all optimizations are in
-        #  place, however, to properly cache stages, stages needs to be immutable.
+        # We **must** deepcopy before we do any optimization, because all optimizations
+        #  are in place, to properly cache stages, stages needs to be immutable.
         tsdfg: translator.TranslatedJaxprSDFG = copy.deepcopy(self._translated_sdfg)
         optimization.jace_optimize(tsdfg=tsdfg, **self._make_compiler_options(compiler_options))
 
@@ -250,7 +254,8 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"]):
         )
 
     def compiler_ir(self, dialect: str | None = None) -> translator.TranslatedJaxprSDFG:
-        """Returns the internal SDFG.
+        """
+        Returns the internal SDFG.
 
         The function returns a `TranslatedJaxprSDFG` object. Direct modification
         of the returned object is forbidden and results in undefined behaviour.
@@ -260,11 +265,16 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"]):
         raise ValueError(f"Unknown dialect '{dialect}'.")
 
     def view(self, filename: str | None = None) -> None:
-        """Runs the `view()` method of the underlying SDFG."""
+        """
+        Runs the `view()` method of the underlying SDFG.
+
+        This will open a browser and display the SDFG.
+        """
         self.compiler_ir().sdfg.view(filename=filename, verbose=False)
 
     def as_sdfg(self) -> dace.SDFG:
-        """Returns the encapsulated SDFG.
+        """
+        Returns the encapsulated SDFG.
 
         Modifying the returned SDFG in any way is undefined behavior.
         """
@@ -273,7 +283,8 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"]):
     def _make_call_description(
         self, intree: jax_tree.PyTreeDef, flat_call_args: Sequence[Any]
     ) -> tcache.StageTransformationSpec:
-        """Creates the key for the `self.compile()` transition function.
+        """
+        Creates the key for the `self.compile()` transition function.
 
         The generated key will not only depend on the arguments that were
         passed to the translation function, i.e. `compile(compiler_options)`,
@@ -289,14 +300,16 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"]):
             stage_id=id(self), flat_call_args=tuple(flat_options), intree=optiontree
         )
 
-    def _make_compiler_options(self, compiler_options: CompilerOptions | None) -> CompilerOptions:
+    @staticmethod
+    def _make_compiler_options(compiler_options: CompilerOptions | None) -> CompilerOptions:
         """Return the compilation options that should be used for compilation."""
         assert isinstance(compiler_options, dict)
         return get_active_compiler_options() | (compiler_options or {})
 
 
 def update_active_compiler_options(new_active_options: CompilerOptions) -> CompilerOptions:
-    """Updates the set of active compiler options.
+    """
+    Updates the set of active compiler options.
 
     Merges the options passed as `new_active_options` with the currently active
     compiler options. This set is used by `JaCeLowered.compile()` to determine
@@ -319,7 +332,8 @@ def get_active_compiler_options() -> CompilerOptions:
 
 
 class JaCeCompiled:
-    """Compiled version of the SDFG.
+    """
+    Compiled version of the SDFG.
 
     This is the last stage of the JaCe's jit chain. A user should never create a
     `JaCeCompiled` instance, instead `JaCeLowered.compile()` should be used.
@@ -361,8 +375,8 @@ class JaCeCompiled:
         self._outtree = outtree
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        """Calls the embedded computation.
-
+        """
+        Calls the embedded computation.
 
         Note:
             Unlike the `lower()` function which takes the same arguments as the

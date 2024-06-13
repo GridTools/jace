@@ -45,12 +45,12 @@ def _only_alt_translators() -> Generator[None, None, None]:
     """Removes all non arithmetic/logical translator from the registry.
 
     This ensures that Jax is not doing some stuff that is supposed to be handled by the
-    test class, such as broadcasting. It makes writing tests a bit harder, but it is worth.
-    For some reasons also type conversion s allowed.
+    test class, such as broadcasting. It makes writing tests a bit harder, but it is
+    worth. For some reasons also type conversion s allowed.
     """
-    from jace.translator.primitive_translators.arithmetic_logical_translators import (
-        _ARITMETIC_OPERATION_TEMPLATES,
-        _LOGICAL_OPERATION_TEMPLATES,
+    from jace.translator.primitive_translators.arithmetic_logical_translators import (  # noqa: PLC0415  # Direct import.
+        _ARITMETIC_OPERATION_TEMPLATES,  # noqa: PLC2701  # Import of private variables.
+        _LOGICAL_OPERATION_TEMPLATES,  # noqa: PLC2701
     )
 
     # Remove all non ALU translators from the registry
@@ -60,14 +60,14 @@ def _only_alt_translators() -> Generator[None, None, None]:
         | _ARITMETIC_OPERATION_TEMPLATES.keys()
         | {"convert_element_type"}
     )
-    jace.translator.set_active_primitive_translators_to(
-        {p: t for p, t in primitive_translators.items() if p in allowed_translators}
-    )
+    testutil.set_active_primitive_translators_to({
+        p: t for p, t in primitive_translators.items() if p in allowed_translators
+    })
 
     yield
 
     # Restore the initial state
-    jace.translator.set_active_primitive_translators_to(primitive_translators)
+    testutil.set_active_primitive_translators_to(primitive_translators)
 
 
 @pytest.fixture(
@@ -194,7 +194,7 @@ def _perform_alt_test(testee: Callable, *args: Any) -> None:
     if jace.util.is_scalar(ref):
         # Builder hack, only arrays are generated.
         assert res.shape == (1,)
-    elif ref.shape == ():  # TODO: Investigate
+    elif ref.shape == ():
         assert res.shape == (1,)
     else:
         assert ref.shape == res.shape

@@ -13,9 +13,11 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from jace import translator
+
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
 
 
 __all__ = ["mkarray"]
@@ -52,3 +54,22 @@ def mkarray(shape: Sequence[int] | int, dtype: type = np.float64, order: str = "
     else:
         res = np.random.random(shape)  # type: ignore[assignment]  # noqa: NPY002
     return np.array(res, order=order, dtype=dtype)  # type: ignore[call-overload]
+
+
+def set_active_primitive_translators_to(
+    new_active_primitives: Mapping[str, translator.PrimitiveTranslator],
+) -> dict[str, translator.PrimitiveTranslator]:
+    """Exchanges the currently active set of translators with `new_active_primitives`.
+
+    The function will return the set of translators the were active before the call.
+
+    Args:
+        new_active_primitives: The new set of active translators.
+    """
+    assert all(
+        primitive_name == translator.primitive
+        for primitive_name, translator in new_active_primitives.items()
+    )
+    previously_active_translators = translator.primitive_translator._PRIMITIVE_TRANSLATORS_REGISTRY
+    translator.primitive_translator._PRIMITIVE_TRANSLATORS_REGISTRY = {**new_active_primitives}
+    return previously_active_translators

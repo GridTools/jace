@@ -21,10 +21,9 @@ from tests import util as testutil
 def test_mismatch_in_datatype_calling() -> None:
     """Tests compilation and calling with different types.
 
-    Note that this is more or less a test for the calling implementation of
-    the `CompiledSDFG` class in DaCe. As I understand the
-    `CompiledSDFG::_construct_args()` function this should be detected.
-    However, as evidently it does not do this.
+    Note that this more or less tests the calling implementation of the `CompiledSDFG`
+    class in DaCe. As I understand the `CompiledSDFG::_construct_args()` function this
+    should be detected. However, as evidently it does not do this.
     """
 
     @jace.jit

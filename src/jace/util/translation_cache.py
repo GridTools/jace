@@ -5,7 +5,8 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""This module contains the functionality related to the compilation cache of the stages.
+"""
+This module contains the functionality related to the compilation cache of the stages.
 
 The cache currently caches the lowering, i.e. the result of `JaCeWrapped.lower()`
 and the compilation, i.e. `JaCeLowered.compile()`. The caches are on a per stage
@@ -43,7 +44,8 @@ NextStage = TypeVar("NextStage", bound="stages.Stage")
 
 
 class CachingStage(Generic[NextStage]):
-    """Annotates a stage whose transition to the next stage is cacheable.
+    """
+    Annotates a stage whose transition to the next stage is cacheable.
 
     To make a transition cacheable, a stage must:
     - be derived from this class.
@@ -65,7 +67,8 @@ class CachingStage(Generic[NextStage]):
     def _make_call_description(
         self: CachingStage, intree: jax_tree.PyTreeDef, flat_call_args: Sequence[Any]
     ) -> StageTransformationSpec:
-        """Computes the key used to represent the call.
+        """
+        Computes the key used to represent the call.
 
         This function is used by the `@cached_transition` decorator to perform
         the lookup inside the cache. It should return a description of the call
@@ -89,7 +92,8 @@ CachingStageType = TypeVar("CachingStageType", bound=CachingStage)
 def cached_transition(
     transition: Callable[Concatenate[CachingStageType, P], NextStage],
 ) -> Callable[Concatenate[CachingStage[NextStage], P], NextStage]:
-    """Decorator for making the transition function of the stage cacheable.
+    """
+    Decorator for making the transition function of the stage cacheable.
 
     See the description of `CachingStage` for the requirements.
     The function will use `_make_call_description()` to decide if the call is
@@ -128,7 +132,8 @@ def get_cache(stage: CachingStage) -> StageCache:
 
 @dataclasses.dataclass(frozen=True)
 class _AbstractCallArgument:
-    """Class to represent a single argument to the transition function in an abstract way.
+    """
+    Class to represent a single argument to the transition function in an abstract way.
 
     As noted in `StageTransformationSpec` there are two ways to describe an
     argument, either by using its concrete value or an abstract description,
@@ -192,7 +197,8 @@ CallArgsSpec: TypeAlias = tuple[_AbstractCallArgument | Hashable]
 
 @dataclasses.dataclass(frozen=True)
 class StageTransformationSpec:
-    """Represents an entire call to a state transformation inside the cache.
+    """
+    Represents the entire call to a state transformation function of a stage.
 
     State transition functions are annotated with `@cached_transition` and their
     result is cached. They key to locate them inside the cache is represented
@@ -224,9 +230,8 @@ StageType = TypeVar("StageType", bound="stages.Stage")
 
 
 class StageCache(Generic[StageType]):
-    """Simple LRU cache to store the results of the stage transition function.
-
-    There is one cache per stage (type) and not per instance.
+    """
+    Simple LRU cache to cache the results of the stage transition function.
 
     Args:
         capacity: The size of the cache, defaults to 256.
@@ -259,7 +264,8 @@ class StageCache(Generic[StageType]):
             self._memory[key] = res
 
     def popitem(self, key: StageTransformationSpec | None) -> None:
-        """Evict `key` from `self`.
+        """
+        Evict `key` from `self`.
 
         If `key` is `None` the oldest entry is evicted.
         """
@@ -271,14 +277,14 @@ class StageCache(Generic[StageType]):
             self._memory.move_to_end(key, last=False)
             self._memory.popitem(last=False)
 
-    def clear(self) -> None:
+    def clear(self) -> None:  # noqa: D102  # Missing description.
         self._memory.clear()
 
     def __len__(self) -> int:
         return len(self._memory)
 
     @property
-    def capacity(self) -> int:
+    def capacity(self) -> int:  # noqa: D102  # No docstring needed.
         return self._capacity
 
     def front(self) -> tuple[StageTransformationSpec, StageType]:
@@ -286,4 +292,4 @@ class StageCache(Generic[StageType]):
         return next(reversed(self._memory.items()))
 
     def __repr__(self) -> str:
-        return f"StageCache({len(self._memory)} / {self._capacity} || {', '.join( '[' + repr(k) + ']' for k in self._memory)})"
+        return f"StageCache({len(self._memory)} / {self._capacity} || {', '.join('[' + repr(k) + ']' for k in self._memory)})"

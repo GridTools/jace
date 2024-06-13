@@ -179,7 +179,6 @@ def test_disabled_x64() -> None:
     Notes:
         Once the x64 issue is resolved make this test a bit more useful.
     """
-    from jax.experimental import disable_x64
 
     def testee(A: np.ndarray, B: np.float64) -> np.ndarray:
         return A + B
@@ -190,7 +189,7 @@ def test_disabled_x64() -> None:
     # Run them with disabled x64 support
     #  This is basically a reimplementation of the `JaCeWrapped.lower()` function.
     #  but we have to do it this way to disable the x64 mode in translation.
-    with disable_x64():
+    with jax.experimental.disable_x64():
         jaxpr = jax.make_jaxpr(testee)(A, B)
 
     _, flat_in_vals, outtree = ptrans.trace_and_flatten_function(
@@ -206,9 +205,10 @@ def test_disabled_x64() -> None:
     )
 
     # Because x64 is disabled Jax traces the input as float32, even if we have passed
-    #  float64 as input! Calling the resulting SDFG with the arguments we used for lowering
-    #  will result in an error, because of the situation, `sizeof(float32) < sizeof(float64)`,
-    #  no out of bound error would result, but the values are garbage.
+    #  float64 as input! Calling the resulting SDFG with the arguments we used for
+    #  lowering will result in an error, because of the situation,
+    #  `sizeof(float32) < sizeof(float64)`, no out of bound error would result, but the
+    #  values are garbage.
     assert all(
         tsdfg.sdfg.arrays[inp_name].dtype.as_numpy_dtype().type is np.float32
         for inp_name in tsdfg.inp_names

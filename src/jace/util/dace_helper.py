@@ -32,7 +32,7 @@ __all__ = ["CompiledSDFG", "compile_jax_sdfg", "run_jax_sdfg"]
 
 
 def compile_jax_sdfg(tsdfg: translator.TranslatedJaxprSDFG) -> CompiledSDFG:
-    """Compiles the SDFG embedded in `tsdfg` and return the resulting `CompiledSDFG` object."""
+    """Compiles the embedded SDFG and return the resulting `CompiledSDFG` object."""
     if any(  # We do not support the DaCe return mechanism
         array_name.startswith("__return")
         for array_name in tsdfg.sdfg.arrays.keys()  # noqa: SIM118  # We can not use `in` because we are not interested in `my_mangled_variable__return_zulu`!
@@ -49,10 +49,11 @@ def compile_jax_sdfg(tsdfg: translator.TranslatedJaxprSDFG) -> CompiledSDFG:
     org_regenerate_code = sdfg._regenerate_code
 
     try:
-        # We need to give the SDFG another name, this is needed to prevent a DaCe error/warning.
-        #  This happens if we compile the same lowered SDFG multiple times with different options.
+        # We need to give the SDFG another name, this is needed to prevent a DaCe
+        #  error/warning. This happens if we compile the same lowered SDFG multiple
+        #  times with different options.
         sdfg.name = f"{sdfg.name}__comp_{int(time.time() * 1000)}_{os.getpid()}"
-        assert len(sdfg.name) < 255
+        assert len(sdfg.name) < 255  # noqa: PLR2004  # Not a magic number.
 
         with dace.config.temporary_config():
             dace.Config.set("compiler", "use_cache", value=False)
@@ -76,7 +77,8 @@ def run_jax_sdfg(
     out_names: Sequence[str],
     flat_call_args: Sequence[Any],
 ) -> list[np.ndarray]:
-    """Run the compiled SDFG.
+    """
+    Run the compiled SDFG.
 
     The function assumes that the SDFG was finalized and then compiled by
     `compile_jax_sdfg()`. All arguments except `csdfg` must come from the
@@ -115,7 +117,7 @@ def run_jax_sdfg(
         if util.is_jax_array(in_val):
             if not util.is_fully_addressable(in_val):
                 raise ValueError(f"Passed a not fully addressable Jax array as '{in_name}'")
-            in_val = in_val.__array__()
+            in_val = in_val.__array__()  # noqa: PLW2901  # Jax arrays do not expose the __array_interface__.
         sdfg_call_args[in_name] = in_val
 
     arrays = csdfg.sdfg.arrays

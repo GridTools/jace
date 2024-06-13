@@ -24,11 +24,13 @@ if TYPE_CHECKING:
 
 
 class CopyTranslator(mapped_base.MappedOperationTranslatorBase):
-    """Implements the `copy` primitive.
+    """
+    Implements the `copy` primitive.
 
     Copy operations are implemented as a map to ensure that they can be fused
     with other maps
-    ."""
+    .
+    """
 
     def __init__(self) -> None:
         super().__init__(primitive_name="copy")
@@ -44,7 +46,8 @@ class CopyTranslator(mapped_base.MappedOperationTranslatorBase):
 
 
 class DevicePutTranslator(mapped_base.MappedOperationTranslatorBase):
-    """Implements the `device_put` primitive.
+    """
+    Implements the `device_put` primitive.
 
     In Jax this primitive is used to copy data between the host and the device.
     Because of the way how JaCe and the optimization pipeline works, either

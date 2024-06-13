@@ -5,6 +5,8 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
+"""Implements the `squeeze` primitive."""
+
 from __future__ import annotations
 
 import itertools
@@ -24,7 +26,8 @@ if TYPE_CHECKING:
 
 
 class SqueezeTranslator(mapped_base.MappedOperationTranslatorBase):
-    """Implements the `squeeze` primitive.
+    """
+    Implements the `squeeze` primitive.
 
     The primitives allows to remove a dimension of size one. Essentially
     equivalent to `np.squeeze` and the inverse to `np.expand_dims()`,

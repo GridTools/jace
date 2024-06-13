@@ -5,7 +5,8 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""This module contains all functions that are related to post processing the SDFG.
+"""
+This module contains all functions that are related to post processing the SDFG.
 
 Most of them operate on `TranslatedJaxprSDFG` objects.
 Currently they mostly exist for the sake of existing.
@@ -34,13 +35,14 @@ def postprocess_jaxpr_sdfg(
     call_args: Sequence[Any],
     outtree: jax_tree.PyTreeDef,
 ) -> translator.TranslatedJaxprSDFG:
-    """Perform the final post processing steps on the `TranslationContext` _in place_ and return a `TranslatedJaxprSDFG` object.
+    """
+    Final post processing steps on the `TranslationContext`.
 
     While the function performs the post processing on the context in place,
     the returned `TranslatedJaxprSDFG` will be decoupled from the input.
 
     Args:
-        trans_ctx: The `TranslationContext` obtained from the `translate_jaxpr()` function.
+        trans_ctx: The `TranslationContext` obtained from a `translate_jaxpr()` call.
         fun: The original function that was translated.
         call_args: The flattened input arguments.
         outtree: A pytree describing how to unflatten the output.
@@ -58,7 +60,8 @@ def postprocess_jaxpr_sdfg(
 def create_input_output_stages(
     trans_ctx: translator.TranslationContext, call_args: Sequence[Any]
 ) -> None:
-    """Creates an input and output state inside the SDFG in place.
+    """
+    Creates an input and output state inside the SDFG in place.
 
     See `_create_input_state()` and `_create_output_state()` for more information.
 
@@ -74,7 +77,8 @@ def create_input_output_stages(
 
 
 def _create_output_state(trans_ctx: translator.TranslationContext) -> None:
-    """Creates the output processing stage for the SDFG in place.
+    """
+    Creates the output processing stage for the SDFG in place.
 
     The function will create a new terminal state, in which all outputs, denoted
     in `trans_ctx.out_names`, will be written into new SDFG variables.
@@ -129,7 +133,8 @@ def _create_output_state(trans_ctx: translator.TranslationContext) -> None:
 
 
 def _create_input_state(trans_ctx: translator.TranslationContext, call_args: Sequence[Any]) -> None:
-    """Creates the input processing state for the SDFG in place.
+    """
+    Creates the input processing state for the SDFG in place.
 
     The function creates a new set of variables that are exposed as inputs.
     If an input argument is an array, the new variable will have the same
@@ -199,7 +204,8 @@ def _create_input_state(trans_ctx: translator.TranslationContext, call_args: Seq
 def finalize_translation_context(
     trans_ctx: translator.TranslationContext, outtree: jax_tree.PyTreeDef, validate: bool = True
 ) -> translator.TranslatedJaxprSDFG:
-    """Finalizes the supplied translation context `trans_ctx`.
+    """
+    Finalizes the supplied translation context `trans_ctx`.
 
     The function will process the SDFG that is encapsulated inside the context,
     i.e. a canonical one, into a proper SDFG, as it is described in
@@ -238,9 +244,6 @@ def finalize_translation_context(
             continue
         tsdfg.sdfg.arrays[arg_name].transient = False
         sdfg_arg_names.append(arg_name)
-
-    # This forces the signature of the SDFG to include all arguments in order they appear.
-    #  If an argument is used as input and output then it is only listed as input.
     tsdfg.sdfg.arg_names = sdfg_arg_names
 
     if validate:
@@ -254,7 +257,8 @@ def trace_and_flatten_function(
     trace_call_kwargs: Mapping[str, Any],
     trace_options: Mapping[str, Any],
 ) -> tuple[jax.core.ClosedJaxpr, list[Any], jax_tree.PyTreeDef]:
-    """Traces `fun` and generates the Jaxpr and compute some related meta data.
+    """
+    Traces `fun` and generates the Jaxpr and compute some related meta data.
 
     For tracing the computation `fun` the function uses the `trace_call_args`
     and `trace_call_kwargs` arguments, both should not be flattened yet.
@@ -291,16 +295,18 @@ def trace_and_flatten_function(
 
     # In Jax `float32` is the main datatype, and they go to great lengths to avoid some
     #  aggressive [type promotion](https://jax.readthedocs.io/en/latest/type_promotion.html).
-    #  However, in this case we will have problems when we call the SDFG, for some reasons
-    #  `CompiledSDFG` does not work in that case correctly, thus we enable it for the tracing.
+    #  However, in this case we will have problems when we call the SDFG, for some
+    #  reasons `CompiledSDFG` does not work in that case correctly, thus we enable it
+    #  for the tracing.
     with jax.experimental.enable_x64():
-        # TODO(phimuell): copy the implementation of the real tracing, and not the debug one.
+        # TODO(phimuell): copy the implementation of the real tracing
         jaxpr, outshapes = jax.make_jaxpr(fun, return_shape=True)(
             *trace_call_args, **trace_call_kwargs
         )
 
-    # Regardless what the documentation of `make_jaxpr` claims, it does not output a pytree.
-    #  instead an abstract description of the shape, that we will transform into a pytree.
+    # Regardless what the documentation of `make_jaxpr` claims, it does not output a
+    #  pytree instead an abstract description of the shape, that we will transform into
+    #  a pytree.
     outtree = jax_tree.tree_structure(outshapes)
 
     # Make the input tree

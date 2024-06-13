@@ -19,7 +19,8 @@ if TYPE_CHECKING:
 
 
 class CompilerOptions(TypedDict, total=False):
-    """All known compiler options to `JaCeLowered.compile()`.
+    """
+    All known compiler options to `JaCeLowered.compile()`.
 
     See `jace_optimize()` for a description of the different options.
 
@@ -47,8 +48,9 @@ NO_OPTIMIZATIONS: Final[CompilerOptions] = {
 }
 
 
-def jace_optimize(tsdfg: translator.TranslatedJaxprSDFG, **kwargs: Unpack[CompilerOptions]) -> None:
-    """Performs optimization of the translated SDFG _in place_.
+def jace_optimize(tsdfg: translator.TranslatedJaxprSDFG, **kwargs: Unpack[CompilerOptions]) -> None:  # noqa: D417  # Missing description for kwargs
+    """
+    Performs optimization of the translated SDFG _in place_.
 
     It is recommended to use the `CompilerOptions` `TypedDict` to pass options
     to the function. However, any option that is not specified will be

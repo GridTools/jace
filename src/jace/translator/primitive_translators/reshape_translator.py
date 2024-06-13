@@ -5,6 +5,8 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
+"""Implements the translator for the `reshape` primitive."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -22,7 +24,8 @@ if TYPE_CHECKING:
 
 
 class ReshapeTranslator(translator.PrimitiveTranslator):
-    """Implements the `reshape` primitive.
+    """
+    Implements the `reshape` primitive.
 
     The current implementation uses a Memlet for this and essentially acts as
     an optimization barrier. Furthermore the Jax primitive also has the optional
@@ -31,7 +34,7 @@ class ReshapeTranslator(translator.PrimitiveTranslator):
     """
 
     @property
-    def primitive(self) -> str:
+    def primitive(self) -> str:  # noqa: D102  # No docstring needed.
         return "reshape"
 
     @override
@@ -43,7 +46,8 @@ class ReshapeTranslator(translator.PrimitiveTranslator):
         eqn: jax_core.JaxprEqn,
         eqn_state: dace.SDFGState,
     ) -> None:
-        """Performs the reshaping.
+        """
+        Performs the reshaping.
 
         Currently a copy using a Memlet is performed.
         """

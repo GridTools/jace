@@ -18,6 +18,8 @@ import pytest
 import jace
 from jace import translator
 
+from tests import util as testutil
+
 
 if TYPE_CHECKING:
     from collections.abc import Generator, Mapping
@@ -28,15 +30,15 @@ def _conserve_builtin_translators() -> Generator[None, None, None]:
     """Restores the set of registered subtranslators after a test."""
     initial_translators = translator.get_registered_primitive_translators()
     yield
-    translator.set_active_primitive_translators_to(initial_translators)
+    testutil.set_active_primitive_translators_to(initial_translators)
 
 
 @pytest.fixture()
 def no_builtin_translators() -> Generator[None, None, None]:  # noqa: PT004  # This is how you should do it: https://docs.pytest.org/en/7.1.x/how-to/fixtures.html#use-fixtures-in-classes-and-modules-with-usefixtures
     """This fixture can be used if the test does not want any builtin translators."""
-    initial_translators = translator.set_active_primitive_translators_to({})
+    initial_translators = testutil.set_active_primitive_translators_to({})
     yield
-    translator.set_active_primitive_translators_to(initial_translators)
+    testutil.set_active_primitive_translators_to(initial_translators)
 
 
 # <------------- Definitions needed for the test
@@ -94,23 +96,6 @@ def test_subtranslatior_managing() -> None:
     assert len(active_subtrans) == 3
 
 
-def test_subtranslatior_managing_isolation() -> None:
-    """Tests if `translator.get_registered_primitive_translators()` protects the internal registry."""
-    assert (
-        translator.get_registered_primitive_translators()
-        is not translator.primitive_translator._PRIMITIVE_TRANSLATORS_REGISTRY
-    )
-
-    initial_primitives = translator.get_registered_primitive_translators()
-    assert translator.get_registered_primitive_translators() is not initial_primitives
-    assert "add" in initial_primitives, "For this test the 'add' primitive must be registered."
-    org_add_prim = initial_primitives["add"]
-
-    initial_primitives["add"] = fake_add_translator
-    assert org_add_prim is not fake_add_translator
-    assert translator.get_registered_primitive_translators()["add"] is org_add_prim
-
-
 def test_subtranslatior_managing_swap() -> None:
     """Tests the `translator.set_active_primitive_translators_to()` functionality."""
 
@@ -126,7 +111,7 @@ def test_subtranslatior_managing_swap() -> None:
     new_active_primitives["add"] = fake_add_translator
 
     # Now perform the changes.
-    old_active = translator.set_active_primitive_translators_to(new_active_primitives)
+    old_active = testutil.set_active_primitive_translators_to(new_active_primitives)
     assert (
         new_active_primitives is not translator.primitive_translator._PRIMITIVE_TRANSLATORS_REGISTRY
     )
@@ -181,7 +166,6 @@ def test_subtranslatior_managing_overwriting_2() -> None:
     @translator.make_primitive_translator("add")
     def still_useless_but_a_bit_less(*args: Any, **kwargs: Any) -> None:  # noqa: ARG001
         trans_cnt[0] += 1
-        return
 
     @jace.jit
     def foo(A: int) -> int:

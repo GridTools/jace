@@ -4,7 +4,8 @@
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
-"""Interface for all primitive translators and managing of the global translator registry.
+"""
+Interface for all primitive translators and managing of the global translator registry.
 
 Todo:
     Implement proper context manager for working with the registry.
@@ -17,7 +18,7 @@ from typing import TYPE_CHECKING, Literal, Protocol, cast, overload, runtime_che
 
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Mapping, MutableMapping, Sequence
+    from collections.abc import Callable, Sequence
 
     import dace
     from jax import core as jax_core
@@ -30,10 +31,7 @@ _PRIMITIVE_TRANSLATORS_REGISTRY: dict[str, translator.PrimitiveTranslator] = {}
 
 
 class PrimitiveTranslatorCallable(Protocol):
-    """Callable version of the primitive translators.
-
-    Used for type annotation purposes, the proper public interface is `PrimitiveTranslator`.
-    """
+    """Callable version of the primitive translators."""
 
     @abc.abstractmethod
     def __call__(
@@ -44,7 +42,8 @@ class PrimitiveTranslatorCallable(Protocol):
         eqn: jax_core.JaxprEqn,
         eqn_state: dace.SDFGState,
     ) -> dace.SDFGState | None:
-        """Translates the Jax primitive into its SDFG equivalent.
+        """
+        Translates the Jax primitive into its SDFG equivalent.
 
         Before the builder calls this function it will perform the following
         preparatory tasks:
@@ -92,7 +91,8 @@ class PrimitiveTranslatorCallable(Protocol):
 
 @runtime_checkable
 class PrimitiveTranslator(PrimitiveTranslatorCallable, Protocol):
-    """Interface for all Jax primitive translators.
+    """
+    Interface for all Jax primitive translators.
 
     A translator for a primitive translates a single equation of a Jaxpr into
     its SDFG equivalent. For satisfying this interface a concrete implementation
@@ -133,7 +133,8 @@ def make_primitive_translator(
     Callable[[translator.PrimitiveTranslatorCallable], translator.PrimitiveTranslator]
     | translator.PrimitiveTranslator
 ):
-    """Turn `primitive_translator` into a `PrimitiveTranslator` for primitive `primitive`.
+    """
+    Turn `primitive_translator` into a `PrimitiveTranslator` for primitive `primitive`.
 
     Essentially, this function adds the `primitive` property to a callable, such
     that it satisfy the `PrimitiveTranslator` protocol. However, it does not add
@@ -175,7 +176,8 @@ def register_primitive_translator(
     translator.PrimitiveTranslator
     | Callable[[translator.PrimitiveTranslator], translator.PrimitiveTranslator]
 ):
-    """Adds a primitive translator to JaCe's global registry.
+    """
+    Adds a primitive translator to JaCe's global registry.
 
     The default set of primitives that are used if nothing is specified to to
     `jace.jit` are stored inside a global registry. To add a translator to this
@@ -210,26 +212,11 @@ def register_primitive_translator(
 
 
 def get_registered_primitive_translators() -> dict[str, translator.PrimitiveTranslator]:
-    """Returns a copy of the current state of JaCe's global primitive registry.
+    """
+    Returns a copy of the current state of JaCe's global primitive registry.
 
     The state returned by this function is compatible to what `jace.jit`'s
     `primitive_translators` argument expects. It is important the the returned
     object is decoupled from the registry.
     """
     return _PRIMITIVE_TRANSLATORS_REGISTRY.copy()
-
-
-def set_active_primitive_translators_to(
-    new_translators: Mapping[str, translator.PrimitiveTranslator],
-) -> MutableMapping[str, translator.PrimitiveTranslator]:
-    """Exchange the global translator registry state of JaCe with `new_translators`.
-
-    The function will return the state of the global translator registry prior
-    to this call. Any changes to `new_translators` after calling this function
-    will have no effect on the global translator registry and vice versa.
-    """
-    global _PRIMITIVE_TRANSLATORS_REGISTRY
-    assert all(getattr(trans, "primitive", prim) for prim, trans in new_translators.items())
-    previous_translators = _PRIMITIVE_TRANSLATORS_REGISTRY
-    _PRIMITIVE_TRANSLATORS_REGISTRY = dict(new_translators)
-    return previous_translators

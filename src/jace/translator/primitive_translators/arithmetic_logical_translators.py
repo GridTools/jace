@@ -5,7 +5,8 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Module containing all translators related to arithmetic and logical operations.
+"""
+Module containing all translators related to arithmetic and logical operations.
 
 Todo:
     - Hijack Jax to inject a proper modulo operation.
@@ -29,7 +30,8 @@ if TYPE_CHECKING:
 
 
 class ArithmeticOperationTranslator(mapped_base.MappedOperationTranslatorBase):
-    """Translator for all arithmetic operations.
+    """
+    Translator for all arithmetic operations.
 
     The class makes use of the `MappedOperationTranslatorBase`. It only implements
     the `write_tasklet_code()` to generate the code for a Tasklet from a template.
@@ -64,7 +66,8 @@ class ArithmeticOperationTranslator(mapped_base.MappedOperationTranslatorBase):
 
 
 class LogicalOperationTranslator(mapped_base.MappedOperationTranslatorBase):
-    """Translator for all logical operations.
+    """
+    Translator for all logical operations.
 
     The reason why the logical operations are separated from the arithmetic
     operation is quite complicated, and in fact the whole thing is harder than

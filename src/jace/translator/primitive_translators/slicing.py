@@ -25,7 +25,8 @@ if TYPE_CHECKING:
 
 
 class SlicingTranslator(mapped_base.MappedOperationTranslatorBase):
-    """Implements the `slice` primitive.
+    """
+    Implements the `slice` primitive.
 
     This is the classical slicing operation which extracts a fixed sized window
     from a fixed initial position. The `dynamic_slice` operation supports a
@@ -52,7 +53,6 @@ class SlicingTranslator(mapped_base.MappedOperationTranslatorBase):
         eqn: jax_core.JaxprEqn,
     ) -> dict[str, dace.Memlet]:
         """We have to add the offsets to the Memlet accesses."""
-
         strides: Sequence[int] = (
             ((1,) * len(tskl_ranges)) if eqn.params["strides"] is None else eqn.params["strides"]
         )
@@ -69,7 +69,8 @@ class SlicingTranslator(mapped_base.MappedOperationTranslatorBase):
 
 
 class DynamicSlicingTranslator(translator.PrimitiveTranslator):
-    """Implements the `dynamic_slice` primitive.
+    """
+    Implements the `dynamic_slice` primitive.
 
     [Dynamic slicing](https://jax.readthedocs.io/en/latest/_autosummary/jax.lax.dynamic_slice.html)
     performs a slicing of a _fixed_ window, but the start of the window is
@@ -82,7 +83,7 @@ class DynamicSlicingTranslator(translator.PrimitiveTranslator):
     """
 
     @property
-    def primitive(self) -> str:
+    def primitive(self) -> str:  # noqa: D102  # No docstring needed.
         return "dynamic_slice"
 
     @override
@@ -100,8 +101,8 @@ class DynamicSlicingTranslator(translator.PrimitiveTranslator):
         # This is the sizes of the slice window.
         window_sizes: Sequence[int] = eqn.params["slice_sizes"]
 
-        # The first input to the primitive is the array we slice from, the others are the start
-        #  indices of the slice window, each is a scalar, maybe literals.
+        # The first input to the primitive is the array we slice from, the others are
+        #  the start indices of the slice window, each is a scalar, maybe literals.
         in_var_name: str = in_var_names[0]
         start_indices: list[str | None] = list(in_var_names[1:])
 
@@ -115,8 +116,8 @@ class DynamicSlicingTranslator(translator.PrimitiveTranslator):
             if start_index is None:
                 continue
 
-            # We use a Tasklet to perform the adjustment not a symbol, because this would
-            #  need an interstage edge serving as kind of an optimization barrier.
+            # We use a Tasklet to perform the adjustment not a symbol, because this
+            # would need an interstage edge serving as kind of an optimization barrier.
             tasklet = dace.nodes.Tasklet(
                 label=f"adjustment_of_slice_start_{start_index}_for_{out_var_names[0]}",
                 inputs={"unadjusted_start_idx": None},
@@ -151,9 +152,9 @@ class DynamicSlicingTranslator(translator.PrimitiveTranslator):
             (f"__i{dim}", f"0:{N}") for dim, N in enumerate(util.get_jax_var_shape(eqn.outvars[0]))
         ]
 
-        # For copying the data, we use dynamic map ranges, which is basically an input connector
-        #  on the map entry whose name is not `IN_*`, this name can then be used as a symbol
-        #  inside the map scope; this symbol is then used as offset.
+        # For copying the data, we use dynamic map ranges, which is basically an input
+        #  connector on the map entry whose name is not `IN_*`, this name can then be
+        #  used as a symbol inside the map scope; this symbol is then used as offset.
         dynamic_map_ranges: dict[str, str] = {}
         memlet_accesses: list[str] = []
 
@@ -161,10 +162,10 @@ class DynamicSlicingTranslator(translator.PrimitiveTranslator):
             if start_index is None:
                 offset = str(util.get_jax_literal_value(eqn.invars[i]))
             else:
-                # Because of [issue 1579](https://github.com/spcl/dace/issues/1579) we have to use
-                #  the same name as the data container for the symbol and can not mangle it.
+                # Because of [issue 1579](https://github.com/spcl/dace/issues/1579) we
+                #  have to use the same name as the data container for the symbol and
+                #  can not mangle it.
                 # TODO(phimuell): Activate mangling when the issue is resolved.
-                # offset = f"__jace_dynamic_map_range_{out_var_names[0]}_{start_index}" # noqa: ERA001
                 offset = start_index
                 dynamic_map_ranges[offset] = start_index
             memlet_accesses.append(f"{it_var} + {offset}")
@@ -182,8 +183,8 @@ class DynamicSlicingTranslator(translator.PrimitiveTranslator):
             external_edges=True,
         )
 
-        # Creating the inputs for the dynamic map ranges.
-        #  We have to use the same access nodes as above, to ensure a single order of computation.
+        # Creating the inputs for the dynamic map ranges. We have to use the same
+        #  access nodes as above, to ensure a single order of computation.
         for symb_name, start_index in dynamic_map_ranges.items():
             eqn_state.add_edge(
                 in_access[start_index],

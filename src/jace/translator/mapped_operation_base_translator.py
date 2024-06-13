@@ -25,7 +25,8 @@ if TYPE_CHECKING:
 
 
 class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
-    """Implements the base for all "mapped base operations".
+    """
+    Implements the base for all "mapped base operations".
 
     A mapped base operation `f` is an operation that has several inputs arrays
     that are elementwise combined to a single output array. A prime example for
@@ -74,7 +75,8 @@ class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
         eqn: jax_core.JaxprEqn,
         eqn_state: dace.SDFGState,
     ) -> None:
-        """Create the mapped Tasklet.
+        """
+        Create the mapped Tasklet.
 
         The function will create the map ranges and based on the shape of the
         output array. It will then call `make_input_memlets()` to get the input
@@ -127,7 +129,8 @@ class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
         in_var_names: Sequence[str | None],
         eqn: jax_core.JaxprEqn,
     ) -> str:
-        """Return the (Python) code that should be put inside the Tasklet.
+        """
+        Return the (Python) code that should be put inside the Tasklet.
 
         This also includes the assignment statement, i.e. `__out`.
         However, the base will do literal substitution on the returned object.
@@ -140,13 +143,14 @@ class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
         """
         ...
 
-    def make_input_memlets(
+    def make_input_memlets(  # noqa: PLR6301  # Subclasses might need them.
         self,
         tskl_ranges: Sequence[tuple[str, str]],
         in_var_names: Sequence[str | None],
         eqn: jax_core.JaxprEqn,
     ) -> dict[str, dace.Memlet]:
-        """Generate the input Memlets for the non literal operators of the primitive.
+        """
+        Generate the input Memlets for the non literal operators of the primitive.
 
         The returned `dict` maps the input connector of the Tasklet to the Memlet
         that is used to connect it to the Map entry node.
@@ -188,10 +192,11 @@ class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
             )
         return tskl_inputs
 
-    def literal_substitution(
+    def literal_substitution(  # noqa: PLR6301  # Subclasses might need it.
         self, tskl_code: str, in_var_names: Sequence[str | None], eqn: jax_core.JaxprEqn
     ) -> str:
-        """Perform literal substitution on the proto Tasklet code `tskl_code`.
+        """
+        Perform literal substitution on the proto Tasklet code `tskl_code`.
 
         Args:
             tskl_code:      The proto Tasklet code with literal.

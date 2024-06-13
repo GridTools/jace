@@ -25,7 +25,8 @@ if TYPE_CHECKING:
 
 
 class ConvertElementTypeTranslator(mapped_base.MappedOperationTranslatorBase):
-    """Implements the `convert_element_type` primitive.
+    """
+    Implements the `convert_element_type` primitive.
 
     Copies the input to the output and performs type conversion.
 
@@ -52,19 +53,20 @@ class ConvertElementTypeTranslator(mapped_base.MappedOperationTranslatorBase):
         out_dtype = util.get_jax_var_dtype(eqn.outvars[0]).type
         out_dtype_s: str = out_dtype.__name__
 
-        # This is the base of the template that we use for conversion. You should notice that
-        #  the Tasklet `__out = __in0` will fail, see commit `f5aabc3` of the prototype. Thus
-        #  we have to do it in this way.
+        # This is the base of the template that we use for conversion. You should notice
+        #  that the Tasklet `__out = __in0` will fail, see commit `f5aabc3` of the
+        #  prototype. Thus we have to do it in this way.
         conv_code = "__in0"
 
         if in_dtype == out_dtype:
-            # For some reason Jax sometimes adds conversions where no are needed. In these cases
-            #  we explicitly create a copy Tasklet, which is trivial and can be removed by DaCe.
+            # For some reason Jax sometimes adds conversions where no are needed. In
+            #  these cases we explicitly create a copy Tasklet, which is trivial and can
+            #  be removed by DaCe.
             # TODO(phimuell): Create a Memlet instead.
             return f"__out = {conv_code}"
 
         if in_dtype_s.startswith("bool"):
-            # Interestingly `__out = int(__in0)` will not work, see commit `f5aabc` of the prototype.
+            # Interestingly `__out = int(__in0)` will not work.
             conv_code = f"(1 if {conv_code} else 0)"
         if out_dtype_s.startswith("bool"):
             conv_code = f"dace.bool_({conv_code})"

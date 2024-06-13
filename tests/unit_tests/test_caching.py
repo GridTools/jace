@@ -70,7 +70,7 @@ def test_caching_same_sizes() -> None:
     A = testutil.mkarray((4, 3))
     B = testutil.mkarray((4, 3))
 
-    # The second batch of argument, it is the same size (structurally) but different values.
+    # The second batch of argument, same structure, but different values.
     AA = A + 1.0362
     BB = B + 0.638956
 
@@ -178,10 +178,7 @@ def test_caching_different_structure() -> None:
 
 
 def test_caching_compilation() -> None:
-    """Tests the compilation cache.
-
-    The actual implementation is simple, because it uses the same code paths as lowering.
-    """
+    """Tests the compilation cache."""
 
     @jace.jit
     def jaceWrapped(A: np.ndarray, B: np.ndarray) -> np.ndarray:
@@ -201,8 +198,8 @@ def test_caching_compilation() -> None:
     optiCompiled = jaceLowered.compile(optimization.DEFAULT_OPTIMIZATIONS)
     unoptiCompiled = jaceLowered.compile(optimization.NO_OPTIMIZATIONS)
 
-    # Because of the way how things work the optimized must have more than the unoptimized.
-    #  If there is sharing, then this would not be the case.
+    # Because of the way how things work the optimized must have more than the
+    #  unoptimized. If there is sharing, then this would not be the case.
     assert unoptiCompiled is not optiCompiled
     assert optiCompiled._csdfg.sdfg.number_of_nodes() == 1
     assert optiCompiled._csdfg.sdfg.number_of_nodes() < unoptiCompiled._csdfg.sdfg.number_of_nodes()
@@ -433,7 +430,6 @@ def test_caching_jax_numpy_array() -> None:
         # Now calling with the second argument, it should not longer again.
         _ = wrapped(for_calling)
         assert lowering_cnt[0] == 1, "Expected no further lowering."
-        return
 
     A_numpy = testutil.mkarray((10, 10))
     A_jax = jnp.array(A_numpy, copy=True)

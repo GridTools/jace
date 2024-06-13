@@ -7,8 +7,9 @@
 
 """Implements tests for the `broadcast_in_dim` primitive.
 
-Parts of the tests are also implemented inside `test_sub_translators_squeeze_expand_dims.py`,
-because this primitive has a relation to `squeeze`.
+Parts of the tests are also implemented inside
+`test_sub_translators_squeeze_expand_dims.py`, because this primitive has a relation to
+`squeeze`.
 
 Todo:
     - `np.meshgrid`

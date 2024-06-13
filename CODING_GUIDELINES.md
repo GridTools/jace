@@ -7,15 +7,20 @@ We follow the [Google Python Style Guide][google-style-guide] with a few minor c
 We deviate from the [Google Python Style Guide][google-style-guide] only in the following points:
 
 - We use [`ruff-linter`][ruff-linter] instead of [`pylint`][pylint].
+
 - We use [`ruff-formatter`][ruff-formatter] for source code and imports formatting, which may work differently than indicated by the guidelines in section [_3. Python Style Rules_](https://google.github.io/styleguide/pyguide.html#3-python-style-rules). For example, maximum line length is set to 100 instead of 79 (although docstring lines should still be limited to 79).
+
 - According to subsection [_2.19 Power Features_](https://google.github.io/styleguide/pyguide.html#219-power-features), direct use of _power features_ (e.g. custom metaclasses, import hacks, reflection) should be avoided, but standard library classes that internally use these power features are accepted. Following the same spirit, we allow the use of power features in infrastructure code with similar functionality and scope as the Python standard library.
+
+- For readability purposes, when a docstring contains more than the required summary line, we prefer indenting the first line at the same cursor position as the first opening quote, although this is not explicitly considered in the doctring conventions described in subsection [_3.8.1 Docstrings_](https://google.github.io/styleguide/pyguide.html#381-docstrings). Example:
 
   ```python
   # single line docstring
   """A one-line summary of the module or program, terminated by a period."""
 
   # multi-line docstring
-  """ A one-line summary of the module or program, terminated by a period.
+  """
+  A one-line summary of the module or program, terminated by a period.
 
   Leave one blank line. The rest of this docstring should contain an
   overall description of the module or program.
@@ -24,7 +29,7 @@ We deviate from the [Google Python Style Guide][google-style-guide] only in the 
 
 - According to subsection [_3.19.12 Imports For Typing_](https://google.github.io/styleguide/pyguide.html#31912-imports-for-typing), symbols from `typing` and `collections.abc` modules used in type annotations _"can be imported directly to keep common annotations concise and match standard typing practices"_. Following the same spirit, we allow symbols to be imported directly from third-party or internal modules when they only contain a collection of frequently used typying definitions.
 
-### Common questions
+### Python usage recommendations
 
 - `pass` vs `...` (`Ellipsis`)
 
@@ -33,15 +38,15 @@ We deviate from the [Google Python Style Guide][google-style-guide] only in the 
   ```python
   # Correct use of `...` as the empty body of an abstract method
   class AbstractFoo:
-     @abstractmethod
-     def bar(self) -> Bar:
-        ...
+      @abstractmethod
+      def bar(self) -> Bar: ...
+
 
   # Correct use of `pass` when mixed with other statements
   try:
-     resource.load(id=42)
+      resource.load(id=42)
   except ResourceException:
-     pass
+      pass
   ```
 
 ### Error messages
@@ -51,7 +56,9 @@ Error messages should be written as sentences, starting with a capital letter an
 Examples:
 
 ```python
-raise ValueError(f"Invalid argument 'dimension': should be of type 'Dimension', got '{dimension.type}'.")
+raise ValueError(
+    f"Invalid argument 'dimension': should be of type 'Dimension', got '{dimension.type}'."
+)
 ```
 
 Interpolated integer values do not need double quotes, if they are indicating an amount. Example:
@@ -63,19 +70,25 @@ raise ValueError(f"Invalid number of arguments: expected 3 arguments, got {len(a
 The double quotes can also be dropped when presenting a sequence of values. In this case the message should be rephrased so the sequence is separated from the text by a colon ':'.
 
 ```python
-raise ValueError(f"unexpected keyword arguments: {', '.join(set(kwarg_names) - set(expected_kwarg_names))}.")
+raise ValueError(
+    f"unexpected keyword arguments: {', '.join(set(kwarg_names) - set(expected_kwarg_names))}."
+)
 ```
 
 The message should be kept to one sentence if reasonably possible. Ideally the sentence should be kept short and avoid unnecessary words. Examples:
 
 ```python
 # too many sentences
-raise ValueError(f"Received an unexpected number of arguments. Should receive 5 arguments, but got {len(args)}. Please provide the correct number of arguments.")
+raise ValueError(
+    f"Received an unexpected number of arguments. Should receive 5 arguments, but got {len(args)}. Please provide the correct number of arguments."
+)
 # better
 raise ValueError(f"Wrong number of arguments: expected 5, got {len(args)}.")
 
 # less extreme
-raise TypeError(f"Wrong argument type. Can only accept 'int's, got '{type(arg)}' instead.")
+raise TypeError(
+    f"Wrong argument type. Can only accept 'int's, got '{type(arg)}' instead."
+)
 # but can still be improved
 raise TypeError(f"Wrong argument type: 'int' expected, got '{type(arg)}'")
 ```
@@ -86,14 +99,14 @@ The terseness vs. helpfulness tradeoff should be more in favor of terseness for 
 
 TODO: update to `autodoc2`
 
-We generate the API documentation automatically from the docstrings using [Sphinx][sphinx] and some extensions such as [Sphinx-autodoc][sphinx-autodoc] and [Sphinx-napoleon][sphinx-napoleon]. These follow the Google Python Style Guide docstring conventions to automatically format the generated documentation. A complete overview can be found here: [Example Google Style Python Docstrings](https://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html#example-google).
+We generate the API documentation automatically from the docstrings using [Sphinx] and some extensions such as [Sphinx-autodoc] and [Sphinx-napoleon]. These follow the Google Python Style Guide docstring conventions to automatically format the generated documentation. A complete overview can be found here: [Example Google Style Python Docstrings](https://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html#example-google).
 
 Sphinx supports the [reStructuredText][sphinx-rest] (reST) markup language for defining additional formatting options in the generated documentation, however section [_3.8 Comments and Docstrings_](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings) of the Google Python Style Guide does not specify how to use markups in docstrings. As a result, we decided to forbid reST markup in docstrings, except for the following cases:
 
 - Cross-referencing other objects using Sphinx text roles for the [Python domain](https://www.sphinx-doc.org/en/master/usage/restructuredtext/domains.html#the-python-domain) (as explained [here](https://www.sphinx-doc.org/en/master/usage/restructuredtext/domains.html#python-roles)).
-- Very basic formatting markup to improve _readability_ of the generated documentation without obscuring the source docstring (e.g. ` ``literal`` ` strings, bulleted lists).
+- Very basic formatting markup to improve _readability_ of the generated documentation without obscuring the source docstring (e.g. ``` ``literal`` ``` strings, bulleted lists).
 
-We highly encourage the [doctest][doctest] format for code examples in docstrings. In fact, doctest runs code examples and makes sure they are in sync with the codebase.
+We highly encourage the [doctest] format for code examples in docstrings. In fact, doctest runs code examples and makes sure they are in sync with the codebase.
 
 ### Module structure
 
@@ -124,14 +137,14 @@ Consider configuration files as another type of source code and apply the same c
 You may occasionally need to disable checks from _quality assurance_ (QA) tools (e.g. linters, type checkers, etc.) on specific lines as some tool might not be able to fully understand why a certain piece of code is needed. This is usually done with special comments, e.g. `# noqa: F401`, `# type: ignore`. However, you should **only** ignore QA errors when you fully understand their source and rewriting your code to pass QA checks would make it less readable. Additionally, you should add a short descriptive code if possible (check [ruff rules][ruff-rules] and [mypy error codes][mypy-error-codes] for reference):
 
 ```python
-f = lambda: 'empty'  # noqa: E731 [lambda-assignment]
+f = lambda: "empty"  # noqa: E731 [lambda-assignment]
 ```
 
 and, if needed, a brief comment for future reference:
 
 ```python
 ...
-return undeclared_symbol  # noqa: F821 [undefined-name] on purpose to trigger black-magic
+return undeclared  # noqa: F821 [undefined-name] on purpose to trigger black-magic
 ```
 
 ## Testing
@@ -142,9 +155,7 @@ Testing components is a critical part of a software development project. We foll
 
 [doctest]: https://docs.python.org/3/library/doctest.html
 [google-style-guide]: https://google.github.io/styleguide/pyguide.html
-[mypy]: https://mypy.readthedocs.io/
 [mypy-error-codes]: https://mypy.readthedocs.io/en/stable/error_code_list.html
-[pre-commit]: https://pre-commit.com/
 [pylint]: https://pylint.pycqa.org/
 [ruff-formatter]: https://docs.astral.sh/ruff/formatter/
 [ruff-linter]: https://docs.astral.sh/ruff/linter/

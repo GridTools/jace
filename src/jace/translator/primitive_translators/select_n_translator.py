@@ -25,7 +25,8 @@ if TYPE_CHECKING:
 
 
 class SelectNTranslator(mapped_base.MappedOperationTranslatorBase):
-    """Implements the `select_n` primitive.
+    """
+    Implements the `select_n` primitive.
 
     The `select_n` primitive is a generalization of `np.where`, that can take an
     arbitrary number of branches, which are selected by an integer predicate.
@@ -50,10 +51,11 @@ class SelectNTranslator(mapped_base.MappedOperationTranslatorBase):
         in_var_names: Sequence[str | None],
         eqn: jax_core.JaxprEqn,
     ) -> str:
-        if len(in_var_names) == 3:
-            # This order is correct, since `False` is interpreted as `0`, which means the first
-            #  case. DaCe seems to have some problems with bools and integer casting around,
-            #  so we handle the bool case explicitly here; See also `ConvertElementTypeTranslator`.
+        if len(in_var_names) == 3:  # noqa: PLR2004  # `3` is not magic.
+            # This order is correct, since `False` is interpreted as `0`, which means
+            #  the first case. DaCe seems to have some problems with bools and integer
+            #  casting around, so we handle the bool case explicitly here.
+            #  See also `ConvertElementTypeTranslator`.
             return "__out = __in1 if __cond else __in0"
 
         return "\n".join(
@@ -70,14 +72,14 @@ class SelectNTranslator(mapped_base.MappedOperationTranslatorBase):
     ) -> dict[str, dace.Memlet]:
         """We have to add the offsets to the Memlet accesses."""
         return {
-            f"__in{i-1}" if i else "__cond": dace.Memlet.simple(
+            f"__in{i - 1}" if i else "__cond": dace.Memlet.simple(
                 in_var_name, ", ".join(f"{it_idx}" for it_idx, _ in tskl_ranges)
             )
             for i, in_var_name in enumerate(in_var_names)
             if in_var_name
         }
 
-    def literal_substitution(
+    def literal_substitution(  # noqa: PLR6301
         self, tskl_code: str, in_var_names: Sequence[str | None], eqn: jax_core.JaxprEqn
     ) -> str:
         """Can not be done by the base because of the renaming."""

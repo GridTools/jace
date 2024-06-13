@@ -20,7 +20,7 @@ import jax
 import numpy as np
 import pytest
 from dace import data as dcdata
-from jax import numpy as jnp
+from jax import core as jax_core, numpy as jnp
 
 import jace
 from jace import translator, util
@@ -124,7 +124,12 @@ def test_builder_variable_alloc_mixed_naming(
 def test_builder_variable_alloc_mixed_naming2(
     translation_builder: translator.JaxprTranslationBuilder,
 ) -> None:
-    """Test automatic naming if there are variables with a given name."""
+    """Tests the naming in a mixed setting.
+
+    This time we do not use `update_var_mapping=True`, instead it now depends on the
+    name. This means that automatic naming will now again include all, letters, but not
+    in a linear order.
+    """
     letoff = 0
     #             *      a        b       c      *      d     e
     for var in [narray, array1, array2, scal1, nscal, scal2, scal3]:
@@ -212,7 +217,7 @@ def test_builder_nested(translation_builder: translator.JaxprTranslationBuilder)
     assert translation_builder.sdfg.number_of_nodes() == 2
     assert translation_builder.sdfg.number_of_edges() == 1
 
-    # Now we go one subcontext deeper; note we do this manually which should not be done.
+    # Now we go one subcontext deeper.
     jaxpr = jax.make_jaxpr(lambda A: A)(1.0)  # dummy jaxpr, needed for construction.
     translation_builder._allocate_translation_ctx(name="builder", jaxpr=jaxpr)
     assert len(translation_builder._ctx_stack) == 2
@@ -254,7 +259,9 @@ def test_builder_nested(translation_builder: translator.JaxprTranslationBuilder)
     assert translation_builder.sdfg.number_of_nodes() == 2
     assert translation_builder.sdfg.number_of_edges() == 1
 
-    # Again the variable that was declared in the nested context is now no longer present.
+    # Again the variable that was declared in the last stack is now no longer present.
+    #  Note if the nested SDFG was integrated into the parent SDFG it would be
+    #  accessible
     with pytest.raises(
         expected_exception=KeyError,
         match=re.escape(
@@ -284,8 +291,8 @@ def test_builder_append_state(translation_builder: translator.JaxprTranslationBu
     assert next(iter(sdfg.edges())).src is sdfg.start_block
     assert next(iter(sdfg.edges())).dst is terminal_state_1
 
-    # Specifying an explicit append state that is the terminal should also update the terminal
-    #  state of the builder.
+    # Specifying an explicit append state that is the terminal should also update the
+    #  terminal state of the builder.
     terminal_state_2: dace.SDFGState = translation_builder.append_new_state(
         "terminal_state_2", prev_state=terminal_state_1
     )
@@ -310,7 +317,7 @@ def test_builder_append_state(translation_builder: translator.JaxprTranslationBu
 def test_builder_variable_multiple_versions(
     translation_builder: translator.JaxprTranslationBuilder,
 ) -> None:
-    """A simple test in which we try to add a variable that is known, but with a different name."""
+    """Add an already known variable, but with a different name."""
     # Now we will add `array1` and then different ways of updating it.
     narray1: str = translation_builder.add_array(array1, update_var_mapping=True)
 
@@ -386,7 +393,6 @@ def test_builder_variable_alloc_list_cleaning(
     ):
         _ = translation_builder.create_jax_var_list(var_list)
 
-    # This currently fails, because the `create_jax_var_list()` function does not clean up.
     assert len(translation_builder.arrays) == 0
 
 
@@ -444,13 +450,10 @@ def test_builder_variable_alloc_list_handle_literal(
 
     It will test the `handle_literals` flag.
     """
-    # First we have to build a jax literal.
-    import numpy as np
-    from jax import core as jcore
 
     val = np.array(1)
-    aval = jcore.get_aval(val)
-    lit = jcore.Literal(val, aval)
+    aval = jax_core.get_aval(val)
+    lit = jax_core.Literal(val, aval)
     var_list = [lit]
 
     with pytest.raises(
@@ -470,8 +473,6 @@ def test_builder_constants(translation_builder: translator.JaxprTranslationBuild
 
     See also the `test_subtranslators_alu.py::test_add3` test.
     """
-    import jax
-
     # Create the Jaxpr that we need.
     constant = [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]
     jaxpr = jax.make_jaxpr(lambda A: A + jax.numpy.array(constant))(1.0)

@@ -16,12 +16,11 @@ import jax
 import numpy as np
 from jax import core as jax_core
 
-import jace.util as util
+from jace import util
 
 
 def is_drop_var(jax_var: jax_core.Atom | util.JaCeVar) -> TypeGuard[jax_core.DropVar]:
-    """Tests if `jax_var` is a drop variable, i.e. a variable that is not read from in a Jaxpr."""
-
+    """Tests if `jax_var` is a drop variable."""
     if isinstance(jax_var, jax_core.DropVar):
         return True
     if isinstance(jax_var, util.JaCeVar):
@@ -30,7 +29,8 @@ def is_drop_var(jax_var: jax_core.Atom | util.JaCeVar) -> TypeGuard[jax_core.Dro
 
 
 def is_jax_array(obj: Any) -> TypeGuard[jax.Array]:
-    """Tests if `obj` is a Jax array.
+    """
+    Tests if `obj` is a Jax array.
 
     Note:
      Jax arrays are special as they can not be mutated. Furthermore, they always
@@ -75,7 +75,8 @@ def is_scalar(obj: Any) -> bool:
 
 
 def get_strides_for_dace(obj: Any) -> tuple[int, ...] | None:
-    """Get the strides of `obj` in a DaCe compatible format.
+    """
+    Get the strides of `obj` in a DaCe compatible format.
 
     The function returns the strides in number of elements, as it is used inside
     DaCe and not in bytes as it is inside NumPy. As in NumPy and DaCe the function
@@ -103,7 +104,8 @@ def get_strides_for_dace(obj: Any) -> tuple[int, ...] | None:
 
 
 def is_on_device(obj: Any) -> bool:
-    """Tests if `obj` is on a device.
+    """
+    Tests if `obj` is on a device.
 
     Jax arrays are always on the CPU and GPU (if there is one). Thus for Jax
     arrays this function is more of a test, if there is a GPU at all.

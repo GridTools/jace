@@ -5,7 +5,8 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Subpackage containing all the code related to the Jaxpr to SDFG translation.
+"""
+Subpackage containing all the code related to the Jaxpr to SDFG translation.
 
 The concrete primitive translators that ships with JaCe are inside the
 `primitive_translators` subpackage.
@@ -20,7 +21,6 @@ from .primitive_translator import (
     get_registered_primitive_translators,
     make_primitive_translator,
     register_primitive_translator,
-    set_active_primitive_translators_to,
 )
 from .translated_jaxpr_sdfg import TranslatedJaxprSDFG
 
@@ -34,5 +34,4 @@ __all__ = [
     "get_registered_primitive_translators",
     "make_primitive_translator",
     "register_primitive_translator",
-    "set_active_primitive_translators_to",
 ]

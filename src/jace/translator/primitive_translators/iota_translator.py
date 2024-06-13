@@ -25,7 +25,8 @@ if TYPE_CHECKING:
 
 
 class IotaTranslator(mapped_base.MappedOperationTranslatorBase):
-    """Implements the `iota` primitive.
+    """
+    Implements the `iota` primitive.
 
     Essentially a very general `jnp.arange()` function.
     """

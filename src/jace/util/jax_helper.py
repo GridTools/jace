@@ -5,7 +5,8 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Implements all utility functions that are related to Jax.
+"""
+Implements all utility functions that are related to Jax.
 
 Most of the functions defined here allow an unified access to Jax' internal in
 a consistent and stable way.
@@ -22,7 +23,7 @@ import jax
 import jax.core as jax_core
 import numpy as np
 
-import jace.util as util
+from jace import util
 
 
 if TYPE_CHECKING:
@@ -31,7 +32,8 @@ if TYPE_CHECKING:
 
 @dataclasses.dataclass(repr=True, frozen=True, eq=False)
 class JaCeVar:
-    """Replacement for the `jax.Var` class.
+    """
+    Replacement for the `jax.Var` class.
 
     This class can be seen as some kind of substitute `jax.core.Var`. The main
     intention of this class is as an internal representation of values, as they
@@ -104,8 +106,7 @@ def get_jax_var_shape(jax_var: jax_core.Atom | JaCeVar) -> tuple[int | dace.symb
     """Returns the shape of `jax_var`."""
     match jax_var:
         case jax_core.Var() | jax_core.Literal():
-            # AbstractValue, does not have a `shape` attribute, but in all cases we care, it will.
-            assert hasattr(jax_var.aval, "shape")
+            assert hasattr(jax_var.aval, "shape")  # To silences mypy.
             return jax_var.aval.shape
         case JaCeVar():
             return jax_var.shape
@@ -117,8 +118,7 @@ def get_jax_var_dtype(jax_var: jax_core.Atom | JaCeVar) -> dace.typeclass:
     """Returns the DaCe equivalent of `jax_var`s datatype."""
     match jax_var:
         case jax_core.Var() | jax_core.Literal():
-            # AbstractValue, does not have a `dtype` attribute, but in all cases we care, it will.
-            assert hasattr(jax_var.aval, "dtype")
+            assert hasattr(jax_var.aval, "dtype")  # To silences mypy.
             return translate_dtype(jax_var.aval.dtype)
         case JaCeVar():
             return jax_var.dtype
@@ -127,16 +127,17 @@ def get_jax_var_dtype(jax_var: jax_core.Atom | JaCeVar) -> dace.typeclass:
 
 
 def is_tracing_ongoing(*args: Any, **kwargs: Any) -> bool:
-    """Test if tracing is ongoing.
+    """
+    Test if tracing is ongoing.
 
     While a return value `True` guarantees that a translation is ongoing, a
     value of `False` does not guarantees that no tracing is ongoing.
     """
     # To detect if there is tracing ongoing, we check the internal tracing stack of Jax.
-    #  Note that this is highly internal and depends on the precise implementation of Jax.
-    #  For that reason we first look at all arguments and check if they are tracers.
-    #  Furthermore, it seems that Jax always have a bottom interpreter on the stack,
-    #  this is because we empty is `len(...) == 1`!
+    #  Note that this is highly internal and depends on the precise implementation of
+    #  Jax. For that reason we first look at all arguments and check if they are
+    #  tracers. Furthermore, it seems that Jax always have a bottom interpreter on the
+    #  stack, thus it is empty if `len(...) == 1`!
     #  See also: https://github.com/google/jax/pull/3370
     if any(isinstance(x, jax_core.Tracer) for x in itertools.chain(args, kwargs.values())):
         return True
@@ -164,7 +165,8 @@ def propose_jax_name(
     jax_var: jax_core.Atom | JaCeVar,
     jax_name_map: Mapping[jax_core.Var | JaCeVar, str] | None = None,
 ) -> str:
-    """Proposes a variable name for `jax_var`.
+    """
+    Proposes a variable name for `jax_var`.
 
     If `jax_name_map` is `None` the function will fallback to
     `get_jax_var_name(jax_var)`. If `jax_name_map` is supplied the function
@@ -193,15 +195,15 @@ def propose_jax_name(
     if isinstance(jax_var, JaCeVar) and (jax_var.name is not None):
         return jax_var.name
 
-    # This code is taken from Jax so it will generate similar ways, the difference is that
-    #  we do the counting differently.
+    # This code is taken from Jax so it will generate similar ways, the difference is
+    #  that we do the counting differently.
     #  Note that `z` is followed by `ba` and not `aa` as it is in Excel.
     c = len(jax_name_map)
     jax_name = ""
     while len(jax_name) == 0 or c != 0:
         c, i = c // 26, c % 26
         jax_name = chr(97 + i) + jax_name
-    jax_name = jax_name + getattr(jax_var, "suffix", "")
+    jax_name += getattr(jax_var, "suffix", "")
 
     if jax_name in util.FORBIDDEN_SDFG_VAR_NAMES:
         jax_name = f"__jace_forbidden_{jax_name}"
@@ -209,12 +211,13 @@ def propose_jax_name(
 
 
 def get_jax_literal_value(lit: jax_core.Atom) -> bool | float | int | np.generic:
-    """Returns the value a literal is wrapping.
+    """
+    Returns the value a literal is wrapping.
 
     The function guarantees to return a scalar value.
     """
     if not isinstance(lit, jax_core.Literal):
-        raise ValueError(f"Can only extract literals not '{type(lit)}'.")
+        raise TypeError(f"Can only extract literals not '{type(lit)}'.")
     val = lit.val
     if isinstance(val, np.ndarray):
         assert val.shape == ()
