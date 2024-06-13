@@ -24,7 +24,10 @@ if TYPE_CHECKING:
     autouse=True,
     params=[
         optimization.NO_OPTIMIZATIONS,
-        optimization.DEFAULT_OPTIMIZATIONS,
+        pytest.param(
+            optimization.DEFAULT_OPTIMIZATIONS,
+            marks=pytest.mark.skip("Simplify bug 'https://github.com/spcl/dace/issues/1595'"),
+        ),
     ],
 )
 def _set_compile_options(request) -> Generator[None, None, None]:
