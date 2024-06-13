@@ -29,18 +29,18 @@ def test_caching_working() -> None:
     lowering_cnt = [0]
 
     @jace.jit
-    def wrapped(A: np.ndarray) -> jax.Array:
+    def wrapped(a: np.ndarray) -> jax.Array:
         lowering_cnt[0] += 1
-        return jnp.sin(A)
+        return jnp.sin(a)
 
-    A = testutil.make_array((10, 10))
-    ref = np.sin(A)
+    a = testutil.make_array((10, 10))
+    ref = np.sin(a)
     res_ids: set[int] = set()
     # We have to store the array, because numpy does reuse the memory.
     res_set: list[np.ndarray] = []
 
     for _ in range(10):
-        res = wrapped(A)
+        res = wrapped(a)
         res_id = res.__array_interface__["data"][0]
 
         assert np.allclose(res, ref)
@@ -57,39 +57,39 @@ def test_caching_same_sizes() -> None:
     lowering_cnt = [0]
 
     # This is the pure Python function.
-    def testee(A: np.ndarray, B: np.ndarray) -> np.ndarray:
-        return A * B
+    def testee(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+        return a * b
 
     # this is the wrapped function.
     @jace.jit
-    def wrapped(A, B):
+    def wrapped(a, b):
         lowering_cnt[0] += 1
-        return testee(A, B)
+        return testee(a, b)
 
     # First batch of arguments.
-    A = testutil.make_array((4, 3))
-    B = testutil.make_array((4, 3))
+    a = testutil.make_array((4, 3))
+    b = testutil.make_array((4, 3))
 
     # The second batch of argument, same structure, but different values.
-    AA = A + 1.0362
-    BB = B + 0.638956
+    AA = a + 1.0362
+    BB = b + 0.638956
 
     # Now let's lower it once directly and call it.
-    lowered: stages.JaCeLowered = wrapped.lower(A, B)
+    lowered: stages.JaCeLowered = wrapped.lower(a, b)
     compiled: stages.JaCeCompiled = lowered.compile()
     assert lowering_cnt[0] == 1
-    assert np.allclose(testee(A, B), compiled(A, B))
+    assert np.allclose(testee(a, b), compiled(a, b))
 
     # Now lets call the wrapped object directly, since we already did the lowering
     #  no lowering (and compiling) is needed.
-    assert np.allclose(testee(A, B), wrapped(A, B))
+    assert np.allclose(testee(a, b), wrapped(a, b))
     assert lowering_cnt[0] == 1
 
     # Now lets call it with different objects, that have the same structure.
     #  Again no lowering should happen.
     assert np.allclose(testee(AA, BB), wrapped(AA, BB))
     assert wrapped.lower(AA, BB) is lowered
-    assert wrapped.lower(A, B) is lowered
+    assert wrapped.lower(a, b) is lowered
     assert lowering_cnt[0] == 1
 
 
@@ -101,21 +101,21 @@ def test_caching_different_sizes() -> None:
 
     # This is the wrapped function.
     @jace.jit
-    def wrapped(A, B):
+    def wrapped(a, b):
         lowering_cnt[0] += 1
-        return A * B
+        return a * b
 
     # First size of arguments
-    A = testutil.make_array((4, 3))
-    B = testutil.make_array((4, 3))
+    a = testutil.make_array((4, 3))
+    b = testutil.make_array((4, 3))
 
     # Second size of arguments
-    C = testutil.make_array((4, 4))
-    D = testutil.make_array((4, 4))
+    c = testutil.make_array((4, 4))
+    d = testutil.make_array((4, 4))
 
     # Now lower the function once for each.
-    lowered1 = wrapped.lower(A, B)
-    lowered2 = wrapped.lower(C, D)
+    lowered1 = wrapped.lower(a, b)
+    lowered2 = wrapped.lower(c, d)
     assert lowering_cnt[0] == 2
     assert lowered1 is not lowered2
 
@@ -137,14 +137,14 @@ def test_caching_different_structure() -> None:
     lowering_cnt = [0]
 
     @jace.jit
-    def wrapped(A, B):
+    def wrapped(a, b):
         lowering_cnt[0] += 1
-        return A * 4.0, B + 2.0
+        return a * 4.0, b + 2.0
 
-    A = testutil.make_array((4, 30), dtype=np.float64)
-    B = testutil.make_array((4, 3), dtype=np.float64)
-    C = testutil.make_array((4, 3), dtype=np.int64)
-    D = testutil.make_array((6, 3), dtype=np.int64)
+    a = testutil.make_array((4, 30), dtype=np.float64)
+    b = testutil.make_array((4, 3), dtype=np.float64)
+    c = testutil.make_array((4, 3), dtype=np.int64)
+    d = testutil.make_array((6, 3), dtype=np.int64)
 
     # These are the known lowered instances.
     lowerings: dict[tuple[int, int], stages.JaCeLowered] = {}
@@ -154,7 +154,7 @@ def test_caching_different_structure() -> None:
     compiled_ids: set[int] = set()
 
     # Generating the lowerings
-    for arg1, arg2 in it.permutations([A, B, C, D], 2):
+    for arg1, arg2 in it.permutations([a, b, c, d], 2):
         lower = wrapped.lower(arg1, arg2)
         compiled = lower.compile()
         assert id(lower) not in lowering_ids
@@ -165,7 +165,7 @@ def test_caching_different_structure() -> None:
         compiled_ids.add(id(compiled))
 
     # Now check if they are still cached.
-    for arg1, arg2 in it.permutations([A, B, C, D], 2):
+    for arg1, arg2 in it.permutations([a, b, c, d], 2):
         lower = wrapped.lower(arg1, arg2)
         clower = lowerings[id(arg1), id(arg2)]
         assert clower is lower
@@ -181,18 +181,18 @@ def test_caching_compilation() -> None:
     """Tests the compilation cache."""
 
     @jace.jit
-    def jaceWrapped(A: np.ndarray, B: np.ndarray) -> np.ndarray:
-        C = A * B
-        D = C + A
-        E = D + B  # Just enough state.
-        return A + B + C + D + E
+    def jaceWrapped(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+        c = a * b
+        d = c + a
+        e = d + b  # Just enough state.
+        return a + b + c + d + e
 
     # These are the argument
-    A = testutil.make_array((4, 3))
-    B = testutil.make_array((4, 3))
+    a = testutil.make_array((4, 3))
+    b = testutil.make_array((4, 3))
 
     # Now we lower it.
-    jaceLowered = jaceWrapped.lower(A, B)
+    jaceLowered = jaceWrapped.lower(a, b)
 
     # Compiling it with and without optimizations enabled
     optiCompiled = jaceLowered.compile(optimization.DEFAULT_OPTIMIZATIONS)
@@ -216,9 +216,9 @@ def test_caching_compilation_options() -> None:
         lowering_cnt = [0]
 
         @jace.jit
-        def wrapped(A: float) -> float:
+        def wrapped(a: float) -> float:
             lowering_cnt[0] += 1
-            return A + 1.0
+            return a + 1.0
 
         lower_cache = wrapped._cache
         lowered = wrapped.lower(1.0)
@@ -258,23 +258,23 @@ def test_caching_dtype() -> None:
     lowering_cnt = [0]
 
     @jace.jit
-    def testee(A: np.ndarray) -> np.ndarray:
+    def testee(a: np.ndarray) -> np.ndarray:
         lowering_cnt[0] += 1
-        return A + A
+        return a + a
 
     dtypes = [np.float64, np.float32, np.int32, np.int64]
     shape = (10, 10)
 
     for i, dtype in enumerate(dtypes):
-        A = testutil.make_array(shape, dtype=dtype)
+        a = testutil.make_array(shape, dtype=dtype)
 
         # First lowering
         assert lowering_cnt[0] == i
-        _ = testee(A)
+        _ = testee(a)
         assert lowering_cnt[0] == i + 1
 
         # Second, implicit, lowering, which must be cached.
-        assert np.allclose(testee(A), 2 * A)
+        assert np.allclose(testee(a), 2 * a)
         assert lowering_cnt[0] == i + 1
 
 
@@ -282,8 +282,8 @@ def test_caching_eviction_simple() -> None:
     """Simple tests for cache eviction."""
 
     @jace.jit
-    def testee(A: np.ndarray) -> np.ndarray:
-        return A + 1.0
+    def testee(a: np.ndarray) -> np.ndarray:
+        return a + 1.0
 
     cache: tcache.StageCache = testee._cache
     assert len(cache) == 0
@@ -339,8 +339,8 @@ def test_caching_eviction_complex() -> None:
     """Tests if the stuff is properly evicted if the cache is full."""
 
     @jace.jit
-    def testee(A: np.ndarray) -> np.ndarray:
-        return A + 1.0
+    def testee(a: np.ndarray) -> np.ndarray:
+        return a + 1.0
 
     cache: tcache.StageCache = testee._cache
     capacity = cache.capacity
@@ -348,8 +348,8 @@ def test_caching_eviction_complex() -> None:
 
     # Lets fill the cache to the brim.
     for i in range(capacity):
-        A = np.ones(i + 10)
-        lowered = testee.lower(A)
+        a = np.ones(i + 10)
+        lowered = testee.lower(a)
         assert len(cache) == i + 1
 
         if i == 0:
@@ -388,24 +388,24 @@ def test_caching_strides() -> None:
     lower_cnt = [0]
 
     @jace.jit
-    def wrapped(A: np.ndarray) -> np.ndarray:
+    def wrapped(a: np.ndarray) -> np.ndarray:
         lower_cnt[0] += 1
-        return A + 10.0
+        return a + 10.0
 
     shape = (10, 100, 1000)
-    C = testutil.make_array(shape, order="C")
-    F = np.array(C, copy=True, order="F")
+    array_c = testutil.make_array(shape, order="c")
+    array_f = np.array(array_c, copy=True, order="F")
 
-    # First we compile run it with C strides.
-    C_lower = wrapped.lower(C)
-    C_res = wrapped(C)
+    # First we compile run it with c strides.
+    lower_c = wrapped.lower(array_c)
+    res_c = wrapped(array_c)
 
-    F_lower = wrapped.lower(F)
-    F_res = F_lower.compile()(F)
+    lower_f = wrapped.lower(array_f)
+    res_f = lower_f.compile()(array_f)
 
-    assert C_res is not F_res
-    assert np.allclose(F_res, C_res)
-    assert F_lower is not C_lower
+    assert res_c is not res_f
+    assert np.allclose(res_f, res_c)
+    assert lower_f is not lower_c
     assert lower_cnt[0] == 2
 
 
@@ -419,9 +419,9 @@ def test_caching_jax_numpy_array() -> None:
         lowering_cnt = [0]
 
         @jace.jit
-        def wrapped(A: np.ndarray | jax.Array) -> np.ndarray | jax.Array:
+        def wrapped(a: np.ndarray | jax.Array) -> np.ndarray | jax.Array:
             lowering_cnt[0] += 1
-            return A + 1.0
+            return a + 1.0
 
         # Explicit lowering.
         _ = wrapped(for_lowering)
@@ -431,9 +431,9 @@ def test_caching_jax_numpy_array() -> None:
         _ = wrapped(for_calling)
         assert lowering_cnt[0] == 1, "Expected no further lowering."
 
-    A_numpy = testutil.make_array((10, 10))
-    A_jax = jnp.array(A_numpy, copy=True)
-    assert A_numpy.dtype == A_jax.dtype
+    a_numpy = testutil.make_array((10, 10))
+    a_jax = jnp.array(a_numpy, copy=True)
+    assert a_numpy.dtype == a_jax.dtype
 
-    _test_impl(A_numpy, A_jax)
-    _test_impl(A_jax, A_numpy)
+    _test_impl(a_numpy, a_jax)
+    _test_impl(a_jax, a_numpy)

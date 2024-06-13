@@ -18,11 +18,12 @@ from tests import util as testutil
 
 def test_copy() -> None:
     @jace.jit
-    def testee(A: np.ndarray) -> jax.Array:
-        return jnp.copy(A)
+    def testee(a: np.ndarray) -> jax.Array:
+        return jnp.copy(a)
 
-    A = testutil.make_array((10, 10, 10))
-    res = testee(A)
-    assert A.dtype == res.dtype
-    assert A.shape == res.shape
-    assert np.all(res == A)
+    a = testutil.make_array((10, 10, 10))
+    res = testee(a)
+    assert a.dtype == res.dtype
+    assert a.shape == res.shape
+    assert a.__array_interface__["data"][0] != res.__array_interface__["data"][0]
+    assert np.all(res == a)

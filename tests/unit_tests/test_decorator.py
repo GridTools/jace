@@ -22,24 +22,24 @@ from tests import util as testutil
 def test_decorator_individually() -> None:
     """Tests the compilation steps individually."""
 
-    def testee_(A: np.ndarray, B: np.ndarray) -> np.ndarray:
-        return A + B
+    def testee_(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+        return a + b
 
     lowering_cnt = [0]
 
     @jace.jit
-    def testee(A, B):
+    def testee(a, b):
         lowering_cnt[0] += 1
-        return testee_(A, B)
+        return testee_(a, b)
 
-    A = testutil.make_array((4, 3))
-    B = testutil.make_array((4, 3))
+    a = testutil.make_array((4, 3))
+    b = testutil.make_array((4, 3))
 
-    lowered = testee.lower(A, B)
+    lowered = testee.lower(a, b)
     compiled = lowered.compile()
 
-    ref = testee_(A, B)
-    res = compiled(A, B)
+    ref = testee_(a, b)
+    res = compiled(a, b)
 
     assert np.allclose(ref, res), f"Expected '{ref}' got '{res}'."
     assert lowering_cnt[0] == 1
@@ -48,21 +48,21 @@ def test_decorator_individually() -> None:
 def test_decorator_one_go() -> None:
     """Tests the compilation steps in one go."""
 
-    def testee_(A: np.ndarray, B: np.ndarray) -> np.ndarray:
-        return A + B
+    def testee_(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+        return a + b
 
     lowering_cnt = [0]
 
     @jace.jit
-    def testee(A, B):
+    def testee(a, b):
         lowering_cnt[0] += 1
-        return testee_(A, B)
+        return testee_(a, b)
 
-    A = testutil.make_array((4, 3))
-    B = testutil.make_array((4, 3))
+    a = testutil.make_array((4, 3))
+    b = testutil.make_array((4, 3))
 
-    ref = testee_(A, B)
-    res = testee(A, B)
+    ref = testee_(a, b)
+    res = testee(a, b)
 
     assert np.allclose(ref, res), f"Expected '{ref}' got '{res}'."
     assert lowering_cnt[0] == 1
@@ -71,8 +71,8 @@ def test_decorator_one_go() -> None:
 def test_decorator_wrapped() -> None:
     """Tests if some properties are set correctly."""
 
-    def testee(A: np.ndarray, B: np.ndarray) -> np.ndarray:
-        return A * B
+    def testee(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+        return a * b
 
     wrapped = jace.jit(testee)
 

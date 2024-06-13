@@ -44,12 +44,12 @@ def vector_shape(request) -> tuple[int, ...]:
 def test_bid_scalar() -> None:
     """Broadcast a scalar to a matrix."""
 
-    def testee(A: float) -> jax.Array:
-        return jnp.broadcast_to(A, (2, 2))
+    def testee(a: float) -> jax.Array:
+        return jnp.broadcast_to(a, (2, 2))
 
-    A = 1.032
-    ref = testee(A)
-    res = jace.jit(testee)(A)
+    a = 1.032
+    ref = testee(a)
+    res = jace.jit(testee)(a)
 
     assert res.shape == ref.shape
     assert res.dtype == ref.dtype
@@ -72,12 +72,12 @@ def test_bid_literal() -> None:
 def test_bid_vector(vector_shape: Sequence[int]) -> None:
     """Broadcast a vector to a tensor."""
 
-    def testee(A: np.ndarray) -> jax.Array:
-        return jnp.broadcast_to(A, (10, 10))
+    def testee(a: np.ndarray) -> jax.Array:
+        return jnp.broadcast_to(a, (10, 10))
 
-    A = testutil.make_array(vector_shape)
-    ref = testee(A)
-    res = jace.jit(testee)(A)
+    a = testutil.make_array(vector_shape)
+    ref = testee(a)
+    res = jace.jit(testee)(a)
     assert res.shape == ref.shape
     assert res.dtype == ref.dtype
     assert np.all(res == ref)

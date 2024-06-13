@@ -22,69 +22,69 @@ import jace
 
 def test_empty_single_return() -> None:
     @jace.jit
-    def wrapped(A: np.ndarray) -> np.ndarray:
-        return A
+    def wrapped(a: np.ndarray) -> np.ndarray:
+        return a
 
-    A = np.arange(12, dtype=np.float64).reshape((4, 3))
-    res = wrapped(A)
+    a = np.arange(12, dtype=np.float64).reshape((4, 3))
+    res = wrapped(a)
 
-    assert np.all(res == A)
-    assert res.__array_interface__["data"][0] != A.__array_interface__["data"][0]
+    assert np.all(res == a)
+    assert res.__array_interface__["data"][0] != a.__array_interface__["data"][0]
 
 
 def test_empty_multiple_return() -> None:
     @jace.jit
-    def wrapped(A: np.ndarray, B: np.float64) -> tuple[np.ndarray, np.float64]:
-        return A, B
+    def wrapped(a: np.ndarray, b: np.float64) -> tuple[np.ndarray, np.float64]:
+        return a, b
 
-    A = np.arange(12, dtype=np.float64).reshape((4, 3))
-    B = np.float64(30.0)
-    res = wrapped(A, B)
+    a = np.arange(12, dtype=np.float64).reshape((4, 3))
+    b = np.float64(30.0)
+    res = wrapped(a, b)
 
-    assert np.all(res[0] == A)
-    assert res[1] == B
-    assert res[0].__array_interface__["data"][0] != A.__array_interface__["data"][0]
+    assert np.all(res[0] == a)
+    assert res[1] == b
+    assert res[0].__array_interface__["data"][0] != a.__array_interface__["data"][0]
 
 
 def test_empty_unused_argument() -> None:
     """Empty body and an unused input argument."""
 
     @jace.jit
-    def wrapped(A: np.ndarray, B: np.float64) -> np.ndarray:  # noqa: ARG001  # Explicitly unused.
-        return A
+    def wrapped(a: np.ndarray, b: np.float64) -> np.ndarray:  # noqa: ARG001  # Explicitly unused.
+        return a
 
-    A = np.arange(12, dtype=np.float64).reshape((4, 3))
-    B = np.float64(30.0)
-    lowered = wrapped.lower(A, B)
+    a = np.arange(12, dtype=np.float64).reshape((4, 3))
+    b = np.float64(30.0)
+    lowered = wrapped.lower(a, b)
     compiled = lowered.compile()
-    res = compiled(A, B)
+    res = compiled(a, b)
 
     assert len(lowered._translated_sdfg.inp_names) == 2
     assert len(compiled._csdfg.inp_names) == 2
     assert isinstance(res, np.ndarray)
-    assert np.all(res == A)
-    assert res.__array_interface__["data"][0] != A.__array_interface__["data"][0]
+    assert np.all(res == a)
+    assert res.__array_interface__["data"][0] != a.__array_interface__["data"][0]
 
 
 def test_empty_scalar() -> None:
     @jace.jit
-    def wrapped(A: np.float64) -> np.float64:
-        return A
+    def wrapped(a: np.float64) -> np.float64:
+        return a
 
-    A = np.pi
+    a = np.pi
 
-    assert np.all(wrapped(A) == A)
+    assert np.all(wrapped(a) == a)
 
 
 @pytest.mark.skip(reason="Nested Jaxpr are not handled.")
 def test_empty_nested() -> None:
     @jace.jit
-    def wrapped(A: np.float64) -> np.float64:
-        return jax.jit(lambda A: A)(A)
+    def wrapped(a: np.float64) -> np.float64:
+        return jax.jit(lambda a: a)(a)
 
-    A = np.pi
+    a = np.pi
 
-    assert np.all(wrapped(A) == A)
+    assert np.all(wrapped(a) == a)
 
 
 @pytest.mark.skip(reason="Literal return value is not implemented.")
@@ -112,8 +112,8 @@ def test_empty_with_drop_vars() -> None:
     def testee(a: np.float64, b: np.float64) -> np.float64:
         return a + b
 
-    A = np.e
-    ref = testee(A)
-    res = jace.jit(testee)(A)
+    a = np.e
+    ref = testee(a)
+    res = jace.jit(testee)(a)
 
     assert np.all(ref == res)

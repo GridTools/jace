@@ -59,15 +59,15 @@ def dst_type(request) -> type:
 def _convert_element_type_impl(input_type: type, output_type: type) -> None:
     """Implementation of the tests of the convert element types primitive."""
     lowering_cnt = [0]
-    A: np.ndarray = testutil.make_array((10, 10), input_type)
-    ref: np.ndarray = np.array(A, copy=True, dtype=output_type)
+    a: np.ndarray = testutil.make_array((10, 10), input_type)
+    ref: np.ndarray = np.array(a, copy=True, dtype=output_type)
 
     @jace.jit
-    def converter(A: np.ndarray) -> jax.Array:
+    def converter(a: np.ndarray) -> jax.Array:
         lowering_cnt[0] += 1
-        return jnp.array(A, copy=False, dtype=output_type)
+        return jnp.array(a, copy=False, dtype=output_type)
 
-    res = converter(A)
+    res = converter(a)
     assert lowering_cnt[0] == 1
     assert (
         res.dtype == output_type

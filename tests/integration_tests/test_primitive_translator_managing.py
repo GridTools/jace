@@ -168,11 +168,11 @@ def test_subtranslatior_managing_overwriting_2() -> None:
         trans_cnt[0] += 1
 
     @jace.jit
-    def foo(A: int) -> int:
-        B = A + 1
-        C = B + 1
-        D = C + 1
-        return D + 1
+    def foo(a: int) -> int:
+        b = a + 1
+        c = b + 1
+        d = c + 1
+        return d + 1
 
     with pytest.warns(
         UserWarning,
@@ -190,27 +190,27 @@ def test_subtranslatior_managing_decoupling() -> None:
 
     # This will use the translators that are currently installed.
     @jace.jit
-    def foo(A: int) -> int:
-        B = A + 1
-        C = B + 1
-        D = C + 1
-        return D + 1
+    def foo(a: int) -> int:
+        b = a + 1
+        c = b + 1
+        d = c + 1
+        return d + 1
 
     # Now register the add translator.
     translator.register_primitive_translator(fake_add_translator, overwrite=True)
 
     # Since `foo` was already constructed, a new registering can not change anything.
-    A = np.zeros((10, 10))
-    assert np.all(foo(A) == 4)
+    a = np.zeros((10, 10))
+    assert np.all(foo(a) == 4)
 
     # But if we now annotate a new function, then we will get fake translator
     @jace.jit
-    def foo_fail(A):
-        B = A + 1
-        return B + 1
+    def foo_fail(a):
+        b = a + 1
+        return b + 1
 
     with pytest.raises(
         expected_exception=NotImplementedError,
         match=re.escape("'fake_add_translator()' was called."),
     ):
-        _ = foo_fail.lower(A)
+        _ = foo_fail.lower(a)

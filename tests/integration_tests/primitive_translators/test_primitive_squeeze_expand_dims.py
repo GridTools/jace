@@ -39,20 +39,20 @@ def _roundtrip_implementation(shape: Sequence[int], axis: int | Sequence[int]) -
         shape:  Shape of the input array.
         axes:   A series of axis that should be tried.
     """
-    A = testutil.make_array(shape)
-    A_org = A.copy()
+    a = testutil.make_array(shape)
+    a_org = a.copy()
 
     for ops in [jnp.expand_dims, jnp.squeeze]:
         with jax.experimental.enable_x64():
-            ref = ops(A, axis)  # type: ignore[operator]  # Function of unknown type.
-            res = jace.jit(lambda A: ops(A, axis))(A)  # type: ignore[operator]  # noqa: B023
+            ref = ops(a, axis)  # type: ignore[operator]  # Function of unknown type.
+            res = jace.jit(lambda a: ops(a, axis))(a)  # type: ignore[operator]  # noqa: B023
 
-        assert ref.shape == res.shape, f"A.shape = {shape}; Expected: {ref.shape}; Got: {res.shape}"
+        assert ref.shape == res.shape, f"a.shape = {shape}; Expected: {ref.shape}; Got: {res.shape}"
         assert ref.dtype == res.dtype
         assert np.all(ref == res), f"Value error for shape '{shape}' and axis={axis}"
-        A = np.array(ref, copy=True)  # It is a Jax array, and we have to reverse this.
-    assert A_org.shape == res.shape
-    assert np.all(A_org == res)
+        a = np.array(ref, copy=True)  # It is a Jax array, and we have to reverse this.
+    assert a_org.shape == res.shape
+    assert np.all(a_org == res)
 
 
 @pytest.fixture(params=[0, -1, 1])

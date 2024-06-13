@@ -27,16 +27,16 @@ def test_mismatch_in_datatype_calling() -> None:
     """
 
     @jace.jit
-    def testee(A: np.ndarray) -> np.ndarray:
-        return -A
+    def testee(a: np.ndarray) -> np.ndarray:
+        return -a
 
     # Different types.
-    A1 = testutil.make_array((4, 3), dtype=np.float32)
-    A2 = testutil.make_array((4, 3), dtype=np.int64)
+    a1 = testutil.make_array((4, 3), dtype=np.float32)
+    a2 = testutil.make_array((4, 3), dtype=np.int64)
 
     # Lower and compilation for first type
-    callee = testee.lower(A1).compile()
+    callee = testee.lower(a1).compile()
 
     # But calling with the second type
     with pytest.raises(Exception):  # noqa: B017, PT011 # Unknown exception.
-        _ = callee(A2)
+        _ = callee(a2)

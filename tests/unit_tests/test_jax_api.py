@@ -24,17 +24,17 @@ from tests import util as testutil
 def test_jit() -> None:
     """Simple add function."""
 
-    def testee(A: np.ndarray, B: np.ndarray) -> np.ndarray:
-        return A + B
+    def testee(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+        return a + b
 
-    A = testutil.make_array((4, 3))
-    B = testutil.make_array((4, 3))
+    a = testutil.make_array((4, 3))
+    b = testutil.make_array((4, 3))
 
     jax_testee = jax.jit(testee)
     jace_testee = jace.jit(testee)
 
-    ref = jax_testee(A, B)
-    res = jace_testee(A, B)
+    ref = jax_testee(a, b)
+    res = jace_testee(a, b)
 
     assert np.allclose(ref, res), f"Expected '{ref}' got '{res}'."
 
@@ -80,19 +80,19 @@ def test_composition_itself() -> None:
 def test_composition_with_jax() -> None:
     """Tests if JaCe can interact with Jax and vice versa."""
 
-    def base_fun(A, B, C):
-        return A + B * jnp.sin(C) - A * B
+    def base_fun(a, b, C):
+        return a + b * jnp.sin(C) - a * b
 
     @jace.jit
-    def jace_fun(A, B, C):
-        return jax.jit(base_fun)(A, B, C)
+    def jace_fun(a, b, C):
+        return jax.jit(base_fun)(a, b, C)
 
-    def jax_fun(A, B, C):
-        return jace.jit(base_fun)(A, B, C)
+    def jax_fun(a, b, C):
+        return jace.jit(base_fun)(a, b, C)
 
-    A, B, C = (testutil.make_array((10, 3, 50)) for _ in range(3))
+    a, b, C = (testutil.make_array((10, 3, 50)) for _ in range(3))
 
-    assert np.allclose(jace_fun(A, B, C), jax_fun(A, B, C))
+    assert np.allclose(jace_fun(a, b, C), jax_fun(a, b, C))
 
 
 @pytest.mark.skip(reason="Nested Jaxpr are not handled.")
@@ -100,26 +100,26 @@ def test_composition_with_jax_2() -> None:
     """Second test if JaCe can interact with Jax and vice versa."""
 
     @jax.jit
-    def f1_jax(A, B):
-        return A + B
+    def f1_jax(a, b):
+        return a + b
 
     @jace.jit
-    def f2_jace(A, B, C):
-        return f1_jax(A, B) - C
+    def f2_jace(a, b, C):
+        return f1_jax(a, b) - C
 
     @jax.jit
-    def f3_jax(A, B, C, D):
-        return f2_jace(A, B, C) * D
+    def f3_jax(a, b, C, D):
+        return f2_jace(a, b, C) * D
 
     @jace.jit
-    def f3_jace(A, B, C, D):
-        return f3_jax(A, B, C, D)
+    def f3_jace(a, b, C, D):
+        return f3_jax(a, b, C, D)
 
-    A, B, C, D = (testutil.make_array((10, 3, 50)) for _ in range(4))
+    a, b, C, D = (testutil.make_array((10, 3, 50)) for _ in range(4))
 
-    ref = ((A + B) - C) * D
-    res_jax = f3_jax(A, B, C, D)
-    res_jace = f3_jace(A, B, C, D)
+    ref = ((a + b) - C) * D
+    res_jax = f3_jax(a, b, C, D)
+    res_jace = f3_jace(a, b, C, D)
 
     assert np.allclose(ref, res_jax), "Jax failed."
     assert np.allclose(ref, res_jace), "JaCe Failed."
@@ -180,20 +180,20 @@ def test_disabled_x64() -> None:
         Once the x64 issue is resolved make this test a bit more useful.
     """
 
-    def testee(A: np.ndarray, B: np.float64) -> np.ndarray:
-        return A + B
+    def testee(a: np.ndarray, b: np.float64) -> np.ndarray:
+        return a + b
 
-    A = testutil.make_array((4, 3))
-    B = np.float64(10.0)
+    a = testutil.make_array((4, 3))
+    b = np.float64(10.0)
 
     # Run them with disabled x64 support
     #  This is basically a reimplementation of the `JaCeWrapped.lower()` function.
     #  but we have to do it this way to disable the x64 mode in translation.
     with jax.experimental.disable_x64():
-        jaxpr = jax.make_jaxpr(testee)(A, B)
+        jaxpr = jax.make_jaxpr(testee)(a, b)
 
     _, flat_in_vals, _ = ptrans.trace_and_flatten_function(
-        fun=testee, trace_call_args=(A, B), trace_call_kwargs={}, trace_options={}
+        fun=testee, trace_call_args=(a, b), trace_call_kwargs={}, trace_options={}
     )
     builder = translator.JaxprTranslationBuilder(
         primitive_translators=translator.get_registered_primitive_translators()
@@ -256,13 +256,13 @@ def test_no_input() -> None:
 def test_jax_array_as_input() -> None:
     """This function tests if we use Jax arrays as inputs."""
 
-    def testee(A: jax.Array) -> jax.Array:
-        return jnp.sin(A + 1.0)
+    def testee(a: jax.Array) -> jax.Array:
+        return jnp.sin(a + 1.0)
 
-    A = jnp.array(testutil.make_array((10, 19)))
+    a = jnp.array(testutil.make_array((10, 19)))
 
-    ref = testee(A)
-    res = jace.jit(testee)(A)
+    ref = testee(a)
+    res = jace.jit(testee)(a)
 
     assert res.shape == ref.shape
     assert res.dtype == ref.dtype
@@ -272,14 +272,14 @@ def test_jax_array_as_input() -> None:
 def test_jax_pytree() -> None:
     """Perform if pytrees are handled correctly."""
 
-    def testee(A: dict[str, np.ndarray]) -> dict[str, jax.Array]:
-        mod_a = {k: jnp.sin(v) for k, v in A.items()}
-        mod_a["__additional"] = jnp.asin(A["a1"])
+    def testee(a: dict[str, np.ndarray]) -> dict[str, jax.Array]:
+        mod_a = {k: jnp.sin(v) for k, v in a.items()}
+        mod_a["__additional"] = jnp.asin(a["a1"])
         return mod_a
 
-    A = {f"a{i}": testutil.make_array((10, 10)) for i in range(4)}
-    ref = testee(A)
-    res = jace.jit(testee)(A)
+    a = {f"a{i}": testutil.make_array((10, 10)) for i in range(4)}
+    ref = testee(a)
+    res = jace.jit(testee)(a)
 
     assert len(res) == len(ref)
     assert type(res) == type(ref)

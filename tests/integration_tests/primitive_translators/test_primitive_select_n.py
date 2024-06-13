@@ -31,8 +31,8 @@ def _perform_test(testee: Callable, *args: Any) -> None:
 
 
 def test_select_n_where() -> None:
-    def testee(P: np.ndarray, T: np.ndarray, F: np.ndarray) -> jax.Array:
-        return jnp.where(P, T, F)
+    def testee(pred: np.ndarray, tbranch: np.ndarray, fbranch: np.ndarray) -> jax.Array:
+        return jnp.where(pred, tbranch, fbranch)
 
     shape = (10, 10)
     pred = testutil.make_array(shape, np.bool_)
@@ -42,14 +42,14 @@ def test_select_n_where() -> None:
 
 
 def test_select_n_where_literal() -> None:
-    def testee1(P: np.ndarray, F: np.ndarray) -> jax.Array:
-        return jnp.where(P, 2, F)
+    def testee1(pred: np.ndarray, fbranch: np.ndarray) -> jax.Array:
+        return jnp.where(pred, 2, fbranch)
 
-    def testee2(P: np.ndarray, T: np.ndarray) -> jax.Array:
-        return jnp.where(P, T, 3)
+    def testee2(pred: np.ndarray, tbranch: np.ndarray) -> jax.Array:
+        return jnp.where(pred, tbranch, 3)
 
-    def testee3(P: np.ndarray) -> jax.Array:
-        return jnp.where(P, 8, 9)
+    def testee3(pred: np.ndarray) -> jax.Array:
+        return jnp.where(pred, 8, 9)
 
     shape = ()
     pred = testutil.make_array(shape, np.bool_)

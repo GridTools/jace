@@ -67,7 +67,7 @@ def test_builder_alloc() -> None:
 
     # The reserved names will be tested in `test_builder_fork()`.
     sdfg_name = "qwertzuiopasdfghjkl"
-    jaxpr = jax.make_jaxpr(lambda A: A)(1.0)  # dummy jaxpr, needed for construction.
+    jaxpr = jax.make_jaxpr(lambda x: x)(1.0)  # dummy jaxpr, needed for construction.
     builder._allocate_translation_ctx(name=sdfg_name, jaxpr=jaxpr)
     assert len(builder._ctx_stack) == 1
     assert builder.is_root_translator()
@@ -218,7 +218,7 @@ def test_builder_nested(translation_builder: translator.JaxprTranslationBuilder)
     assert translation_builder.sdfg.number_of_edges() == 1
 
     # Now we go one subcontext deeper.
-    jaxpr = jax.make_jaxpr(lambda A: A)(1.0)  # dummy jaxpr, needed for construction.
+    jaxpr = jax.make_jaxpr(lambda x: x)(1.0)  # dummy jaxpr, needed for construction.
     translation_builder._allocate_translation_ctx(name="builder", jaxpr=jaxpr)
     assert len(translation_builder._ctx_stack) == 2
     assert translation_builder.sdfg.name == "builder"
@@ -475,7 +475,7 @@ def test_builder_constants(translation_builder: translator.JaxprTranslationBuild
     """
     # Create the Jaxpr that we need.
     constant = [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]
-    jaxpr = jax.make_jaxpr(lambda A: A + jax.numpy.array(constant))(1.0)
+    jaxpr = jax.make_jaxpr(lambda x: x + jax.numpy.array(constant))(1.0)
 
     # We have to manually allocate the builder context.
     #  You should not do that.
@@ -495,15 +495,15 @@ def test_builder_constants(translation_builder: translator.JaxprTranslationBuild
 def test_builder_scalar_return_value() -> None:
     """Tests if scalars can be returned directly."""
 
-    def scalar_ops(A: float) -> float:
-        return A + A - A * A
+    def scalar_ops(a: float) -> float:
+        return a + a - a * a
 
     lower_cnt = [0]
 
     @jace.jit
-    def wrapped(A: float) -> float:
+    def wrapped(a: float) -> float:
         lower_cnt[0] += 1
-        return scalar_ops(A)
+        return scalar_ops(a)
 
     vals = testutil.make_array(100)
     for i in range(vals.size):
@@ -517,11 +517,11 @@ def test_builder_scalar_return_type() -> None:
     """As Jax we always return an array, even for a scalar."""
 
     @jace.jit
-    def wrapped(A: np.float64) -> np.float64:
-        return A + A - A * A
+    def wrapped(a: np.float64) -> np.float64:
+        return a + a - a * a
 
-    A = np.float64(1.0)
-    res = wrapped(A)
+    a = np.float64(1.0)
+    res = wrapped(a)
     assert res.shape == (1,)
     assert res.dtype == np.float64
     assert res[0] == np.float64(1.0)
@@ -534,17 +534,17 @@ def test_builder_multiple_return_values() -> None:
     """
 
     @jace.jit
-    def wrapped(A: np.ndarray, B: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        return A + B, A - B
+    def wrapped(a: np.ndarray, b: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        return a + b, a - b
 
-    A = testutil.make_array((2, 2))
-    B = testutil.make_array((2, 2))
+    a = testutil.make_array((2, 2))
+    b = testutil.make_array((2, 2))
 
-    lowered = wrapped.lower(A, B)
+    lowered = wrapped.lower(a, b)
     compiled = lowered.compile()
 
-    ref = (A + B, A - B)
-    res = compiled(A, B)
+    ref = (a + b, a - b)
+    res = compiled(a, b)
 
     assert len(lowered._translated_sdfg.inp_names) == 2
     assert len(compiled._csdfg.inp_names) == 2
@@ -567,34 +567,34 @@ def test_builder_direct_return() -> None:
     """
 
     @jace.jit
-    def wrapped(A: np.ndarray, B: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        return A + B, B, A
+    def wrapped(a: np.ndarray, b: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        return a + b, b, a
 
-    A = testutil.make_array((2, 2))
-    B = testutil.make_array((2, 2))
+    a = testutil.make_array((2, 2))
+    b = testutil.make_array((2, 2))
 
-    ref0 = A + B
-    res = wrapped(A, B)
+    ref0 = a + b
+    res = wrapped(a, b)
 
     assert isinstance(res, tuple)
     assert len(res) == 3
     assert np.allclose(ref0, res[0])
-    assert np.all(res[2] == A)
-    assert res[2].__array_interface__["data"][0] != A.__array_interface__["data"][0]
-    assert np.all(res[1] == B)
-    assert res[1].__array_interface__["data"][0] != B.__array_interface__["data"][0]
+    assert np.all(res[2] == a)
+    assert res[2].__array_interface__["data"][0] != a.__array_interface__["data"][0]
+    assert np.all(res[1] == b)
+    assert res[1].__array_interface__["data"][0] != b.__array_interface__["data"][0]
 
 
 @pytest.mark.skip(reason="Literal return values are not supported.")
 def test_builder_literal_return_value() -> None:
     """Tests if there can be literals in the return values."""
 
-    def testee(A: np.ndarray) -> tuple[np.ndarray, np.float64, np.ndarray]:
-        return (A + 1.0, np.float64(1.0), A - 1.0)
+    def testee(a: np.ndarray) -> tuple[np.ndarray, np.float64, np.ndarray]:
+        return (a + 1.0, np.float64(1.0), a - 1.0)
 
-    A = testutil.make_array((2, 2))
-    ref = testee(A)
-    res = jace.jit(testee)(A)
+    a = testutil.make_array((2, 2))
+    ref = testee(a)
+    res = jace.jit(testee)(a)
 
     assert isinstance(res, tuple)
     assert len(res) == 3
@@ -605,20 +605,20 @@ def test_builder_literal_return_value() -> None:
 def test_builder_unused_arg() -> None:
     """Tests if there is an unused argument."""
 
-    def testee(A: np.ndarray, B: np.ndarray) -> np.ndarray:  # noqa: ARG001  # Explicitly unused.
-        return A + 3.0
+    def testee(a: np.ndarray, b: np.ndarray) -> np.ndarray:  # noqa: ARG001  # Explicitly unused.
+        return a + 3.0
 
-    A = testutil.make_array((10, 10))
-    B = testutil.make_array((11, 11))
-    C = testutil.make_array((20, 20))
+    a = testutil.make_array((10, 10))
+    b = testutil.make_array((11, 11))
+    c = testutil.make_array((20, 20))
 
     wrapped = jace.jit(testee)
-    lowered = wrapped.lower(A, B)
+    lowered = wrapped.lower(a, b)
     compiled = lowered.compile()
 
-    ref = testee(A, B)
-    res1 = compiled(A, B)  # Correct call
-    res2 = compiled(A, C)  # wrong call to show that nothing is affected.
+    ref = testee(a, b)
+    res1 = compiled(a, b)  # Correct call
+    res2 = compiled(a, c)  # wrong call to show that nothing is affected.
 
     assert len(lowered._translated_sdfg.inp_names) == 2
     assert len(compiled._csdfg.inp_names) == 2
@@ -643,12 +643,12 @@ def test_builder_F_strides() -> None:
         See also `tests/test_caching.py::test_caching_strides`.
     """
 
-    def testee(A: np.ndarray) -> np.ndarray:
-        return A + 10.0
+    def testee(a: np.ndarray) -> np.ndarray:
+        return a + 10.0
 
-    A = testutil.make_array((4, 3), order="F")
-    ref = testee(A)
-    res = jace.jit(testee)(A)
+    a = testutil.make_array((4, 3), order="F")
+    ref = testee(a)
+    res = jace.jit(testee)(a)
 
     assert ref.shape == res.shape
     assert np.allclose(ref, res)
@@ -658,11 +658,11 @@ def test_builder_drop_variables() -> None:
     """Tests if the builder can handle drop variables."""
 
     @jace.grad
-    def testee(A: np.float64) -> jax.Array:
-        return jnp.exp(jnp.sin(jnp.tan(A**3))) ** 2
+    def testee(a: np.float64) -> jax.Array:
+        return jnp.exp(jnp.sin(jnp.tan(a**3))) ** 2
 
-    A = np.e
-    ref = testee(A)
-    res = jace.jit(testee)(A)
+    a = np.e
+    ref = testee(a)
+    res = jace.jit(testee)(a)
 
     assert np.allclose(ref, res)

@@ -16,8 +16,8 @@ import jace
 
 
 def test_iota_arange() -> None:
-    def testee(A: int) -> jax.Array:
-        return jnp.arange(18, dtype=int) + A
+    def testee(a: int) -> jax.Array:
+        return jnp.arange(18, dtype=int) + a
 
     ref = testee(0)
     res = jace.jit(testee)(0)
@@ -28,8 +28,8 @@ def test_iota_arange() -> None:
 def test_iota_broadcast(d) -> None:
     shape = (2, 2, 2, 2)
 
-    def testee(A: np.int32) -> jax.Array:
-        return jax.lax.broadcasted_iota("int32", shape, d) + A
+    def testee(a: np.int32) -> jax.Array:
+        return jax.lax.broadcasted_iota("int32", shape, d) + a
 
     ref = testee(np.int32(0))
     res = jace.jit(testee)(np.int32(0))

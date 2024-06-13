@@ -191,10 +191,7 @@ def _perform_alt_test(testee: Callable, *args: Any) -> None:
     ref = testee(*args)
     res = wrapped(*args)
 
-    if jace.util.is_scalar(ref):
-        # Builder hack, only arrays are generated.
-        assert res.shape == (1,)
-    elif ref.shape == ():
+    if jace.util.is_scalar(ref) or ref.shape == ():
         assert res.shape == (1,)
     else:
         assert ref.shape == res.shape
@@ -206,119 +203,119 @@ def _perform_alt_test(testee: Callable, *args: Any) -> None:
 
 
 def test_mapped_unary_scalar() -> None:
-    def testee(A: np.float64) -> np.float64 | jax.Array:
-        return jnp.cos(A)
+    def testee(a: np.float64) -> np.float64 | jax.Array:
+        return jnp.cos(a)
 
     _perform_alt_test(testee, np.float64(1.0))
 
 
 def test_mapped_unary_array() -> None:
-    def testee(A: np.ndarray) -> jax.Array:
-        return jnp.sin(A)
+    def testee(a: np.ndarray) -> jax.Array:
+        return jnp.sin(a)
 
-    A = testutil.make_array((100, 10, 3))
+    a = testutil.make_array((100, 10, 3))
 
-    _perform_alt_test(testee, A)
+    _perform_alt_test(testee, a)
 
 
 def test_mapped_unary_scalar_literal() -> None:
-    def testee(A: float) -> float | jax.Array:
-        return jnp.sin(1.98) + A
+    def testee(a: float) -> float | jax.Array:
+        return jnp.sin(1.98) + a
 
     _perform_alt_test(testee, 10.0)
 
 
 def test_mapped_binary_scalar() -> None:
-    def testee(A: np.float64, B: np.float64) -> np.float64:
-        return A * B
+    def testee(a: np.float64, B: np.float64) -> np.float64:
+        return a * B
 
     _perform_alt_test(testee, np.float64(1.0), np.float64(2.0))
 
 
 def test_mapped_binary_scalar_partial_literal() -> None:
-    def testeeR(A: np.float64) -> np.float64:
-        return A * 2.03
+    def testeeR(a: np.float64) -> np.float64:
+        return a * 2.03
 
-    def testeeL(A: np.float64) -> np.float64:
-        return 2.03 * A
+    def testeeL(a: np.float64) -> np.float64:
+        return 2.03 * a
 
-    A = np.float64(7.0)
-    _perform_alt_test(testeeR, A)
-    _perform_alt_test(testeeL, A)
+    a = np.float64(7.0)
+    _perform_alt_test(testeeR, a)
+    _perform_alt_test(testeeL, a)
 
 
 def test_mapped_binary_array() -> None:
     """Test binary of arrays, with same size."""
 
-    def testee(A: np.ndarray, B: np.ndarray) -> np.ndarray:
-        return A + B
+    def testee(a: np.ndarray, B: np.ndarray) -> np.ndarray:
+        return a + B
 
-    A = testutil.make_array((100, 10, 3))
+    a = testutil.make_array((100, 10, 3))
     B = testutil.make_array((100, 10, 3))
-    _perform_alt_test(testee, A, B)
+    _perform_alt_test(testee, a, B)
 
 
 def test_mapped_binary_array_scalar() -> None:
-    def testee(A: np.ndarray | np.float64, B: np.float64 | np.ndarray) -> np.ndarray:
-        return A + B  # type: ignore[return-value]  # It is always an array.
+    def testee(a: np.ndarray | np.float64, B: np.float64 | np.ndarray) -> np.ndarray:
+        return a + B  # type: ignore[return-value]  # It is always an array.
 
-    A = testutil.make_array((100, 22))
+    a = testutil.make_array((100, 22))
     B = np.float64(1.34)
-    _perform_alt_test(testee, A, B)
-    _perform_alt_test(testee, B, A)
+    _perform_alt_test(testee, a, B)
+    _perform_alt_test(testee, B, a)
 
 
 def test_mapped_binary_array_partial_literal() -> None:
-    def testeeR(A: np.ndarray) -> np.ndarray:
-        return A + 1.52
+    def testeeR(a: np.ndarray) -> np.ndarray:
+        return a + 1.52
 
-    def testeeL(A: np.ndarray) -> np.ndarray:
-        return 1.52 + A
+    def testeeL(a: np.ndarray) -> np.ndarray:
+        return 1.52 + a
 
-    A = testutil.make_array((100, 22))
-    _perform_alt_test(testeeR, A)
-    _perform_alt_test(testeeL, A)
+    a = testutil.make_array((100, 22))
+    _perform_alt_test(testeeR, a)
+    _perform_alt_test(testeeL, a)
 
 
 def test_mapped_binary_array_constants() -> None:
-    def testee(A: np.ndarray) -> np.ndarray:
-        return A + jnp.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]])
+    def testee(a: np.ndarray) -> np.ndarray:
+        return a + jnp.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]])
 
-    A = testutil.make_array((3, 3))
-    _perform_alt_test(testee, A)
+    a = testutil.make_array((3, 3))
+    _perform_alt_test(testee, a)
 
 
 def test_mapped_broadcast(broadcast_input: tuple[np.ndarray, np.ndarray]) -> None:
-    def testee(A: np.ndarray, B: np.ndarray) -> np.ndarray:
-        return A + B
+    def testee(a: np.ndarray, B: np.ndarray) -> np.ndarray:
+        return a + B
 
-    A = broadcast_input[0]
+    a = broadcast_input[0]
     B = broadcast_input[1]
-    _perform_alt_test(testee, A, B)
-    _perform_alt_test(testee, B, A)
+    _perform_alt_test(testee, a, B)
+    _perform_alt_test(testee, B, a)
 
 
 # <------------ Tests for arithmetic and logical translators/operations
 
 
 def test_alt_general_unary(alt_unary_ops: tuple[Callable, np.ndarray]) -> None:
-    def testee(A: np.ndarray) -> np.ndarray:
-        return alt_unary_ops[0](A)
+    def testee(a: np.ndarray) -> np.ndarray:
+        return alt_unary_ops[0](a)
 
     _perform_alt_test(testee, alt_unary_ops[1])
 
 
 def test_alt_unary_isfinite() -> None:
-    def testee(A: np.ndarray) -> jax.Array:
-        return jnp.isfinite(A)
+    def testee(a: np.ndarray) -> jax.Array:
+        return jnp.isfinite(a)
 
-    A = np.array([np.inf, +np.inf, -np.inf, np.nan, -np.nan, 1.0])
+    a = np.array([np.inf, +np.inf, -np.inf, np.nan, -np.nan, 1.0])
 
     args = dace.Config.get("compiler", "cpu", "args")
     try:
         new_args = args.replace("-ffast-math", "-fno-finite-math-only")
         dace.Config.set("compiler", "cpu", "args", value=new_args)
-        _perform_alt_test(testee, A)
+        _perform_alt_test(testee, a)
 
     finally:
         dace.Config.set("compiler", "cpu", "args", value=args)
@@ -327,8 +324,8 @@ def test_alt_unary_isfinite() -> None:
 def test_alt_general_binary_float(
     alt_binary_ops_float: tuple[Callable, tuple[np.ndarray, np.ndarray]],
 ) -> None:
-    def testee(A: np.ndarray, B: np.ndarray) -> np.ndarray:
-        return alt_binary_ops_float[0](A, B)
+    def testee(a: np.ndarray, B: np.ndarray) -> np.ndarray:
+        return alt_binary_ops_float[0](a, B)
 
     _perform_alt_test(testee, *alt_binary_ops_float[1])
 
@@ -336,8 +333,8 @@ def test_alt_general_binary_float(
 def test_alt_compare_operation(
     alt_binary_compare_ops: tuple[Callable, tuple[np.ndarray, np.ndarray]],
 ) -> None:
-    def testee(A: np.ndarray, B: np.ndarray) -> np.ndarray:
-        return alt_binary_compare_ops[0](A, B)
+    def testee(a: np.ndarray, B: np.ndarray) -> np.ndarray:
+        return alt_binary_compare_ops[0](a, B)
 
     _perform_alt_test(testee, *alt_binary_compare_ops[1])
 
@@ -354,8 +351,8 @@ def test_alt_logical_bitwise_operation(
 
 
 def test_alt_unary_integer_power() -> None:
-    def testee(A: np.ndarray) -> np.ndarray:
-        return A**3
+    def testee(a: np.ndarray) -> np.ndarray:
+        return a**3
 
-    A = testutil.make_array((10, 2, 3))
-    _perform_alt_test(testee, A)
+    a = testutil.make_array((10, 2, 3))
+    _perform_alt_test(testee, a)
