@@ -23,9 +23,8 @@ if TYPE_CHECKING:
 @pytest.fixture(
     autouse=True,
     params=[
-        optimization.NO_OPTIMIZATIONS
-        # TODO(phimuell): find a way to conditionally enable.
-        # optimization.DEFAULT_OPTIMIZATIONS,
+        optimization.NO_OPTIMIZATIONS,
+        optimization.DEFAULT_OPTIMIZATIONS,
     ],
 )
 def _set_compile_options(request) -> Generator[None, None, None]:
