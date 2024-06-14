@@ -25,7 +25,7 @@ You can set up a development environment by running:
 python3 -m venv .venv
 source ./.venv/bin/activate
 pip install --upgrade pip setuptools wheel
-pip install -r requirements-dev.txt
+pip install -r requirements/dev.txt
 pip install -v -e .
 ```
 
@@ -34,7 +34,7 @@ If you have the [Python Launcher for Unix](https://github.com/brettcannon/python
 ```bash
 py -m venv .venv
 py -m pip install --upgrade pip setuptools wheel
-py -m pip install -r requirements-dev.txt
+py -m pip install -r requirements/dev.txt
 py -m pip install -v -e .
 ```
 
