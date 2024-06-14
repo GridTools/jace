@@ -155,6 +155,10 @@ Thumbs.db
 
 # DaCe
 .dacecache/
+_dacegraphs
+
+# JaCe
+.jacecache/
 
 # Common editor files
 *~
