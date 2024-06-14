@@ -34,7 +34,7 @@ from typing import TYPE_CHECKING, Any, Union
 from jax import tree_util as jax_tree
 
 import jace
-from jace import optimization, translator, util
+from jace import optimization, tracing, translator, util
 from jace.optimization import CompilerOptions
 from jace.translator import pre_post_translation as ptrans
 from jace.util import translation_cache as tcache
@@ -146,7 +146,7 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"]):
         Note:
             The tracing is always done with activated `x64` mode.
         """
-        jaxpr, flat_call_args, outtree = ptrans.trace_and_flatten_function(
+        jaxpr, flat_call_args, outtree = tracing.trace_and_flatten_function(
             fun=self._fun,
             trace_call_args=args,
             trace_call_kwargs=kwargs,

@@ -15,7 +15,7 @@ import pytest
 from jax import numpy as jnp
 
 import jace
-from jace import translator, util
+from jace import tracing, translator, util
 from jace.translator import pre_post_translation as ptrans
 
 from tests import util as testutil
@@ -192,7 +192,7 @@ def test_disabled_x64() -> None:
     with jax.experimental.disable_x64():
         jaxpr = jax.make_jaxpr(testee)(a, b)
 
-    _, flat_in_vals, _ = ptrans.trace_and_flatten_function(
+    _, flat_in_vals, _ = tracing.trace_and_flatten_function(
         fun=testee, trace_call_args=(a, b), trace_call_kwargs={}, trace_options={}
     )
     builder = translator.JaxprTranslationBuilder(
