@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 def postprocess_jaxpr_sdfg(
     trans_ctx: translator.TranslationContext,
     fun: Callable,  # noqa: ARG001  # Currently unused
-    call_args: Sequence[Any],
+    flat_call_args: Sequence[Any],
     validate: bool = True,
 ) -> jace.TranslatedJaxprSDFG:
     """
@@ -42,7 +42,7 @@ def postprocess_jaxpr_sdfg(
     Args:
         trans_ctx: The `TranslationContext` obtained from a `translate_jaxpr()` call.
         fun: The original function that was translated.
-        call_args: The flattened input arguments.
+        flat_call_args: The flattened input arguments.
         validate: Perform validation.
 
     Todo:
@@ -50,12 +50,12 @@ def postprocess_jaxpr_sdfg(
         - Fixing stride problem of the input.
     """
     trans_ctx.validate()  # Always validate, it is cheap.
-    create_input_output_stages(trans_ctx=trans_ctx, call_args=call_args)
+    create_input_output_stages(trans_ctx=trans_ctx, flat_call_args=flat_call_args)
     return finalize_translation_context(trans_ctx, validate=validate)
 
 
 def create_input_output_stages(
-    trans_ctx: translator.TranslationContext, call_args: Sequence[Any]
+    trans_ctx: translator.TranslationContext, flat_call_args: Sequence[Any]
 ) -> None:
     """
     Creates an input and output state inside the SDFG in place.
@@ -64,12 +64,12 @@ def create_input_output_stages(
 
     Args:
         trans_ctx: The translation context that should be modified.
-        call_args: The flattened call arguments that should be used.
+        flat_call_args: The flattened call arguments that should be used.
 
     Note:
         The processed SDFG will remain canonical.
     """
-    _create_input_state(trans_ctx, call_args)
+    _create_input_state(trans_ctx, flat_call_args)
     _create_output_state(trans_ctx)
 
 
@@ -87,8 +87,13 @@ def _create_output_state(trans_ctx: translator.TranslationContext) -> None:
     """
     assert trans_ctx.inp_names is not None and trans_ctx.out_names is not None
 
-    if set(trans_ctx.inp_names).intersection(trans_ctx.out_names):
-        raise NotImplementedError("Shared input and output variables are not supported yet.")
+    # NOTE: Currently we do not support to write back into an input argument, as Jax.
+    #  However, this is a requirement for handling ICON stencils, that we will support
+    #  eventually. If we get a translation context that lists a variable name in the
+    #  inputs and outputs, this means that it was returned unmodified. In Jax this
+    #  will lead to a copy and we also do it. This is implemented by just naïvely
+    #  creating a separate output variable for every output we have, irrespectively
+    #  of its name inside the Jaxpr.
 
     output_pattern = "__jace_output_{}"
     sdfg = trans_ctx.sdfg
@@ -129,19 +134,20 @@ def _create_output_state(trans_ctx: translator.TranslationContext) -> None:
     trans_ctx.out_names = tuple(new_output_names)
 
 
-def _create_input_state(trans_ctx: translator.TranslationContext, call_args: Sequence[Any]) -> None:
+def _create_input_state(
+    trans_ctx: translator.TranslationContext, flat_call_args: Sequence[Any]
+) -> None:
     """
     Creates the input processing state for the SDFG in place.
 
-    The function will create a new set of variables that are exposed as inputs. If an
-    input argument is an array, the new variable will have the same strides and storage
-    location the actual input value, that is passed inside `call_args`. If the input is
-    a scalar and GPU mode is activated, the function will add the necessary connections
-    to transfer it to the device.
+    The function will create a new set of variables that are exposed as inputs. This
+    variables are based on the example input arguments passed through `flat_call_args`.
+    This process will hard code the memory location and strides into the SDFG.
+    The assignment is performed inside a new state, which is put at the beginning.
 
     Args:
         trans_ctx: The translation context that should be modified.
-        call_args: The flattened call arguments for which the input
+        flat_call_args: The flattened call arguments for which the input
             state should be specialized.
 
     Todo:
@@ -149,17 +155,19 @@ def _create_input_state(trans_ctx: translator.TranslationContext, call_args: Seq
     """
     assert trans_ctx.inp_names is not None and trans_ctx.out_names is not None
 
-    if set(trans_ctx.inp_names).intersection(trans_ctx.out_names):
-        raise NotImplementedError("Shared input and output variables are not supported yet.")
-    if len(call_args) != len(trans_ctx.inp_names):
-        raise ValueError(f"Expected {len(trans_ctx.inp_names)}, but got {len(call_args)}.")
+    # NOTE: This function will create a distinct variable for every input. Once we
+    #  allow write back arguments they will be handled in the `_create_output_state()`
+    #  function anyway, also see the comment in that function.
+
+    if len(flat_call_args) != len(trans_ctx.inp_names):
+        raise ValueError(f"Expected {len(trans_ctx.inp_names)}, but got {len(flat_call_args)}.")
 
     sdfg = trans_ctx.sdfg
     new_input_state: dace.SDFGState = sdfg.add_state(f"{sdfg.name}__start_state")
     new_input_names: list[str] = []
     input_pattern = "__jace_input_{}"
 
-    for i, (org_input_name, call_arg) in enumerate(zip(trans_ctx.inp_names, call_args)):
+    for i, (org_input_name, call_arg) in enumerate(zip(trans_ctx.inp_names, flat_call_args)):
         org_input_desc: dace.data.Data = sdfg.arrays[org_input_name]
         new_input_name = input_pattern.format(i)
 
