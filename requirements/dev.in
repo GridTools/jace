@@ -1,11 +1,12 @@
+-r base.in
 furo>=2023.08.17
-mypy >= 1.9.0
+mypy>=1.9.0
 myst_parser>=0.13
-pytest >=6
-pytest-cov >=3
-ruff >= 0.3.5
+pytest>=6
+pytest-cov>=3
+ruff>=0.3.5
 sphinx>=7.0
 sphinx_autodoc_typehints
 sphinx_copybutton
-types-all
+tomlkit>=0.12.4
 typing-extensions>=4.10.0
