@@ -76,6 +76,8 @@ def venv(session: nox.Session) -> None:
         print(f"Creating virtualenv at '{venv_path}' (options: {virtualenv_args})...")
         session.install("virtualenv")
         session.run("virtualenv", venv_path, silent=True)
+    else:
+        print(f"'{venv_path}' path already exists. Skipping virtualenv creation...")
 
     python_path = venv_path / "bin" / "python"
     requirements_file = f"requirements/{req_preset}.txt"
