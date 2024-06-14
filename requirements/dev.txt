@@ -12,6 +12,10 @@ babel==2.15.0
     # via sphinx
 beautifulsoup4==4.12.3
     # via furo
+certifi==2024.6.2
+    # via requests
+charset-normalizer==3.3.2
+    # via requests
 coverage[toml]==7.5.3
     # via pytest-cov
 docutils==0.21.2
@@ -22,6 +26,8 @@ exceptiongroup==1.2.1
     # via pytest
 furo==2024.5.6
     # via -r requirements/dev.in
+idna==3.7
+    # via requests
 imagesize==1.4.1
     # via sphinx
 iniconfig==2.0.0
@@ -52,6 +58,8 @@ pytest==8.2.2
     #   pytest-cov
 pytest-cov==5.0.0
     # via -r requirements/dev.in
+requests==2.32.3
+    # via sphinx
 ruff==0.4.8
     # via -r requirements/dev.in
 snowballstemmer==2.2.0
@@ -90,6 +98,8 @@ typing-extensions==4.12.2
     # via
     #   -r requirements/dev.in
     #   mypy
+urllib3==2.2.1
+    # via requests
 
 # The following packages are considered to be unsafe in a requirements file:
 # setuptools

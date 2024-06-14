@@ -10,7 +10,7 @@ alembic==1.13.1
     # via optuna
 colorlog==6.8.2
     # via optuna
-cupy-cuda12x==13.1.0
+cupy-cuda12x==13.2.0
     # via -r requirements/cuda12.in
 fastrlock==0.8.2
     # via cupy-cuda12x
