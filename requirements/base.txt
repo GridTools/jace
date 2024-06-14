@@ -9,36 +9,20 @@ aenum==3.1.15
     # via dace
 astunparse==1.6.3
     # via dace
-blinker==1.8.2
-    # via flask
-certifi==2024.6.2
-    # via requests
-charset-normalizer==3.3.2
-    # via requests
-click==8.1.7
-    # via flask
-dace==0.15.1
+dace==0.16
     # via -r requirements/base.in
 dill==0.3.8
     # via dace
-flask==3.0.3
-    # via dace
 fparser==0.1.4
     # via dace
-idna==3.7
-    # via requests
-itsdangerous==2.2.0
-    # via flask
 jax[cpu]==0.4.29
     # via -r requirements/base.in
 jaxlib==0.4.29
     # via jax
 jinja2==3.1.4
-    # via flask
+    # via dace
 markupsafe==2.1.5
-    # via
-    #   jinja2
-    #   werkzeug
+    # via jinja2
 ml-dtypes==0.4.0
     # via
     #   jax
@@ -64,8 +48,6 @@ ply==3.11
     # via dace
 pyyaml==6.0.1
     # via dace
-requests==2.32.3
-    # via dace
 scipy==1.13.1
     # via
     #   jax
@@ -74,16 +56,12 @@ setuptools-scm==8.1.0
     # via fparser
 six==1.16.0
     # via astunparse
-sympy==1.9
+sympy==1.12.1
     # via dace
 tomli==2.0.1
     # via setuptools-scm
-urllib3==2.2.1
-    # via requests
 websockets==12.0
     # via dace
-werkzeug==3.0.3
-    # via flask
 wheel==0.43.0
     # via astunparse
 
