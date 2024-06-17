@@ -34,7 +34,7 @@ def test_temp_file():
     def my_read(F):
         print(F.read())
 
-    with tempfile.NamedTemporaryFile(mode="wt") as F:  # noqa: PLW1514
+    with tempfile.NamedTemporaryFile() as F:
         print("created temporary file", F.name)
         F.write("Hello world.")
         F.seek(0)
