@@ -20,9 +20,17 @@ def test_version():
 
 def test_folder():
     jacefolder = pathlib.Path(".jacecache/")
-    jacefolder.mkdir()
+    jacefolder.mkdir(exist_ok=True)
 
 
 def test_temp_folder():
     with tempfile.TemporaryDirectory() as tmpdirname:
         print("created temporary directory", tmpdirname)
+        with open(tmpdirname + "/my_test_file", "w") as F:  # noqa: PTH123 PLW1514
+            F.write("Hello world.")
+
+
+def test_temp_file():
+    with tempfile.NamedTemporaryFile(mode="wt") as F:  # noqa: PLW1514
+        print("created temporary file", F.name)
+        F.write("Hello world.")
