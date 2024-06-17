@@ -32,7 +32,7 @@ def test_temp_folder():
 
 def test_temp_file():
     def my_read(F):
-        print(F.readlines())
+        print(F.read())
 
     with tempfile.NamedTemporaryFile(mode="wt") as F:  # noqa: PLW1514
         print("created temporary file", F.name)
