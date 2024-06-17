@@ -4,11 +4,11 @@ A kind of roadmap that gives a rough idea about how the project will be continue
 
 - [x] Being able to perform _some_ translations [PR#3](https://github.com/GridTools/jace/pull/3).
 - [ ] Basic functionalities:
-  - [ ] Annotation `@jace.jit`.
-  - [ ] Composable with Jax, i.e. take the Jax derivative of a JaCe annotated function.
-  - [ ] Implementing the `stages` model that is supported by Jax.
+  - [x] Annotation `@jace.jit`.
+  - [x] Composable with Jax, i.e. take the Jax derivative of a JaCe annotated function.
+  - [x] Implementing the `stages` model that is supported by Jax.
   - [ ] Handling Jax arrays as native input (only on single host).
-  - [ ] Cache the compilation and lowering results for later reuse.
+  - [x] Cache the compilation and lowering results for later reuse.
     In Jax these parts (together with the dispatch) are actually written in C++, thus in the beginning we will use a self made cache.
 - [ ] Implementing some basic `PrimitiveTranslators`, that allows us to run some early tests, such as:
   - [ ] Backporting the ones from the prototype.
