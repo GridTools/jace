@@ -8,9 +8,15 @@
 from __future__ import annotations
 
 import importlib.metadata
+import pathlib
 
 import jace as m
 
 
 def test_version():
     assert importlib.metadata.version("jace") == m.__version__
+
+
+def test_folder():
+    jacefolder = pathlib.Path(".jacecache/")
+    jacefolder.mkdir()
