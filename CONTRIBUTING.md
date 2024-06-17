@@ -9,7 +9,7 @@ The fastest way to start with development is to use nox. If you don't have nox, 
 To use, run `nox`. This will lint and test using every installed version of Python on your system, skipping ones that are not installed. You can also run specific jobs:
 
 ```console
-$ nox -s venv-3.10  # (or venv-3.11, or venv-3.12) Setup a fully working development envinroment
+$ nox -s venv-3.10  # (or venv-3.11, or venv-3.12) Setup a fully working development environment
 $ nox -s lint  # Lint only
 $ nox -s tests  # Python tests
 $ nox -s docs -- --serve  # Build and serve the docs
