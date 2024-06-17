@@ -9,6 +9,7 @@ The fastest way to start with development is to use nox. If you don't have nox, 
 To use, run `nox`. This will lint and test using every installed version of Python on your system, skipping ones that are not installed. You can also run specific jobs:
 
 ```console
+$ nox -s venv-3.10  # (or venv-3.11, or venv-3.12) Setup a fully working development environment
 $ nox -s lint  # Lint only
 $ nox -s tests  # Python tests
 $ nox -s docs -- --serve  # Build and serve the docs
@@ -29,7 +30,7 @@ pip install -r requirements/dev.txt
 pip install -v -e .
 ```
 
-If you have the [Python Launcher for Unix](https://github.com/brettcannon/python-launcher), you can instead do:
+Or, if you have the [Python Launcher for Unix](https://github.com/brettcannon/python-launcher), you could do:
 
 ```bash
 py -m venv .venv
@@ -43,7 +44,7 @@ py -m pip install -v -e .
 You should prepare pre-commit, which will help you by checking that commits pass required checks:
 
 ```bash
-pip install pre-commit # or brew install pre-commit on macOS
+pipx install pre-commit # or brew install pre-commit on macOS
 pre-commit install # Will install a pre-commit hook into the git repo
 ```
 
