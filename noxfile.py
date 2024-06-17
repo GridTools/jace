@@ -37,7 +37,7 @@ def load_from_frozen_requirements(filename: str) -> dict[str, str]:
 REQUIREMENTS = load_from_frozen_requirements(ROOT_DIR / "requirements" / "dev.txt")
 
 
-@nox.session
+@nox.session(python="3.10")
 def lint(session: nox.Session) -> None:
     """Run the linter (pre-commit)."""
     session.install("pre-commit")
@@ -54,7 +54,12 @@ def tests(session: nox.Session) -> None:
 @nox.session(python=["3.10", "3.11", "3.12"])
 def venv(session: nox.Session) -> None:
     """
-    Sets up a Python development environment. Use as: `nox -s venv -- [dest_path] [req_preset]
+    Sets up a Python development environment. Use as: `nox -s venv-3.xx -- [req_preset] [dest_path]
+
+    req_preset: The requirements file to use as 'requirements/{req_preset}.txt'.
+        Default: 'dev'
+    dest_path (optional): The path to the virtualenv to create.
+        Default: '.venv-{3.xx}-{req_preset}'
 
     This session will:
     - Create a python virtualenv for the session
@@ -63,20 +68,25 @@ def venv(session: nox.Session) -> None:
     - Invoke the python interpreter from the created project environment
       to install the project and all it's development dependencies.
     """  # noqa: W505 [doc-line-too-long]
-    venv_path = f"{DEFAULT_DEV_VENV_PATH}-{session.python}"
     req_preset = "dev"
+    venv_path = None
     virtualenv_args = []
     if session.posargs:
-        venv_path, *more_pos_args = session.posargs
+        req_preset, *more_pos_args = session.posargs
         if more_pos_args:
-            req_preset, _ = more_pos_args
+            venv_path, *_ = more_pos_args
+    if not venv_path:
+        venv_path = f"{DEFAULT_DEV_VENV_PATH}-{session.python}-{req_preset}"
     venv_path = pathlib.Path(venv_path).resolve()
 
     if not venv_path.exists():
         print(f"Creating virtualenv at '{venv_path}' (options: {virtualenv_args})...")
         session.install("virtualenv")
         session.run("virtualenv", venv_path, silent=True)
-    else:
+    elif venv_path.exists():
+        assert (
+            venv_path.is_dir() and (venv_path / "bin" / f"python{session.python}").exists
+        ), f"'{venv_path}' path already exists but is not a virtualenv with python{session.python}."
         print(f"'{venv_path}' path already exists. Skipping virtualenv creation...")
 
     python_path = venv_path / "bin" / "python"
@@ -97,7 +107,7 @@ def venv(session: nox.Session) -> None:
     )
 
 
-@nox.session
+@nox.session(reuse_venv=True)
 def requirements(session: nox.Session) -> None:
     """Freeze requirements files from project specification and synchronize versions across tools."""  # noqa: W505 [doc-line-too-long]
     requirements_path = ROOT_DIR / "requirements"
