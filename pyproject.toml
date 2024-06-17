@@ -110,7 +110,10 @@ module = [
 
 [tool.pytest.ini_options]
 addopts = ["-ra", "--showlocals", "--strict-markers", "--strict-config"]
-filterwarnings = ["error"]
+filterwarnings = [
+  "error",
+  "ignore:numpy\\..*:DeprecationWarning",  # DaCe is not NumPy v2.0 ready so ignore the usage of deprecated features.
+]
 log_cli_level = "INFO"
 minversion = "6.0"
 testpaths = ["tests"]
