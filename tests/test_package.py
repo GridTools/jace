@@ -36,7 +36,7 @@ def test_temp_file():
 
     with tempfile.NamedTemporaryFile() as F:
         print("created temporary file", F.name)
-        F.write("Hello world.")
+        F.write(b"Hello world.")
         F.seek(0)
         my_read(F)
 
