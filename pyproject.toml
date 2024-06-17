@@ -24,7 +24,7 @@ classifiers = [
   "Typing :: Typed",
 ]
 dependencies = [
-  "dace>=0.15",
+  "dace>=0.16",
   "jax[cpu]>=0.4.24",
   "numpy>=1.26.0",
 ]
