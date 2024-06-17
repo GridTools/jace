@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import importlib.metadata
 import pathlib
+import tempfile
 
 import jace as m
 
@@ -20,3 +21,8 @@ def test_version():
 def test_folder():
     jacefolder = pathlib.Path(".jacecache/")
     jacefolder.mkdir()
+
+
+def test_temp_folder():
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        print("created temporary directory", tmpdirname)
