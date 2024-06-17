@@ -31,14 +31,14 @@ def test_temp_folder():
 
 
 def test_temp_file():
-    def my_read(path):
-        with open(path) as F:  # noqa: PTH123 PLW1514
-            print(F.readlines())
+    def my_read(F):
+        print(F.readlines())
 
     with tempfile.NamedTemporaryFile(mode="wt") as F:  # noqa: PLW1514
         print("created temporary file", F.name)
         F.write("Hello world.")
-        my_read(F.name)
+        F.seek(0)
+        my_read(F)
 
 
 def test_temp_file2():
