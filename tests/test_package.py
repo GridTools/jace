@@ -34,3 +34,12 @@ def test_temp_file():
     with tempfile.NamedTemporaryFile(mode="wt") as F:  # noqa: PLW1514
         print("created temporary file", F.name)
         F.write("Hello world.")
+
+
+def test_temp_file2():
+    def my_write(path):
+        with open(path, "w") as F:  # noqa: PTH123 PLW1514
+            F.write("Hello world.")
+
+    with tempfile.NamedTemporaryFile(mode="wt") as F:  # noqa: PLW1514
+        my_write(F.name)
