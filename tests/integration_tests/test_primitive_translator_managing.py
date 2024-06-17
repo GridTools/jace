@@ -63,7 +63,7 @@ class SubTrans2(translator.PrimitiveTranslator):
 
 
 @translator.make_primitive_translator("non_existing_callable_primitive3")
-def SubTrans3_Callable(*args: Any, **kwargs: Any) -> None:  # noqa: ARG001
+def primitive_translator_3_callable(*args: Any, **kwargs: Any) -> None:  # noqa: ARG001
     raise NotImplementedError
 
 
@@ -83,7 +83,7 @@ def test_subtranslatior_managing() -> None:
     sub2 = SubTrans2()
 
     # These are all primitive translators
-    prim_translators = [sub1, sub2, SubTrans3_Callable]
+    prim_translators = [sub1, sub2, primitive_translator_3_callable]
 
     # Add the instances.
     for sub in prim_translators:

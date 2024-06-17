@@ -71,8 +71,8 @@ def test_caching_same_sizes() -> None:
     b = testutil.make_array((4, 3))
 
     # The second batch of argument, same structure, but different values.
-    AA = a + 1.0362
-    BB = b + 0.638956
+    aa = a + 1.0362
+    bb = b + 0.638956
 
     # Now let's lower it once directly and call it.
     lowered: stages.JaCeLowered = wrapped.lower(a, b)
@@ -87,8 +87,8 @@ def test_caching_same_sizes() -> None:
 
     # Now lets call it with different objects, that have the same structure.
     #  Again no lowering should happen.
-    assert np.allclose(testee(AA, BB), wrapped(AA, BB))
-    assert wrapped.lower(AA, BB) is lowered
+    assert np.allclose(testee(aa, bb), wrapped(aa, bb))
+    assert wrapped.lower(aa, bb) is lowered
     assert wrapped.lower(a, b) is lowered
     assert lowering_cnt[0] == 1
 
@@ -181,7 +181,7 @@ def test_caching_compilation() -> None:
     """Tests the compilation cache."""
 
     @jace.jit
-    def jaceWrapped(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+    def jace_wrapped(a: np.ndarray, b: np.ndarray) -> np.ndarray:
         c = a * b
         d = c + a
         e = d + b  # Just enough state.
@@ -192,21 +192,24 @@ def test_caching_compilation() -> None:
     b = testutil.make_array((4, 3))
 
     # Now we lower it.
-    jaceLowered = jaceWrapped.lower(a, b)
+    jace_lowered = jace_wrapped.lower(a, b)
 
     # Compiling it with and without optimizations enabled
-    optiCompiled = jaceLowered.compile(optimization.DEFAULT_OPTIMIZATIONS)
-    unoptiCompiled = jaceLowered.compile(optimization.NO_OPTIMIZATIONS)
+    optized_compiled = jace_lowered.compile(optimization.DEFAULT_OPTIMIZATIONS)
+    unoptized_compiled = jace_lowered.compile(optimization.NO_OPTIMIZATIONS)
 
     # Because of the way how things work the optimized must have more than the
     #  unoptimized. If there is sharing, then this would not be the case.
-    assert unoptiCompiled is not optiCompiled
-    assert optiCompiled._csdfg.sdfg.number_of_nodes() == 1
-    assert optiCompiled._csdfg.sdfg.number_of_nodes() < unoptiCompiled._csdfg.sdfg.number_of_nodes()
+    assert unoptized_compiled is not optized_compiled
+    assert optized_compiled._csdfg.sdfg.number_of_nodes() == 1
+    assert (
+        optized_compiled._csdfg.sdfg.number_of_nodes()
+        < unoptized_compiled._csdfg.sdfg.number_of_nodes()
+    )
 
     # Now we check if they are still inside the cache.
-    assert optiCompiled is jaceLowered.compile(optimization.DEFAULT_OPTIMIZATIONS)
-    assert unoptiCompiled is jaceLowered.compile(optimization.NO_OPTIMIZATIONS)
+    assert optized_compiled is jace_lowered.compile(optimization.DEFAULT_OPTIMIZATIONS)
+    assert unoptized_compiled is jace_lowered.compile(optimization.NO_OPTIMIZATIONS)
 
 
 def test_caching_compilation_options() -> None:

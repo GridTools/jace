@@ -226,55 +226,55 @@ def test_mapped_unary_scalar_literal() -> None:
 
 
 def test_mapped_binary_scalar() -> None:
-    def testee(a: np.float64, B: np.float64) -> np.float64:
-        return a * B
+    def testee(a: np.float64, b: np.float64) -> np.float64:
+        return a * b
 
     _perform_alt_test(testee, np.float64(1.0), np.float64(2.0))
 
 
 def test_mapped_binary_scalar_partial_literal() -> None:
-    def testeeR(a: np.float64) -> np.float64:
+    def testee_r(a: np.float64) -> np.float64:
         return a * 2.03
 
-    def testeeL(a: np.float64) -> np.float64:
+    def testee_l(a: np.float64) -> np.float64:
         return 2.03 * a
 
     a = np.float64(7.0)
-    _perform_alt_test(testeeR, a)
-    _perform_alt_test(testeeL, a)
+    _perform_alt_test(testee_r, a)
+    _perform_alt_test(testee_l, a)
 
 
 def test_mapped_binary_array() -> None:
     """Test binary of arrays, with same size."""
 
-    def testee(a: np.ndarray, B: np.ndarray) -> np.ndarray:
-        return a + B
+    def testee(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+        return a + b
 
     a = testutil.make_array((100, 10, 3))
-    B = testutil.make_array((100, 10, 3))
-    _perform_alt_test(testee, a, B)
+    b = testutil.make_array((100, 10, 3))
+    _perform_alt_test(testee, a, b)
 
 
 def test_mapped_binary_array_scalar() -> None:
-    def testee(a: np.ndarray | np.float64, B: np.float64 | np.ndarray) -> np.ndarray:
-        return a + B  # type: ignore[return-value]  # It is always an array.
+    def testee(a: np.ndarray | np.float64, b: np.float64 | np.ndarray) -> np.ndarray:
+        return a + b  # type: ignore[return-value]  # It is always an array.
 
     a = testutil.make_array((100, 22))
-    B = np.float64(1.34)
-    _perform_alt_test(testee, a, B)
-    _perform_alt_test(testee, B, a)
+    b = np.float64(1.34)
+    _perform_alt_test(testee, a, b)
+    _perform_alt_test(testee, b, a)
 
 
 def test_mapped_binary_array_partial_literal() -> None:
-    def testeeR(a: np.ndarray) -> np.ndarray:
+    def testee_r(a: np.ndarray) -> np.ndarray:
         return a + 1.52
 
-    def testeeL(a: np.ndarray) -> np.ndarray:
+    def testee_l(a: np.ndarray) -> np.ndarray:
         return 1.52 + a
 
     a = testutil.make_array((100, 22))
-    _perform_alt_test(testeeR, a)
-    _perform_alt_test(testeeL, a)
+    _perform_alt_test(testee_r, a)
+    _perform_alt_test(testee_l, a)
 
 
 def test_mapped_binary_array_constants() -> None:
@@ -286,13 +286,13 @@ def test_mapped_binary_array_constants() -> None:
 
 
 def test_mapped_broadcast(broadcast_input: tuple[np.ndarray, np.ndarray]) -> None:
-    def testee(a: np.ndarray, B: np.ndarray) -> np.ndarray:
-        return a + B
+    def testee(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+        return a + b
 
     a = broadcast_input[0]
-    B = broadcast_input[1]
-    _perform_alt_test(testee, a, B)
-    _perform_alt_test(testee, B, a)
+    b = broadcast_input[1]
+    _perform_alt_test(testee, a, b)
+    _perform_alt_test(testee, b, a)
 
 
 # <------------ Tests for arithmetic and logical translators/operations
@@ -324,8 +324,8 @@ def test_alt_unary_isfinite() -> None:
 def test_alt_general_binary_float(
     alt_binary_ops_float: tuple[Callable, tuple[np.ndarray, np.ndarray]],
 ) -> None:
-    def testee(a: np.ndarray, B: np.ndarray) -> np.ndarray:
-        return alt_binary_ops_float[0](a, B)
+    def testee(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+        return alt_binary_ops_float[0](a, b)
 
     _perform_alt_test(testee, *alt_binary_ops_float[1])
 
@@ -333,8 +333,8 @@ def test_alt_general_binary_float(
 def test_alt_compare_operation(
     alt_binary_compare_ops: tuple[Callable, tuple[np.ndarray, np.ndarray]],
 ) -> None:
-    def testee(a: np.ndarray, B: np.ndarray) -> np.ndarray:
-        return alt_binary_compare_ops[0](a, B)
+    def testee(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+        return alt_binary_compare_ops[0](a, b)
 
     _perform_alt_test(testee, *alt_binary_compare_ops[1])
 

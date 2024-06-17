@@ -52,7 +52,7 @@ def translation_builder() -> translator.JaxprTranslationBuilder:
     builder = translator.JaxprTranslationBuilder(
         primitive_translators=translator.get_registered_primitive_translators()
     )
-    jaxpr = jax.make_jaxpr(lambda A: A)(1.0)  # dummy jaxpr, needed for construction.
+    jaxpr = jax.make_jaxpr(lambda a: a)(1.0)  # dummy jaxpr, needed for construction.
     builder._allocate_translation_ctx(name=name, jaxpr=jaxpr)
     return builder
 
@@ -634,7 +634,7 @@ def test_builder_jace_var() -> None:
             _ = JaCeVar((), dace.int8, name=iname)
 
 
-def test_builder_F_strides() -> None:
+def test_builder_FORTRAN_strides() -> None:  # noqa: N802  # Function name
     """Tests if we can lower without a standard stride.
 
     Notes:

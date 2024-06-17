@@ -232,7 +232,6 @@ max-complexity = 12
 ]
 "tests/**" = [
   "D",  # pydocstyle
-  "N",  # TODO(egparedes): remove ignore as soon as all tests are properly named
   "PLR2004",  # [magic-value-comparison]
   "T10",  # flake8-debugger
   "T20",  # flake8-print

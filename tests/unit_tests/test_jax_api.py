@@ -80,19 +80,19 @@ def test_composition_itself() -> None:
 def test_composition_with_jax() -> None:
     """Tests if JaCe can interact with Jax and vice versa."""
 
-    def base_fun(a, b, C):
-        return a + b * jnp.sin(C) - a * b
+    def base_fun(a, b, c):
+        return a + b * jnp.sin(c) - a * b
 
     @jace.jit
-    def jace_fun(a, b, C):
-        return jax.jit(base_fun)(a, b, C)
+    def jace_fun(a, b, c):
+        return jax.jit(base_fun)(a, b, c)
 
-    def jax_fun(a, b, C):
-        return jace.jit(base_fun)(a, b, C)
+    def jax_fun(a, b, c):
+        return jace.jit(base_fun)(a, b, c)
 
-    a, b, C = (testutil.make_array((10, 3, 50)) for _ in range(3))
+    a, b, c = (testutil.make_array((10, 3, 50)) for _ in range(3))
 
-    assert np.allclose(jace_fun(a, b, C), jax_fun(a, b, C))
+    assert np.allclose(jace_fun(a, b, c), jax_fun(a, b, c))
 
 
 @pytest.mark.skip(reason="Nested Jaxpr are not handled.")
@@ -104,22 +104,22 @@ def test_composition_with_jax_2() -> None:
         return a + b
 
     @jace.jit
-    def f2_jace(a, b, C):
-        return f1_jax(a, b) - C
+    def f2_jace(a, b, c):
+        return f1_jax(a, b) - c
 
     @jax.jit
-    def f3_jax(a, b, C, D):
-        return f2_jace(a, b, C) * D
+    def f3_jax(a, b, c, d):
+        return f2_jace(a, b, c) * d
 
     @jace.jit
-    def f3_jace(a, b, C, D):
-        return f3_jax(a, b, C, D)
+    def f3_jace(a, b, c, d):
+        return f3_jax(a, b, c, d)
 
-    a, b, C, D = (testutil.make_array((10, 3, 50)) for _ in range(4))
+    a, b, c, d = (testutil.make_array((10, 3, 50)) for _ in range(4))
 
-    ref = ((a + b) - C) * D
-    res_jax = f3_jax(a, b, C, D)
-    res_jace = f3_jace(a, b, C, D)
+    ref = ((a + b) - c) * d
+    res_jax = f3_jax(a, b, c, d)
+    res_jace = f3_jace(a, b, c, d)
 
     assert np.allclose(ref, res_jax), "Jax failed."
     assert np.allclose(ref, res_jace), "JaCe Failed."
@@ -140,10 +140,10 @@ def test_grad_annotation_direct() -> None:
         return jace.grad(jace.grad(f))(x)
 
     # These are the random numbers where we test
-    Xs = (testutil.make_array(10) - 0.5) * 10
+    xs = (testutil.make_array(10) - 0.5) * 10
 
-    for i in range(Xs.shape[0]):
-        x = Xs[i]
+    for i in range(xs.shape[0]):
+        x = xs[i]
         res = jace_ddf(x)
         ref = jax_ddf(x)
         assert np.allclose(res, ref)
