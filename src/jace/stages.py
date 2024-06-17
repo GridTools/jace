@@ -146,16 +146,18 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"]):
         Note:
             The tracing is always done with activated `x64` mode.
         """
-        jaxpr, flat_call_args, outtree = tracing.trace_and_flatten_function(
+        jaxpr_maker = tracing.make_jaxpr(
             fun=self._fun,
-            trace_call_args=args,
-            trace_call_kwargs=kwargs,
             trace_options=self._jit_options,
+            return_outtree=True,
         )
+        jaxpr, outtree = jaxpr_maker(*args, **kwargs)
         builder = translator.JaxprTranslationBuilder(
             primitive_translators=self._primitive_translators
         )
         trans_ctx: translator.TranslationContext = builder.translate_jaxpr(jaxpr)
+
+        flat_call_args = jax_tree.tree_leaves((args, kwargs))
         tsdfg: jace.TranslatedJaxprSDFG = ptrans.postprocess_jaxpr_sdfg(
             trans_ctx=trans_ctx,
             fun=self.wrapped_fun,

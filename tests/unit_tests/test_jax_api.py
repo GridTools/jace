@@ -12,10 +12,10 @@ from __future__ import annotations
 import jax
 import numpy as np
 import pytest
-from jax import numpy as jnp
+from jax import numpy as jnp, tree_util as jax_tree
 
 import jace
-from jace import tracing, translator, util
+from jace import translator, util
 from jace.translator import pre_post_translation as ptrans
 
 from tests import util as testutil
@@ -192,16 +192,14 @@ def test_disabled_x64() -> None:
     with jax.experimental.disable_x64():
         jaxpr = jax.make_jaxpr(testee)(a, b)
 
-    _, flat_in_vals, _ = tracing.trace_and_flatten_function(
-        fun=testee, trace_call_args=(a, b), trace_call_kwargs={}, trace_options={}
-    )
+    flat_call_args = jax_tree.tree_leaves(((a, b), {}))
     builder = translator.JaxprTranslationBuilder(
         primitive_translators=translator.get_registered_primitive_translators()
     )
     trans_ctx: translator.TranslationContext = builder.translate_jaxpr(jaxpr)
 
     tsdfg: jace.TranslatedJaxprSDFG = ptrans.postprocess_jaxpr_sdfg(
-        trans_ctx=trans_ctx, fun=testee, flat_call_args=flat_in_vals
+        trans_ctx=trans_ctx, fun=testee, flat_call_args=flat_call_args
     )
 
     # Because x64 is disabled Jax traces the input as float32, even if we have passed
