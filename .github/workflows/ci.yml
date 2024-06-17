@@ -50,7 +50,7 @@ jobs:
         allow-prereleases: true
 
     - name: Install requirementes
-      run: python -m pip install -r requirements-dev.txt
+      run: python -m pip install -r requirements/dev.txt
 
     - name: Install package
       run: python -m pip install .

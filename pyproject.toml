@@ -24,7 +24,7 @@ classifiers = [
   "Typing :: Typed",
 ]
 dependencies = [
-  "dace>=0.15",
+  "dace>=0.16",
   "jax[cpu]>=0.4.24",
   "numpy>=1.26.0",
 ]
@@ -211,7 +211,7 @@ tests = [
 max-complexity = 12
 
 [tool.ruff.lint.per-file-ignores]
-"!tests/**.py" = ["PT"]  # Ignore flake8-pytest-style outside 'tests/'
+"!tests/**" = ["PT"]  # Ignore flake8-pytest-style outside 'tests/'
 "docs/**" = [
   "D",  # pydocstyle
   "T10",  # flake8-debugger
@@ -219,6 +219,12 @@ max-complexity = 12
 ]
 "noxfile.py" = [
   "D",  # pydocstyle
+  "T10",  # flake8-debugger
+  "T20",  # flake8-print
+]
+"requirements/**" = [
+  "D",  # pydocstyle
+  "T10",  # flake8-debugger
   "T20",  # flake8-print
 ]
 "tests/**" = [
