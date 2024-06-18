@@ -34,7 +34,7 @@ from typing import TYPE_CHECKING, Any, Generic, ParamSpec, TypeVar, Union
 from jax import tree_util as jax_tree
 
 import jace
-from jace import api, optimization, tracing, translator, util
+from jace import api, optimization, tracing, translated_jaxpr_sdfg, translator, util
 from jace.optimization import CompilerOptions
 from jace.translator import pre_post_translation as ptrans
 from jace.util import translation_cache as tcache
@@ -255,7 +255,7 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"], Generic[_RetrunType]):
         optimization.jace_optimize(tsdfg=tsdfg, **finalize_compilation_options(compiler_options))
 
         return JaCeCompiled(
-            csdfg=jace.compile_jaxpr_sdfg(tsdfg),
+            csdfg=translated_jaxpr_sdfg.compile_jaxpr_sdfg(tsdfg),
             outtree=self._outtree,
         )
 
