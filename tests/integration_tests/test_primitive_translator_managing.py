@@ -190,24 +190,24 @@ def test_subtranslatior_managing_decoupling() -> None:
 
     # This will use the translators that are currently installed.
     @jace.jit
-    def foo(a: int) -> int:
-        b = a + 1
-        c = b + 1
-        d = c + 1
-        return d + 1
+    def foo(a: np.ndarray) -> np.ndarray:
+        b = a + np.int32(1)
+        c = b + np.int32(1)
+        d = c + np.int32(1)
+        return d + np.int32(1)
 
     # Now register the add translator.
     translator.register_primitive_translator(fake_add_translator, overwrite=True)
 
     # Since `foo` was already constructed, a new registering can not change anything.
-    a = np.zeros((10, 10))
+    a = np.zeros((10, 10), dtype=np.int32)
     assert np.all(foo(a) == 4)
 
     # But if we now annotate a new function, then we will get fake translator
     @jace.jit
-    def foo_fail(a):
-        b = a + 1
-        return b + 1
+    def foo_fail(a: np.ndarray) -> np.ndarray:
+        b = a + np.int32(1)
+        return b + np.int32(1)
 
     with pytest.raises(
         expected_exception=NotImplementedError,

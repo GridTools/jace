@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import functools
 import inspect
-from typing import TYPE_CHECKING, Any, Literal, overload
+from typing import TYPE_CHECKING, Any, Literal, ParamSpec, overload
 
 from jax import grad, jacfwd, jacrev
 
@@ -24,6 +24,8 @@ if TYPE_CHECKING:
 
 __all__ = ["grad", "jacfwd", "jacrev", "jit"]
 
+_P = ParamSpec("_P")
+
 
 @overload
 def jit(
@@ -31,24 +33,24 @@ def jit(
     /,
     primitive_translators: Mapping[str, translator.PrimitiveTranslator] | None = None,
     **kwargs: Any,
-) -> Callable[[Callable], stages.JaCeWrapped]: ...
+) -> Callable[[Callable[_P, Any]], stages.JaCeWrapped[_P]]: ...
 
 
 @overload
 def jit(
-    fun: Callable,
+    fun: Callable[_P, Any],
     /,
     primitive_translators: Mapping[str, translator.PrimitiveTranslator] | None = None,
     **kwargs: Any,
-) -> stages.JaCeWrapped: ...
+) -> stages.JaCeWrapped[_P]: ...
 
 
 def jit(
-    fun: Callable | None = None,
+    fun: Callable[_P, Any] | None = None,
     /,
     primitive_translators: Mapping[str, translator.PrimitiveTranslator] | None = None,
     **kwargs: Any,
-) -> stages.JaCeWrapped | Callable[[Callable], stages.JaCeWrapped]:
+) -> Callable[[Callable[_P, Any]], stages.JaCeWrapped[_P]] | stages.JaCeWrapped[_P]:
     """
     JaCe's replacement for `jax.jit` (just-in-time) wrapper.
 
@@ -72,13 +74,12 @@ def jit(
             f"The following arguments to 'jace.jit' are not yet supported: {', '.join(kwargs)}."
         )
 
-    def wrapper(f: Callable) -> stages.JaCeWrapped:
+    def wrapper(f: Callable[_P, Any]) -> stages.JaCeWrapped[_P]:
         if any(
             param.default is not param.empty for param in inspect.signature(f).parameters.values()
         ):
             raise NotImplementedError("Default values are not yet supported.")
 
-        # TODO(egparedes): Improve typing.
         jace_wrapper = stages.JaCeWrapped(
             fun=f,
             primitive_translators=(

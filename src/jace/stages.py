@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import copy
 import inspect
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Any, Generic, ParamSpec, Union
 
 from jax import tree_util as jax_tree
 
@@ -59,8 +59,15 @@ __all__ = [
 #: Known compilation stages in JaCe.
 Stage = Union["JaCeWrapped", "JaCeLowered", "JaCeCompiled"]
 
+# Used for type annotation of the `Stages`, it is important that the return type can
+#  not be annotated, because JaCe will modify it, in case it is a scalar. Thus the
+#  return type is not annotated. Furthermore, because static arguments change the
+#  signature (in a runtime dependent manor) `JaCeCompiled.__call__()` can not be
+#  annotated as well. For that reason only the arguments are annotated.
+_P = ParamSpec("_P")
 
-class JaCeWrapped(tcache.CachingStage["JaCeLowered"]):
+
+class JaCeWrapped(tcache.CachingStage["JaCeLowered"], Generic[_P]):
     """
     A function ready to be specialized, lowered, and compiled.
 
@@ -90,13 +97,13 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"]):
         which is implicitly and temporary activated during tracing.
     """
 
-    _fun: Callable
+    _fun: Callable[_P, Any]
     _primitive_translators: dict[str, translator.PrimitiveTranslator]
     _jit_options: dict[str, Any]
 
     def __init__(
         self,
-        fun: Callable,
+        fun: Callable[_P, Any],
         primitive_translators: Mapping[str, translator.PrimitiveTranslator],
         jit_options: Mapping[str, Any],
     ) -> None:
@@ -108,7 +115,7 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"]):
         self._jit_options = {**jit_options}
         self._fun = fun
 
-    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+    def __call__(self, *args: _P.args, **kwargs: _P.kwargs) -> Any:
         """
         Executes the wrapped function, lowering and compiling as needed in one step.
 
@@ -129,7 +136,7 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"]):
         return compiled(*args, **kwargs)
 
     @tcache.cached_transition
-    def lower(self, *args: Any, **kwargs: Any) -> JaCeLowered:
+    def lower(self, *args: _P.args, **kwargs: _P.kwargs) -> JaCeLowered:
         """
         Lower the wrapped computation for the given arguments.
 

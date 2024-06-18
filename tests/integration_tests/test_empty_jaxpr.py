@@ -71,7 +71,7 @@ def test_empty_scalar() -> None:
     def wrapped(a: np.float64) -> np.float64:
         return a
 
-    a = np.pi
+    a = np.float64(np.pi)
 
     assert np.all(wrapped(a) == a)
 
@@ -82,7 +82,7 @@ def test_empty_nested() -> None:
     def wrapped(a: np.float64) -> np.float64:
         return jax.jit(lambda a: a)(a)
 
-    a = np.pi
+    a = np.float64(np.pi)
 
     assert np.all(wrapped(a) == a)
 
