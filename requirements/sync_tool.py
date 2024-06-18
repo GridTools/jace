@@ -58,7 +58,7 @@ def load_from_toml(filename: str, key: str) -> list[pkg_reqs.Requirement]:
 
 
 def package_id(req: pkg_reqs.Requirement) -> str:
-    req = copy.deepcopy(req)
+    req = copy.copy(req)
     req.specifier = pkg_reqs.SpecifierSet()
     req.marker = None
     return str(req)
