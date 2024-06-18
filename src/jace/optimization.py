@@ -1,0 +1,70 @@
+# JaCe - JAX Just-In-Time compilation using DaCe (Data Centric Parallel Programming)
+#
+# Copyright (c) 2024, ETH Zurich
+# All rights reserved.
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
+"""
+JaCe specific optimizations.
+
+Currently just a dummy exists for the sake of providing a callable function.
+"""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Final, TypedDict
+
+from typing_extensions import Unpack
+
+
+if TYPE_CHECKING:
+    from jace import translator
+
+
+class CompilerOptions(TypedDict, total=False):
+    """
+    All known compiler options to `JaCeLowered.compile()`.
+
+    See `jace_optimize()` for a description of the different options.
+
+    There are some predefined option sets in `jace.jax.stages`:
+    - `DEFAULT_OPTIONS`
+    - `NO_OPTIMIZATIONS`
+    """
+
+    auto_optimize: bool
+    simplify: bool
+
+
+# TODO(phimuell): Add a context manager to modify the default.
+DEFAULT_OPTIMIZATIONS: Final[CompilerOptions] = {"auto_optimize": True, "simplify": True}
+
+NO_OPTIMIZATIONS: Final[CompilerOptions] = {"auto_optimize": False, "simplify": False}
+
+
+def jace_optimize(tsdfg: translator.TranslatedJaxprSDFG, **kwargs: Unpack[CompilerOptions]) -> None:  # noqa: D417  # Missing description for kwargs
+    """
+    Performs optimization of the translated SDFG _in place_.
+
+    It is recommended to use the `CompilerOptions` `TypedDict` to pass options
+    to the function. However, any option that is not specified will be
+    interpreted as to be disabled.
+
+    Args:
+        tsdfg: The translated SDFG that should be optimized.
+        simplify: Run the simplification pipeline.
+        auto_optimize: Run the auto optimization pipeline (currently does nothing)
+    """
+    # Currently this function exists primarily for the same of existing.
+
+    simplify = kwargs.get("simplify", False)
+    auto_optimize = kwargs.get("auto_optimize", False)
+
+    if simplify:
+        tsdfg.sdfg.simplify()
+
+    if auto_optimize:
+        pass
+
+    tsdfg.validate()

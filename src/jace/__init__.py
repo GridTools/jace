@@ -9,7 +9,20 @@
 
 from __future__ import annotations
 
+import jace.translator.primitive_translators as _  # noqa: F401  # Populate the internal registry.
 
-__version__ = "0.1.0"
+from .__about__ import __author__, __copyright__, __license__, __version__, __version_info__
+from .api import grad, jacfwd, jacrev, jit
 
-__all__ = ["__version__"]
+
+__all__ = [
+    "__author__",
+    "__copyright__",
+    "__license__",
+    "__version__",
+    "__version_info__",
+    "grad",
+    "jacfwd",
+    "jacrev",
+    "jit",
+]
