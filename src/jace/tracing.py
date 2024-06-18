@@ -23,7 +23,9 @@ from jax import tree_util as jax_tree
 
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Mapping
+    from collections.abc import Callable
+
+    from jace import api
 
 _P = ParamSpec("_P")
 _RetrunType = TypeVar("_RetrunType")
@@ -32,7 +34,7 @@ _RetrunType = TypeVar("_RetrunType")
 @overload
 def make_jaxpr(
     fun: Callable[_P, _RetrunType],
-    trace_options: Mapping[str, Any],
+    trace_options: api.JitOptions,
     return_outtree: Literal[True],
 ) -> Callable[_P, tuple[jax.core.ClosedJaxpr, jax_tree.PyTreeDef]]: ...
 
@@ -40,14 +42,14 @@ def make_jaxpr(
 @overload
 def make_jaxpr(
     fun: Callable[_P, _RetrunType],
-    trace_options: Mapping[str, Any],
+    trace_options: api.JitOptions,
     return_outtree: Literal[False] = False,
 ) -> Callable[_P, jax.core.ClosedJaxpr]: ...
 
 
 def make_jaxpr(
     fun: Callable[_P, Any],
-    trace_options: Mapping[str, Any],
+    trace_options: api.JitOptions,
     return_outtree: bool = False,
 ) -> (
     Callable[_P, tuple[jax.core.ClosedJaxpr, jax_tree.PyTreeDef]]
@@ -60,8 +62,6 @@ def make_jaxpr(
     the output. By default the callable will only return the Jaxpr, however, by setting
     `return_outtree` the function will also return the output tree, this is different
     from the `return_shape` of `jax.make_jaxpr()`.
-    Furthermore, this function accepts all tracing parameters, passed through the
-    `trace_options` map that `@jace.jit` supports.
 
     Currently the tracing is always performed with an enabled `x64` mode.
 

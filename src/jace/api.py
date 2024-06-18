@@ -11,9 +11,10 @@ from __future__ import annotations
 
 import functools
 import inspect
-from typing import TYPE_CHECKING, Any, Literal, ParamSpec, TypeVar, overload
+from typing import TYPE_CHECKING, Literal, ParamSpec, TypedDict, TypeVar, overload
 
 from jax import grad, jacfwd, jacrev
+from typing_extensions import Unpack
 
 from jace import stages, translator
 
@@ -22,11 +23,22 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
 
 
-__all__ = ["grad", "jacfwd", "jacrev", "jit"]
+__all__ = ["JitOptions", "grad", "jacfwd", "jacrev", "jit"]
 
 # Used for type annotation, see the notes in `jace.stages` for more.
 _P = ParamSpec("_P")
 _RetrunType = TypeVar("_RetrunType")
+
+
+class JitOptions(TypedDict, total=False):
+    """
+    All known options to `jace.jit` that influence tracing.
+
+    Notes:
+        Currently there are no known options, but essentially it is a subset of some
+        of the options that are supported by `jax.jit` together with some additional
+        JaCe specific ones.
+    """
 
 
 @overload
@@ -34,7 +46,7 @@ def jit(
     fun: Literal[None] = None,
     /,
     primitive_translators: Mapping[str, translator.PrimitiveTranslator] | None = None,
-    **kwargs: Any,
+    **kwargs: Unpack[JitOptions],
 ) -> Callable[[Callable[_P, _RetrunType]], stages.JaCeWrapped[_P, _RetrunType]]: ...
 
 
@@ -43,7 +55,7 @@ def jit(
     fun: Callable[_P, _RetrunType],
     /,
     primitive_translators: Mapping[str, translator.PrimitiveTranslator] | None = None,
-    **kwargs: Any,
+    **kwargs: Unpack[JitOptions],
 ) -> stages.JaCeWrapped[_P, _RetrunType]: ...
 
 
@@ -51,7 +63,7 @@ def jit(
     fun: Callable[_P, _RetrunType] | None = None,
     /,
     primitive_translators: Mapping[str, translator.PrimitiveTranslator] | None = None,
-    **kwargs: Any,
+    **kwargs: Unpack[JitOptions],
 ) -> (
     Callable[[Callable[_P, _RetrunType]], stages.JaCeWrapped[_P, _RetrunType]]
     | stages.JaCeWrapped[_P, _RetrunType]

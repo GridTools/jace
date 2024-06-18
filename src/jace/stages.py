@@ -34,7 +34,7 @@ from typing import TYPE_CHECKING, Any, Generic, ParamSpec, TypeVar, Union
 from jax import tree_util as jax_tree
 
 import jace
-from jace import optimization, tracing, translator, util
+from jace import api, optimization, tracing, translator, util
 from jace.optimization import CompilerOptions
 from jace.translator import pre_post_translation as ptrans
 from jace.util import translation_cache as tcache
@@ -104,13 +104,13 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"], Generic[_P, _RetrunType]):
 
     _fun: Callable[_P, _RetrunType]
     _primitive_translators: dict[str, translator.PrimitiveTranslator]
-    _jit_options: dict[str, Any]
+    _jit_options: api.JitOptions
 
     def __init__(
         self,
         fun: Callable[_P, _RetrunType],
         primitive_translators: Mapping[str, translator.PrimitiveTranslator],
-        jit_options: Mapping[str, Any],
+        jit_options: api.JitOptions,
     ) -> None:
         assert all(
             param.default is param.empty for param in inspect.signature(fun).parameters.values()
