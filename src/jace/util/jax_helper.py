@@ -19,6 +19,7 @@ import itertools
 from typing import TYPE_CHECKING, Any
 
 import dace
+import jax
 import jax.core as jax_core
 import numpy as np
 
@@ -132,10 +133,19 @@ def is_tracing_ongoing(*args: Any, **kwargs: Any) -> bool:
     While a return value `True` guarantees that a translation is ongoing, a
     value of `False` does not guarantees that no tracing is ongoing.
     """
-    # The current implementation only checks the arguments if it contains tracers.
-    if (len(args) == 0) and (len(kwargs) == 0):
-        raise RuntimeError("Failed to determine if tracing is ongoing.")
-    return any(isinstance(x, jax_core.Tracer) for x in itertools.chain(args, kwargs.values()))
+    # To detect if there is tracing ongoing, we check the internal tracing stack of Jax.
+    #  Note that this is highly internal and depends on the precise implementation of
+    #  Jax. For that reason we first look at all arguments and check if they are
+    #  tracers. Furthermore, it seems that Jax always have a bottom interpreter on the
+    #  stack, thus it is empty if `len(...) == 1`!
+    #  See also: https://github.com/google/jax/pull/3370
+    if any(isinstance(x, jax_core.Tracer) for x in itertools.chain(args, kwargs.values())):
+        return True
+    if len(jax._src.core.thread_local_state.trace_state.trace_stack.stack) == 1:
+        return False
+    if len(jax._src.core.thread_local_state.trace_state.trace_stack.stack) > 1:
+        return True
+    raise RuntimeError("Failed to determine if tracing is ongoing.")
 
 
 def translate_dtype(dtype: Any) -> dace.typeclass:

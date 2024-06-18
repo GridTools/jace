@@ -39,7 +39,7 @@ def is_jax_array(obj: Any) -> TypeGuard[jax.Array]:
     return isinstance(obj, jax.Array)
 
 
-def is_array(obj: Any) -> bool:
+def is_array(obj: Any) -> TypeGuard[jax.typing.ArrayLike]:
     """Identifies arrays, this also includes Jax arrays."""
     return dace.is_array(obj) or is_jax_array(obj)
 
@@ -74,6 +74,35 @@ def is_scalar(obj: Any) -> bool:
     return type(obj) in known_types
 
 
+def get_strides_for_dace(obj: Any) -> tuple[int, ...] | None:
+    """
+    Get the strides of `obj` in a DaCe compatible format.
+
+    The function returns the strides in number of elements, as it is used inside
+    DaCe and not in bytes as it is inside NumPy. As in NumPy and DaCe the function
+    returns `None` to indicate standard C order.
+
+    Notes:
+        If `obj` is not array like an error is generated.
+    """
+    if not is_array(obj):
+        raise TypeError(f"Passed '{obj}' ({type(obj).__name__}) is not array like.")
+
+    if is_jax_array(obj):
+        if not is_fully_addressable(obj):
+            raise NotImplementedError("Sharded jax arrays are not supported.")
+        obj = obj.__array__()
+    assert hasattr(obj, "strides")
+
+    if obj.strides is None:
+        return None
+    if not hasattr(obj, "itemsize"):
+        # No `itemsize` member so we assume that it is already in elements.
+        return obj.strides
+
+    return tuple(stride // obj.itemsize for stride in obj.strides)
+
+
 def is_on_device(obj: Any) -> bool:
     """
     Tests if `obj` is on a device.
@@ -91,3 +120,12 @@ def is_fully_addressable(obj: Any) -> bool:
     if is_jax_array(obj):
         return obj.is_fully_addressable
     return True
+
+
+def is_c_contiguous(obj: Any) -> bool:
+    """Tests if `obj` is in C order."""
+    if not is_array(obj):
+        return False
+    if is_jax_array(obj):
+        obj = obj.__array__()
+    return obj.flags["C_CONTIGUOUS"]

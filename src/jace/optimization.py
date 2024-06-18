@@ -5,11 +5,7 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""
-JaCe specific optimizations.
-
-Currently just a dummy exists for the sake of providing a callable function.
-"""
+"""JaCe specific optimizations."""
 
 from __future__ import annotations
 
@@ -19,7 +15,7 @@ from typing_extensions import Unpack
 
 
 if TYPE_CHECKING:
-    from jace import translator
+    import jace
 
 
 class CompilerOptions(TypedDict, total=False):
@@ -35,15 +31,24 @@ class CompilerOptions(TypedDict, total=False):
 
     auto_optimize: bool
     simplify: bool
+    persistent: bool
 
 
 # TODO(phimuell): Add a context manager to modify the default.
-DEFAULT_OPTIMIZATIONS: Final[CompilerOptions] = {"auto_optimize": True, "simplify": True}
+DEFAULT_OPTIMIZATIONS: Final[CompilerOptions] = {
+    "auto_optimize": True,
+    "simplify": True,
+    "persistent": True,
+}
 
-NO_OPTIMIZATIONS: Final[CompilerOptions] = {"auto_optimize": False, "simplify": False}
+NO_OPTIMIZATIONS: Final[CompilerOptions] = {
+    "auto_optimize": False,
+    "simplify": False,
+    "persistent": False,
+}
 
 
-def jace_optimize(tsdfg: translator.TranslatedJaxprSDFG, **kwargs: Unpack[CompilerOptions]) -> None:  # noqa: D417  # Missing description for kwargs
+def jace_optimize(tsdfg: jace.TranslatedJaxprSDFG, **kwargs: Unpack[CompilerOptions]) -> None:  # noqa: D417  # Missing description for kwargs
     """
     Performs optimization of the translated SDFG _in place_.
 
@@ -55,6 +60,9 @@ def jace_optimize(tsdfg: translator.TranslatedJaxprSDFG, **kwargs: Unpack[Compil
         tsdfg: The translated SDFG that should be optimized.
         simplify: Run the simplification pipeline.
         auto_optimize: Run the auto optimization pipeline (currently does nothing)
+        persistent:  Make the memory allocation persistent, i.e. allocate the
+            transients only once at the beginning and then reuse the memory across
+            the lifetime of the SDFG.
     """
     # Currently this function exists primarily for the same of existing.
 

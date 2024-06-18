@@ -13,9 +13,12 @@ import jace.translator.primitive_translators as _  # noqa: F401  # Populate the 
 
 from .__about__ import __author__, __copyright__, __license__, __version__, __version_info__
 from .api import grad, jacfwd, jacrev, jit
+from .translated_jaxpr_sdfg import CompiledJaxprSDFG, TranslatedJaxprSDFG
 
 
 __all__ = [
+    "CompiledJaxprSDFG",
+    "TranslatedJaxprSDFG",
     "__author__",
     "__copyright__",
     "__license__",

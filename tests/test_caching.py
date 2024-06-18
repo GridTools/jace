@@ -11,7 +11,6 @@
 from __future__ import annotations
 
 import itertools as it
-import re
 
 import numpy as np
 import pytest
@@ -244,13 +243,9 @@ def test_caching_strides() -> None:
     #  But the cache is aware of this, which helps catch some nasty bugs.
     F_lower = None  # Remove later
     F_res = C_res.copy()  # Remove later
-    with pytest.raises(  # noqa: PT012 # Multiple calls
-        expected_exception=NotImplementedError,
-        match=re.escape("Currently can not yet handle strides beside 'C_CONTIGUOUS'."),
-    ):
-        F_lower = wrapped.lower(F)
-        F_res = wrapped(F)
-    assert F_lower is None  # Remove later.
+    F_lower = wrapped.lower(F)
+    F_res = wrapped(F)
+    assert F_lower is not C_lower
     assert C_res is not F_res
     assert np.allclose(F_res, C_res)
     assert F_lower is not C_lower
