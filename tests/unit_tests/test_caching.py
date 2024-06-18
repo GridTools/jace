@@ -37,11 +37,11 @@ def test_caching_working() -> None:
     ref = np.sin(a)
     res_ids: set[int] = set()
     # We have to store the array, because numpy does reuse the memory.
-    res_set: list[np.ndarray] = []
+    res_set: list[jax.Array] = []
 
     for _ in range(10):
         res = wrapped(a)
-        res_id = res.__array_interface__["data"][0]
+        res_id = res.__array_interface__["data"][0]  # type: ignore[attr-defined]
 
         assert np.allclose(res, ref)
         assert lowering_cnt[0] == 1
@@ -62,7 +62,7 @@ def test_caching_same_sizes() -> None:
 
     # this is the wrapped function.
     @jace.jit
-    def wrapped(a, b):
+    def wrapped(a: np.ndarray, b: np.ndarray) -> np.ndarray:
         lowering_cnt[0] += 1
         return testee(a, b)
 

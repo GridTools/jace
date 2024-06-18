@@ -524,7 +524,7 @@ def test_builder_scalar_return_type() -> None:
     res = wrapped(a)
     assert res.shape == (1,)
     assert res.dtype == np.float64
-    assert res[0] == np.float64(1.0)
+    assert np.all(res == np.float64(1.0))
 
 
 def test_builder_multiple_return_values() -> None:

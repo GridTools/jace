@@ -25,5 +25,5 @@ def test_copy() -> None:
     res = testee(a)
     assert a.dtype == res.dtype
     assert a.shape == res.shape
-    assert a.__array_interface__["data"][0] != res.__array_interface__["data"][0]
+    assert a.__array_interface__["data"][0] != res.__array_interface__["data"][0]  # type: ignore[attr-defined]
     assert np.all(res == a)

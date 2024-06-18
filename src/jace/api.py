@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import functools
 import inspect
-from typing import TYPE_CHECKING, Any, Literal, ParamSpec, overload
+from typing import TYPE_CHECKING, Any, Literal, ParamSpec, TypeVar, overload
 
 from jax import grad, jacfwd, jacrev
 
@@ -24,7 +24,9 @@ if TYPE_CHECKING:
 
 __all__ = ["grad", "jacfwd", "jacrev", "jit"]
 
+# Used for type annotation, see the notes in `jace.stages` for more.
 _P = ParamSpec("_P")
+_RetrunType = TypeVar("_RetrunType")
 
 
 @overload
@@ -33,24 +35,27 @@ def jit(
     /,
     primitive_translators: Mapping[str, translator.PrimitiveTranslator] | None = None,
     **kwargs: Any,
-) -> Callable[[Callable[_P, Any]], stages.JaCeWrapped[_P]]: ...
+) -> Callable[[Callable[_P, _RetrunType]], stages.JaCeWrapped[_P, _RetrunType]]: ...
 
 
 @overload
 def jit(
-    fun: Callable[_P, Any],
+    fun: Callable[_P, _RetrunType],
     /,
     primitive_translators: Mapping[str, translator.PrimitiveTranslator] | None = None,
     **kwargs: Any,
-) -> stages.JaCeWrapped[_P]: ...
+) -> stages.JaCeWrapped[_P, _RetrunType]: ...
 
 
 def jit(
-    fun: Callable[_P, Any] | None = None,
+    fun: Callable[_P, _RetrunType] | None = None,
     /,
     primitive_translators: Mapping[str, translator.PrimitiveTranslator] | None = None,
     **kwargs: Any,
-) -> Callable[[Callable[_P, Any]], stages.JaCeWrapped[_P]] | stages.JaCeWrapped[_P]:
+) -> (
+    Callable[[Callable[_P, _RetrunType]], stages.JaCeWrapped[_P, _RetrunType]]
+    | stages.JaCeWrapped[_P, _RetrunType]
+):
     """
     JaCe's replacement for `jax.jit` (just-in-time) wrapper.
 
@@ -74,7 +79,7 @@ def jit(
             f"The following arguments to 'jace.jit' are not yet supported: {', '.join(kwargs)}."
         )
 
-    def wrapper(f: Callable[_P, Any]) -> stages.JaCeWrapped[_P]:
+    def wrapper(f: Callable[_P, _RetrunType]) -> stages.JaCeWrapped[_P, _RetrunType]:
         if any(
             param.default is not param.empty for param in inspect.signature(f).parameters.values()
         ):

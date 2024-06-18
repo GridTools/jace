@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import copy
 import inspect
-from typing import TYPE_CHECKING, Any, Generic, ParamSpec, Union
+from typing import TYPE_CHECKING, Any, Generic, ParamSpec, TypeVar, Union
 
 from jax import tree_util as jax_tree
 
@@ -59,15 +59,20 @@ __all__ = [
 #: Known compilation stages in JaCe.
 Stage = Union["JaCeWrapped", "JaCeLowered", "JaCeCompiled"]
 
-# Used for type annotation of the `Stages`, it is important that the return type can
-#  not be annotated, because JaCe will modify it, in case it is a scalar. Thus the
-#  return type is not annotated. Furthermore, because static arguments change the
-#  signature (in a runtime dependent manor) `JaCeCompiled.__call__()` can not be
-#  annotated as well. For that reason only the arguments are annotated.
+# These are used to annotated the `Stages`, however, there are some limitations.
+#  First, the only stage that is fully annotated is `JaCeWrapped`. Second, since
+#  static arguments modify the type signature of `JaCeCompiled.__call__()`, see
+#  [Jax](https://jax.readthedocs.io/en/latest/aot.html#lowering-with-static-arguments)
+#  for more, its argument can not be annotated, only its return type can.
+#  However, in case of scalar return values, the return type is wrong anyway, since
+#  JaCe and Jax for that matter, transforms scalars to arrays. Since there is no way of
+#  changing that, but from a semantic point they behave the same so it should not
+#  matter too much.
 _P = ParamSpec("_P")
+_RetrunType = TypeVar("_RetrunType")
 
 
-class JaCeWrapped(tcache.CachingStage["JaCeLowered"], Generic[_P]):
+class JaCeWrapped(tcache.CachingStage["JaCeLowered"], Generic[_P, _RetrunType]):
     """
     A function ready to be specialized, lowered, and compiled.
 
@@ -97,13 +102,13 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"], Generic[_P]):
         which is implicitly and temporary activated during tracing.
     """
 
-    _fun: Callable[_P, Any]
+    _fun: Callable[_P, _RetrunType]
     _primitive_translators: dict[str, translator.PrimitiveTranslator]
     _jit_options: dict[str, Any]
 
     def __init__(
         self,
-        fun: Callable[_P, Any],
+        fun: Callable[_P, _RetrunType],
         primitive_translators: Mapping[str, translator.PrimitiveTranslator],
         jit_options: Mapping[str, Any],
     ) -> None:
@@ -115,7 +120,7 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"], Generic[_P]):
         self._jit_options = {**jit_options}
         self._fun = fun
 
-    def __call__(self, *args: _P.args, **kwargs: _P.kwargs) -> Any:
+    def __call__(self, *args: _P.args, **kwargs: _P.kwargs) -> _RetrunType:
         """
         Executes the wrapped function, lowering and compiling as needed in one step.
 
@@ -136,7 +141,7 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"], Generic[_P]):
         return compiled(*args, **kwargs)
 
     @tcache.cached_transition
-    def lower(self, *args: _P.args, **kwargs: _P.kwargs) -> JaCeLowered:
+    def lower(self, *args: _P.args, **kwargs: _P.kwargs) -> JaCeLowered[_RetrunType]:
         """
         Lower the wrapped computation for the given arguments.
 
@@ -198,7 +203,7 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"], Generic[_P]):
         )
 
 
-class JaCeLowered(tcache.CachingStage["JaCeCompiled"]):
+class JaCeLowered(tcache.CachingStage["JaCeCompiled"], Generic[_RetrunType]):
     """
     Represents the original computation as an SDFG.
 
@@ -233,7 +238,7 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"]):
         self._outtree = outtree
 
     @tcache.cached_transition
-    def compile(self, compiler_options: CompilerOptions | None = None) -> JaCeCompiled:
+    def compile(self, compiler_options: CompilerOptions | None = None) -> JaCeCompiled[_RetrunType]:
         """
         Optimize and compile the lowered SDFG using `compiler_options`.
 
@@ -292,7 +297,7 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"]):
         )
 
 
-class JaCeCompiled:
+class JaCeCompiled(Generic[_RetrunType]):
     """
     Compiled version of the SDFG.
 
@@ -327,7 +332,7 @@ class JaCeCompiled:
         self._csdfg = csdfg
         self._outtree = outtree
 
-    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+    def __call__(self, *args: Any, **kwargs: Any) -> _RetrunType:
         """
         Calls the embedded computation.
 
@@ -340,7 +345,7 @@ class JaCeCompiled:
         flat_call_args = jax_tree.tree_leaves((args, kwargs))
         flat_output = self._csdfg(flat_call_args)
         if flat_output is None:
-            return None
+            return None  # type: ignore[return-value]  # Type confusion.
         return jax_tree.tree_unflatten(self._outtree, flat_output)
 
 
