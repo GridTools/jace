@@ -16,7 +16,7 @@ functionality for use in JaCe.
 from __future__ import annotations
 
 import inspect
-from typing import TYPE_CHECKING, Any, Concatenate, Literal, ParamSpec, overload
+from typing import TYPE_CHECKING, Any, Literal, ParamSpec, TypeVar, overload
 
 import jax
 from jax import tree_util as jax_tree
@@ -26,26 +26,27 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
 
 _P = ParamSpec("_P")
+_RetrunType = TypeVar("_RetrunType")
 
 
 @overload
 def make_jaxpr(
-    fun: Callable[Concatenate[_P], Any],
+    fun: Callable[_P, _RetrunType],
     trace_options: Mapping[str, Any],
     return_outtree: Literal[True],
-) -> Callable[Concatenate[_P], tuple[jax.core.ClosedJaxpr, jax_tree.PyTreeDef]]: ...
+) -> Callable[_P, tuple[jax.core.ClosedJaxpr, jax_tree.PyTreeDef]]: ...
 
 
 @overload
 def make_jaxpr(
-    fun: Callable[Concatenate[_P], Any],
+    fun: Callable[_P, _RetrunType],
     trace_options: Mapping[str, Any],
     return_outtree: Literal[False] = False,
-) -> Callable[Concatenate[_P], jax.core.ClosedJaxpr]: ...
+) -> Callable[_P, jax.core.ClosedJaxpr]: ...
 
 
 def make_jaxpr(
-    fun: Callable[Concatenate[_P], Any],
+    fun: Callable[_P, Any],
     trace_options: Mapping[str, Any],
     return_outtree: bool = False,
 ) -> (
