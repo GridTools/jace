@@ -70,7 +70,7 @@ repos:
     additional_dependencies:
     - dace==0.16
     - jax[cpu]==0.4.29
-    - numpy==1.26.4
+    - numpy==2.0.0
     - pytest==8.2.2
     - typing-extensions==4.12.2
 - repo: https://github.com/codespell-project/codespell
