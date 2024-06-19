@@ -28,7 +28,7 @@ class IotaTranslator(mapped_base.MappedOperationTranslatorBase):
     """
     Implements the `iota` primitive.
 
-    Essentially a very general `jnp.arange()` function.
+    Essentially, a very general `jnp.arange()` function.
     """
 
     def __init__(self) -> None:

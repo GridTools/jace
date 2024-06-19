@@ -93,7 +93,7 @@ def test_dynamic_slice_partially_dynamic(a_4x4x4x4: np.ndarray) -> None:
 
 def test_dynamic_slice_full_literal(a_4x4x4x4: np.ndarray) -> None:
     def testee(a: np.ndarray) -> jax.Array:
-        return jax.lax.dynamic_slice(a, (0, 1, 0, 2), (2, 2, 2, 2))
+        return jax.lax.dynamic_slice(a, (0, 1, 0, 3), (2, 2, 2, 2))
 
     res = jace.jit(testee)(a_4x4x4x4)
     ref = testee(a_4x4x4x4)

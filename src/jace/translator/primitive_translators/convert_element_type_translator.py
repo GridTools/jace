@@ -28,7 +28,10 @@ class ConvertElementTypeTranslator(mapped_base.MappedOperationTranslatorBase):
     """
     Implements the `convert_element_type` primitive.
 
-    Copies the input to the output and performs type conversion.
+    The primitive will expand to a "copy Map", however, the Tasklet will not
+    simply copy the input to the output, but also perform type conversion.
+    However, in cases where the input type is the same as the output type,
+    the Tasklet will just be a copy Tasklet, that can then be removed by DaCe.
 
     Notes:
         This translator ignores the `new_dtype` and `weak_type` parameters of

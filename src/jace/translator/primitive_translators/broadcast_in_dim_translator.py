@@ -25,7 +25,13 @@ if TYPE_CHECKING:
 
 
 class BroadcastInDimTranslator(mapped_base.MappedOperationTranslatorBase):
-    """Implements the `broadcast_in_dim` primitive."""
+    """
+    Implements the `broadcast_in_dim` primitive.
+
+    The primitive is implemented through the `MappedOperationTranslatorBase` base.
+    Essentially it creates a copy, but also creates special Memlets that replicate
+    the content of the input.
+    """
 
     def __init__(self) -> None:
         super().__init__(primitive_name="broadcast_in_dim")

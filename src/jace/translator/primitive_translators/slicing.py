@@ -29,8 +29,11 @@ class SlicingTranslator(mapped_base.MappedOperationTranslatorBase):
     Implements the `slice` primitive.
 
     This is the classical slicing operation which extracts a fixed sized window
-    from a fixed initial position. The `dynamic_slice` operation supports a
-    variable starting point.
+    from a fixed initial position. The slicing is implemented using a partial copy.
+
+    Notes:
+        Slices are essentially optimization barriers as they can not be fused
+        with Maps before them.
     """
 
     def __init__(self) -> None:
@@ -101,41 +104,47 @@ class DynamicSlicingTranslator(translator.PrimitiveTranslator):
         # This is the sizes of the slice window.
         window_sizes: Sequence[int] = eqn.params["slice_sizes"]
 
-        # The first input to the primitive is the array we slice from, the others are
-        #  the start indices of the slice window, each is a scalar, maybe literals.
-        in_var_name: str = in_var_names[0]
-        start_indices: list[str | None] = list(in_var_names[1:])
-
-        # Access nodes for the modified start indexes.
+        # Maps the variable name, that stores the start index of the window in one
+        #  dimensions to the access node, that holds the value. The variable name
+        #  is also used as dynamic range offset.
+        #  Only present if the index is not a literal.
         in_access: dict[str, dace.nodes.AccessNode] = {}
 
+        # Name of the variable from where we get the start index of the window
+        #  or the value itself, if it is a literal; in the order of the dimension.
+        #  If the value is `None` then the literal was not yet processed.
+        window_start_indices: list[str | None] = list(in_var_names[1:])
+
         # We will always adapt the start indexes and not check if it is needed.
-        for dim, (start_index, dim_size, wsize) in enumerate(
-            zip(start_indices, util.get_jax_var_shape(eqn.invars[0]), window_sizes)
+        for dim, (window_start_index, dim_size, window_size) in enumerate(
+            zip(window_start_indices, util.get_jax_var_shape(eqn.invars[0]), window_sizes)
         ):
-            if start_index is None:
+            if window_start_index is None:
+                # Jax does not adjust the literals on its own
+                raw_window_start = int(util.get_jax_literal_value(eqn.invars[dim + 1]))  # type: ignore[arg-type]  # type confusion
+                adjusted_window_start = min(dim_size, raw_window_start + window_size) - window_size
+                window_start_indices[dim] = str(adjusted_window_start)
                 continue
 
-            # We use a Tasklet to perform the adjustment not a symbol, because this
-            # would need an interstage edge serving as kind of an optimization barrier.
+            # We do not use a symbol for the start of the window but a Tasklet, as
+            #  a symbol would need an interstage edge, which is an optimization barrier.
             tasklet = dace.nodes.Tasklet(
-                label=f"adjustment_of_slice_start_{start_index}_for_{out_var_names[0]}",
+                label=f"adjustment_of_slice_start_{window_start_index}_for_{out_var_names[0]}",
                 inputs={"unadjusted_start_idx": None},
                 outputs={"adjusted_start_idx": None},
-                code=f"adjusted_start_idx = min(unadjusted_start_idx + {wsize}, {dim_size}) - {wsize}",
+                code=f"adjusted_start_idx = min(unadjusted_start_idx + {window_size}, {dim_size}) - {window_size}",
             )
-
             new_start_idx_var_name = builder.add_array(
                 eqn.invars[dim + 1], name_prefix="__jace_adapted_start_idx_"
             )
             new_start_idx_acc = eqn_state.add_access(new_start_idx_var_name)
 
             eqn_state.add_edge(
-                eqn_state.add_read(start_index),
+                eqn_state.add_read(window_start_index),
                 None,
                 tasklet,
                 "unadjusted_start_idx",
-                dace.Memlet.simple(start_index, "0"),
+                dace.Memlet.simple(window_start_index, "0"),
             )
             eqn_state.add_edge(
                 tasklet,
@@ -144,33 +153,22 @@ class DynamicSlicingTranslator(translator.PrimitiveTranslator):
                 None,
                 dace.Memlet.simple(new_start_idx_var_name, "0"),
             )
-            # Update the name of the start index
-            start_indices[dim] = new_start_idx_var_name
+            # Update the name of the start index, and store the access
+            #  node for later use.
+            window_start_indices[dim] = new_start_idx_var_name
             in_access[new_start_idx_var_name] = new_start_idx_acc
 
         tskl_ranges: list[tuple[str, str]] = [
             (f"__i{dim}", f"0:{N}") for dim, N in enumerate(util.get_jax_var_shape(eqn.outvars[0]))
         ]
 
-        # For copying the data, we use dynamic map ranges, which is basically an input
-        #  connector on the map entry whose name is not `IN_*`, this name can then be
-        #  used as a symbol inside the map scope; this symbol is then used as offset.
-        dynamic_map_ranges: dict[str, str] = {}
         memlet_accesses: list[str] = []
 
-        for i, ((it_var, _), start_index) in enumerate(zip(tskl_ranges, start_indices), 1):
-            if start_index is None:
-                offset = str(util.get_jax_literal_value(eqn.invars[i]))
-            else:
-                # Because of [issue 1579](https://github.com/spcl/dace/issues/1579) we
-                #  have to use the same name as the data container for the symbol and
-                #  can not mangle it.
-                # TODO(phimuell): Activate mangling when the issue is resolved.
-                offset = start_index
-                dynamic_map_ranges[offset] = start_index
-            memlet_accesses.append(f"{it_var} + {offset}")
+        for (it_var, _), offset_symbol_name in zip(tskl_ranges, window_start_indices):
+            assert offset_symbol_name is not None
+            memlet_accesses.append(f"{it_var} + {offset_symbol_name}")
 
-        tskl_input = dace.Memlet.simple(in_var_name, ", ".join(memlet_accesses))
+        tskl_input = dace.Memlet.simple(in_var_names[0], ", ".join(memlet_accesses))
         tskl_output = dace.Memlet.simple(
             out_var_names[0], ", ".join(name for name, _ in tskl_ranges)
         )
@@ -185,15 +183,17 @@ class DynamicSlicingTranslator(translator.PrimitiveTranslator):
 
         # Creating the inputs for the dynamic map ranges. We have to use the same
         #  access nodes as above, to ensure a single order of computation.
-        for symb_name, start_index in dynamic_map_ranges.items():
+        for window_start_index_name, windows_start_access_node in in_access.items():
             eqn_state.add_edge(
-                in_access[start_index],
+                windows_start_access_node,
                 None,
                 map_entry,
-                symb_name,
-                dace.Memlet.simple(start_index, "0"),
+                window_start_index_name,
+                dace.Memlet.simple(window_start_index_name, "0"),
             )
-            map_entry.add_in_connector(symb_name)
+            map_entry.add_in_connector(window_start_index_name)
+
+        builder.sdfg.view()
 
 
 translator.register_primitive_translator(SlicingTranslator())

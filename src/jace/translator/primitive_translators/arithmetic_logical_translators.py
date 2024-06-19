@@ -33,8 +33,8 @@ class ArithmeticOperationTranslator(mapped_base.MappedOperationTranslatorBase):
     """
     Translator for all arithmetic operations.
 
-    The class makes use of the `MappedOperationTranslatorBase`. It only implements
-    the `write_tasklet_code()` to generate the code for a Tasklet from a template.
+    The class is derived from `MappedOperationTranslatorBase` and overwrites the
+    `write_tasklet_code()` function for the Tasklet code.
 
     Args:
         prim_name:      The name of the primitive that should be handled.
@@ -43,6 +43,7 @@ class ArithmeticOperationTranslator(mapped_base.MappedOperationTranslatorBase):
     Note:
         - It does not implement the logical operations, they are implemented by
             the `LogicalOperationTranslator` class.
+        - Despite its name this class also provides the comparison operators.
         - It does not implement `mod` nor `fmod` as they are translated to some
             nested `pjit` implementation by Jax for unknown reasons.
     """
@@ -70,17 +71,16 @@ class LogicalOperationTranslator(mapped_base.MappedOperationTranslatorBase):
     Translator for all logical operations.
 
     The reason why the logical operations are separated from the arithmetic
-    operation is quite complicated, and in fact the whole thing is harder than
+    operations is quite complicated and in fact the whole thing is harder than
     it should be. NumPy has two kinds of these operations, i.e.
     `logical_{and, or, xor, not}()` and `bitwise_{and, or, xor, not}()`, but Jax
-    has only a single kind of logical operations, that operate in bitwise mode.
+    has only a single kind of logical operation, that operate in bitwise mode.
     The first idea would be to use `ArithmeticOperationTranslator` with a template
     such as `__out = __in0 & __in1` or `__out = ~__in0`. Since DaCe eventually
     generates C++ code and C++ has a native bool type, and `true` is guaranteed
     to be `1` and `false` equals `0`, this works for all operations except `not`,
-    as `~true` in C++ is again `true`. Thus the `not` primitive must be handled
-    separately, however, it does not make sense to split the logical operations,
-    thus all of them are handled by this class.
+    as `~true` in C++ is essentially `~1`, which is again `true`!
+    Thus the `not` primitive must be handled separately.
 
     The solution to the problem is, to introduce two templates, one used for the
     bool context and one used in the integer context. This works because depending
@@ -93,8 +93,9 @@ class LogicalOperationTranslator(mapped_base.MappedOperationTranslatorBase):
         bool_tmpl:      The template used for the bool case.
 
     Notes:
-        This class does not do parameter substitution as the
-        `ArithmeticOperationTranslator` does.
+        Since it does not make sense to single out `not` and keep the other
+        logical operations in `ArithmeticOperationTranslator` all of them are
+        handled by this class.
     """
 
     def __init__(self, prim_name: str, int_tmpl: str, bool_tmpl: str) -> None:

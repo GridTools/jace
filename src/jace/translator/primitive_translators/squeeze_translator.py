@@ -29,9 +29,8 @@ class SqueezeTranslator(mapped_base.MappedOperationTranslatorBase):
     """
     Implements the `squeeze` primitive.
 
-    The primitives allows to remove a dimension of size one. Essentially
-    equivalent to `np.squeeze` and the inverse to `np.expand_dims()`,
-    which is handled by the `broadcast_in_dim` primitive.
+    The primitives allows to remove dimensions of size one. Essentially
+    equivalent to `np.squeeze` and the inverse to `np.expand_dims()`.
     """
 
     def __init__(self) -> None:

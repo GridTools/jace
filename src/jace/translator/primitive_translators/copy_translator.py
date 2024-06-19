@@ -11,10 +11,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import dace
 from typing_extensions import override
 
 from jace import translator
-from jace.translator import mapped_operation_base_translator as mapped_base
 
 
 if TYPE_CHECKING:
@@ -23,55 +23,69 @@ if TYPE_CHECKING:
     from jax import core as jax_core
 
 
-class CopyTranslator(mapped_base.MappedOperationTranslatorBase):
+class CopyTranslator:
     """
     Implements the `copy` primitive.
 
-    Copy operations are implemented as a map to ensure that they can be fused
-    with other maps
-    .
+    The translator is implemented by using a Memlet.
     """
 
-    def __init__(self) -> None:
-        super().__init__(primitive_name="copy")
+    @property
+    def primitive(self) -> str:  # noqa: D102  # No docstring needed.
+        return "copy"
 
-    @override
-    def write_tasklet_code(
+    def __call__(  # noqa: D102  # No docstring
         self,
-        tskl_ranges: Sequence[tuple[str, str]],
+        builder: translator.JaxprTranslationBuilder,
         in_var_names: Sequence[str | None],
-        eqn: jax_core.JaxprEqn,
-    ) -> str:
-        return "__out = __in0"
+        out_var_names: Sequence[str],
+        eqn: jax_core.JaxprEqn,  # noqa: ARG002
+        eqn_state: dace.SDFGState,
+    ) -> None:
+        eqn_state.add_nedge(
+            eqn_state.add_read(in_var_names[0]),
+            eqn_state.add_write(out_var_names[0]),
+            dace.Memlet.from_array(
+                in_var_names[0],
+                builder.arrays[in_var_names[0]],  # type: ignore[index]  # Guaranteed to be a string
+            ),
+        )
 
 
-class DevicePutTranslator(mapped_base.MappedOperationTranslatorBase):
+class DevicePutTranslator(CopyTranslator):
     """
     Implements the `device_put` primitive.
 
-    In Jax this primitive is used to copy data between the host and the device.
-    Because of the way how JaCe and the optimization pipeline works, either
-    everything is on the host or the device.
-
-    Todo:
-        Think about how to implement this correctly.
+    In Jax this primitive is used to copy data between the host and the device,
+    in DaCe Memlets can do this. However, because of the way JaCe operates, at
+    least in the beginning a computation is either fully on the host or on the
+    device this copy will essentially perform a copying.
     """
 
-    def __init__(self) -> None:
-        super().__init__(primitive_name="device_put")
+    @property
+    def primitive(self) -> str:  # noqa: D102  # No docstring
+        return "device_put"
 
     @override
-    def write_tasklet_code(
+    def __call__(  # No docstring
         self,
-        tskl_ranges: Sequence[tuple[str, str]],
+        builder: translator.JaxprTranslationBuilder,
         in_var_names: Sequence[str | None],
+        out_var_names: Sequence[str],
         eqn: jax_core.JaxprEqn,
-    ) -> str:
+        eqn_state: dace.SDFGState,
+    ) -> None:
         if not (eqn.params["device"] is None and eqn.params["src"] is None):
             raise NotImplementedError(
                 f"Can only copy on the host, but not from {eqn.params['src']} to {eqn.params['device']}."
             )
-        return "__out = __in0"
+        return super().__call__(
+            builder=builder,
+            in_var_names=in_var_names,
+            out_var_names=out_var_names,
+            eqn=eqn,
+            eqn_state=eqn_state,
+        )
 
 
 _ = translator.register_primitive_translator(CopyTranslator())
