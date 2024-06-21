@@ -201,7 +201,7 @@ def compile_jaxpr_sdfg(tsdfg: TranslatedJaxprSDFG) -> CompiledJaxprSDFG:
         # We need to give the SDFG another name, this is needed to prevent a DaCe
         #  error/warning. This happens if we compile the same lowered SDFG multiple
         #  times with different options.
-        sdfg.name = f"{sdfg.name}__{uuid.uuid1()}"
+        sdfg.name = f"{sdfg.name}__{str(uuid.uuid1()).replace('-', '_')}"
         assert len(sdfg.name) < 255  # noqa: PLR2004 magic-value-comparison  # 255 maximal file name size on UNIX.
 
         with dace.config.temporary_config():
