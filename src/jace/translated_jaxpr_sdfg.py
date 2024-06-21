@@ -10,9 +10,8 @@
 from __future__ import annotations
 
 import dataclasses
-import os
 import pathlib
-import time
+import uuid
 from typing import TYPE_CHECKING, Any
 
 import dace
@@ -32,10 +31,10 @@ if TYPE_CHECKING:
 @dataclasses.dataclass(frozen=True, kw_only=True)
 class TranslatedJaxprSDFG:
     """
-    Encapsulates a translated SDFG with additional the metadata.
+    Encapsulates the SDFG generated from a Jaxpr and additional metadata.
 
     Contrary to the SDFG that is encapsulated inside an `TranslationContext`
-    object, `self` carries a proper SDFG, however:
+    object, `self` carries a proper SDFG with the following structure:
     - It does not have `__return*` variables, instead all return arguments are
         passed by arguments.
     - All input arguments are passed through arguments mentioned in `inp_names`,
@@ -43,7 +42,7 @@ class TranslatedJaxprSDFG:
     - Only variables listed as in/outputs are non transient.
     - The order inside `inp_names` and `out_names` is the same as in the original Jaxpr.
     - If an input is used as outputs it appears in both `inp_names` and `out_names`.
-    - Its `arg_names` is set to  `inp_names + out_names`, but arguments that are
+    - Its `arg_names` is set to `inp_names + out_names`, but arguments that are
         input and outputs are only listed as inputs.
 
     The only valid way to obtain a `TranslatedJaxprSDFG` is by passing a
@@ -91,6 +90,7 @@ class TranslatedJaxprSDFG:
         return True
 
 
+@dataclasses.dataclass(frozen=True, kw_only=True)
 class CompiledJaxprSDFG:
     """
     Compiled version of a `TranslatedJaxprSDFG` instance.
@@ -121,20 +121,12 @@ class CompiledJaxprSDFG:
     """
 
     csdfg: compiled_sdfg.CompiledSDFG
-    sdfg: dace.SDFG
     inp_names: tuple[str, ...]
     out_names: tuple[str, ...]
 
-    def __init__(
-        self,
-        csdfg: compiled_sdfg.CompiledSDFG,
-        inp_names: tuple[str, ...],
-        out_names: tuple[str, ...],
-    ) -> None:
-        self.csdfg = csdfg
-        self.sdfg = self.csdfg.sdfg
-        self.inp_names = inp_names
-        self.out_names = out_names
+    @property
+    def sdfg(self) -> dace.SDFG:  # noqa: D102 [undocumented-public-method]
+        return self.csdfg.sdfg
 
     def __call__(
         self,
@@ -151,23 +143,25 @@ class CompiledJaxprSDFG:
             flat_call_args: Flattened input arguments.
         """
         if len(self.inp_names) != len(flat_call_args):
-            # Either error or static arguments are not removed.
-            raise RuntimeError("Wrong number of arguments.")
+            raise RuntimeError(
+                f"Expected {len(self.inp_names)} flattened arguments, but got {len(flat_call_args)}."
+            )
 
         sdfg_call_args: dict[str, Any] = {}
         for in_name, in_val in zip(self.inp_names, flat_call_args):
             # TODO(phimuell): Implement a stride matching process.
             if util.is_jax_array(in_val):
                 if not util.is_fully_addressable(in_val):
-                    raise ValueError(f"Passed a not fully addressable Jax array as '{in_name}'")
-                in_val = in_val.__array__()  # noqa: PLW2901  # Jax arrays do not expose the __array_interface__.
+                    raise ValueError(f"Passed a not fully addressable JAX array as '{in_name}'")
+                in_val = in_val.__array__()  # noqa: PLW2901 [redefined-loop-name]  # JAX arrays do not expose the __array_interface__.
             sdfg_call_args[in_name] = in_val
 
         arrays = self.sdfg.arrays
-        for out_name, sdfg_array in ((out_name, arrays[out_name]) for out_name in self.out_names):
+        for out_name in self.out_names:
+            sdfg_array = arrays[out_name]
             if out_name in sdfg_call_args:
                 if util.is_jax_array(sdfg_call_args[out_name]):
-                    raise ValueError("Passed an immutable Jax array as output.")
+                    raise ValueError("Passed an immutable JAX array as output.")
             else:
                 sdfg_call_args[out_name] = dace_data.make_array_from_descriptor(sdfg_array)
 
@@ -191,7 +185,7 @@ def compile_jaxpr_sdfg(tsdfg: TranslatedJaxprSDFG) -> CompiledJaxprSDFG:
     """Compile `tsdfg` and return a `CompiledJaxprSDFG` object with the result."""
     if any(  # We do not support the DaCe return mechanism
         array_name.startswith("__return")
-        for array_name in tsdfg.sdfg.arrays.keys()  # noqa: SIM118  # We can not use `in` because we are not interested in `my_mangled_variable__return_zulu`!
+        for array_name in tsdfg.sdfg.arrays.keys()  # noqa: SIM118 [in-dict-keys]  # We can not use `in` because we are not interested in `my_mangled_variable__return_zulu`!
     ):
         raise ValueError("Only support SDFGs without '__return' members.")
     if tsdfg.sdfg.free_symbols:  # This is a simplification that makes our life simple.
@@ -202,19 +196,20 @@ def compile_jaxpr_sdfg(tsdfg: TranslatedJaxprSDFG) -> CompiledJaxprSDFG:
     # To ensure that the SDFG is compiled and to get rid of a warning we must modify
     #  some settings of the SDFG. But we also have to fake an immutable SDFG
     sdfg = tsdfg.sdfg
-    org_sdfg_name = sdfg.name
-    org_recompile = sdfg._recompile
-    org_regenerate_code = sdfg._regenerate_code
+    original_sdfg_name = sdfg.name
+    original_recompile = sdfg._recompile
+    original_regenerate_code = sdfg._regenerate_code
 
     try:
         # We need to give the SDFG another name, this is needed to prevent a DaCe
         #  error/warning. This happens if we compile the same lowered SDFG multiple
         #  times with different options.
-        sdfg.name = f"{sdfg.name}__comp_{int(time.time() * 1000)}_{os.getpid()}"
-        assert len(sdfg.name) < 255  # noqa: PLR2004  # Not a magic number.
+        sdfg.name = f"{sdfg.name}__{uuid.uuid1()}"
+        assert len(sdfg.name) < 255  # noqa: PLR2004 magic-value-comparison  # 255 maximal file name size on UNIX.
 
         with dace.config.temporary_config():
             dace.Config.set("compiler", "use_cache", value=False)
+            # TODO(egparedes/phimuell): Add a configuration option.
             dace.Config.set("cache", value="name")
             dace.Config.set("default_build_folder", value=pathlib.Path(".jacecache").resolve())
             sdfg._recompile = True
@@ -222,8 +217,8 @@ def compile_jaxpr_sdfg(tsdfg: TranslatedJaxprSDFG) -> CompiledJaxprSDFG:
             csdfg: CompiledSDFG = sdfg.compile()
 
     finally:
-        sdfg.name = org_sdfg_name
-        sdfg._recompile = org_recompile
-        sdfg._regenerate_code = org_regenerate_code
+        sdfg.name = original_sdfg_name
+        sdfg._recompile = original_recompile
+        sdfg._regenerate_code = original_regenerate_code
 
     return CompiledJaxprSDFG(csdfg=csdfg, inp_names=tsdfg.inp_names, out_names=tsdfg.out_names)

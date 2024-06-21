@@ -30,17 +30,17 @@ def is_drop_var(jax_var: jax_core.Atom | util.JaCeVar) -> TypeGuard[jax_core.Dro
 
 def is_jax_array(obj: Any) -> TypeGuard[jax.Array]:
     """
-    Tests if `obj` is a Jax array.
+    Tests if `obj` is a JAX array.
 
     Note:
-     Jax arrays are special as they can not be mutated. Furthermore, they always
+     JAX arrays are special as they can not be mutated. Furthermore, they always
      allocate on the CPU _and_ on the GPU, if present.
     """
     return isinstance(obj, jax.Array)
 
 
 def is_array(obj: Any) -> TypeGuard[jax.typing.ArrayLike]:
-    """Identifies arrays, this also includes Jax arrays."""
+    """Identifies arrays, this also includes JAX arrays."""
     return dace.is_array(obj) or is_jax_array(obj)
 
 
@@ -107,7 +107,7 @@ def is_on_device(obj: Any) -> bool:
     """
     Tests if `obj` is on a device.
 
-    Jax arrays are always on the CPU and GPU (if there is one). Thus for Jax
+    JAX arrays are always on the CPU and GPU (if there is one). Thus for JAX
     arrays this function is more of a test, if there is a GPU at all.
     """
     if is_jax_array(obj):

@@ -7,11 +7,11 @@
 """
 Reimplementation of the `jax.stages` module.
 
-This module reimplements the public classes of that Jax module.
+This module reimplements the public classes of that JAX module.
 However, because JaCe uses DaCe as backend they differ is some small aspects.
 
-As in Jax JaCe has different stages, the terminology is taken from
-[Jax' AOT-Tutorial](https://jax.readthedocs.io/en/latest/aot.html).
+As in JAX JaCe has different stages, the terminology is taken from
+[JAX' AOT-Tutorial](https://jax.readthedocs.io/en/latest/aot.html).
 - Stage out:
     In this phase an executable Python function is translated to a Jaxpr.
 - Lower:
@@ -21,7 +21,7 @@ As in Jax JaCe has different stages, the terminology is taken from
 - Execution:
     This is the actual running of the computation.
 
-As in Jax the in JaCe the user only has access to the last tree stages and
+As in JAX the in JaCe the user only has access to the last tree stages and
 staging out and lowering is handled as a single step.
 """
 
@@ -33,10 +33,9 @@ from typing import TYPE_CHECKING, Any, Generic, ParamSpec, TypeVar, Union
 
 from jax import tree_util as jax_tree
 
-import jace
-from jace import api, optimization, tracing, translated_jaxpr_sdfg, translator, util
+from jace import api, optimization, tracing, translated_jaxpr_sdfg as tjsdfg, translator, util
 from jace.optimization import CompilerOptions
-from jace.translator import pre_post_translation as ptrans
+from jace.translator import pre_post_translation as pptrans
 from jace.util import translation_cache as tcache
 
 
@@ -46,7 +45,7 @@ if TYPE_CHECKING:
     import dace
 
 __all__ = [
-    "CompilerOptions",  # export for compatibility with Jax.
+    "CompilerOptions",  # export for compatibility with JAX.
     "JaCeCompiled",
     "JaCeLowered",
     "JaCeWrapped",
@@ -62,17 +61,17 @@ Stage = Union["JaCeWrapped", "JaCeLowered", "JaCeCompiled"]
 # These are used to annotated the `Stages`, however, there are some limitations.
 #  First, the only stage that is fully annotated is `JaCeWrapped`. Second, since
 #  static arguments modify the type signature of `JaCeCompiled.__call__()`, see
-#  [Jax](https://jax.readthedocs.io/en/latest/aot.html#lowering-with-static-arguments)
+#  [JAX](https://jax.readthedocs.io/en/latest/aot.html#lowering-with-static-arguments)
 #  for more, its argument can not be annotated, only its return type can.
 #  However, in case of scalar return values, the return type is wrong anyway, since
-#  JaCe and Jax for that matter, transforms scalars to arrays. Since there is no way of
+#  JaCe and JAX for that matter, transforms scalars to arrays. Since there is no way of
 #  changing that, but from a semantic point they behave the same so it should not
 #  matter too much.
 _P = ParamSpec("_P")
-_RetrunType = TypeVar("_RetrunType")
+_ReturnType = TypeVar("_ReturnType")
 
 
-class JaCeWrapped(tcache.CachingStage["JaCeLowered"], Generic[_P, _RetrunType]):
+class JaCeWrapped(tcache.CachingStage["JaCeLowered"], Generic[_P, _ReturnType]):
     """
     A function ready to be specialized, lowered, and compiled.
 
@@ -85,7 +84,7 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"], Generic[_P, _RetrunType]):
     object is later lowered with the same arguments the result might be taken
     from the cache.
 
-    Furthermore, a `JaCeWrapped` object is composable with all Jax transformations,
+    Furthermore, a `JaCeWrapped` object is composable with all JAX transformations,
     all other stages are not.
 
     Args:
@@ -102,15 +101,15 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"], Generic[_P, _RetrunType]):
         which is implicitly and temporary activated during tracing.
     """
 
-    _fun: Callable[_P, _RetrunType]
+    _fun: Callable[_P, _ReturnType]
     _primitive_translators: dict[str, translator.PrimitiveTranslator]
-    _jit_options: api.JitOptions
+    _jit_options: api.JITOptions
 
     def __init__(
         self,
-        fun: Callable[_P, _RetrunType],
+        fun: Callable[_P, _ReturnType],
         primitive_translators: Mapping[str, translator.PrimitiveTranslator],
-        jit_options: api.JitOptions,
+        jit_options: api.JITOptions,
     ) -> None:
         assert all(
             param.default is param.empty for param in inspect.signature(fun).parameters.values()
@@ -120,7 +119,7 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"], Generic[_P, _RetrunType]):
         self._jit_options = {**jit_options}
         self._fun = fun
 
-    def __call__(self, *args: _P.args, **kwargs: _P.kwargs) -> _RetrunType:
+    def __call__(self, *args: _P.args, **kwargs: _P.kwargs) -> _ReturnType:
         """
         Executes the wrapped function, lowering and compiling as needed in one step.
 
@@ -128,7 +127,7 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"], Generic[_P, _RetrunType]):
         arguments as the original computation and the return value is unflattened.
 
         Note:
-            This function is also aware if a Jax tracing is going on. In this
+            This function is also aware if a JAX tracing is going on. In this
             case, it will forward the computation.
             Currently, this function ignores the value of `jax.disable_jit()`.
         """
@@ -141,7 +140,7 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"], Generic[_P, _RetrunType]):
         return compiled(*args, **kwargs)
 
     @tcache.cached_transition
-    def lower(self, *args: _P.args, **kwargs: _P.kwargs) -> JaCeLowered[_RetrunType]:
+    def lower(self, *args: _P.args, **kwargs: _P.kwargs) -> JaCeLowered[_ReturnType]:
         """
         Lower the wrapped computation for the given arguments.
 
@@ -161,30 +160,31 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"], Generic[_P, _RetrunType]):
         jaxpr_maker = tracing.make_jaxpr(
             fun=self._fun,
             trace_options=self._jit_options,
-            return_outtree=True,
+            return_out_tree=True,
         )
-        jaxpr, outtree = jaxpr_maker(*args, **kwargs)
+        jaxpr, out_tree = jaxpr_maker(*args, **kwargs)
         builder = translator.JaxprTranslationBuilder(
             primitive_translators=self._primitive_translators
         )
         trans_ctx: translator.TranslationContext = builder.translate_jaxpr(jaxpr)
 
         flat_call_args = jax_tree.tree_leaves((args, kwargs))
-        tsdfg: jace.TranslatedJaxprSDFG = ptrans.postprocess_jaxpr_sdfg(
+        tsdfg: tjsdfg.TranslatedJaxprSDFG = pptrans.postprocess_jaxpr_sdfg(
             trans_ctx=trans_ctx,
             fun=self.wrapped_fun,
             flat_call_args=flat_call_args,
         )
 
         # NOTE: `tsdfg` is deepcopied as a side effect of post processing.
-        return JaCeLowered(tsdfg, outtree)
+        return JaCeLowered(tsdfg, out_tree)
 
     @property
-    def wrapped_fun(self) -> Callable:  # noqa: D102  # No docstring.
+    def wrapped_fun(self) -> Callable:
+        """Return the underlying Python function."""
         return self._fun
 
     def _make_call_description(
-        self, intree: jax_tree.PyTreeDef, flat_call_args: Sequence[Any]
+        self, in_tree: jax_tree.PyTreeDef, flat_call_args: Sequence[Any]
     ) -> tcache.StageTransformationSpec:
         """
         Computes the key for the `JaCeWrapped.lower()` call inside the cache.
@@ -199,11 +199,11 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"], Generic[_P, _RetrunType]):
         # TODO(phimuell): Implement static arguments
         flat_call_args = tuple(tcache._AbstractCallArgument.from_value(x) for x in flat_call_args)
         return tcache.StageTransformationSpec(
-            stage_id=id(self), flat_call_args=tuple(flat_call_args), intree=intree
+            stage_id=id(self), flat_call_args=tuple(flat_call_args), in_tree=in_tree
         )
 
 
-class JaCeLowered(tcache.CachingStage["JaCeCompiled"], Generic[_RetrunType]):
+class JaCeLowered(tcache.CachingStage["JaCeCompiled"], Generic[_ReturnType]):
     """
     Represents the original computation as an SDFG.
 
@@ -212,33 +212,33 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"], Generic[_RetrunType]):
     calling `self.compile()`. A user should never directly construct a `JaCeLowered`
     object directly, instead `JaCeWrapped.lower()` should be used.
 
-    Before the SDFG is compiled it is optimized, see `JaCeLowered.compile()` for how to
+    The SDFG is optimized before the compilation, see `JaCeLowered.compile()` for how to
     control the process.
 
     Args:
         tsdfg: The lowered SDFG with metadata.
-        outtree: The pytree describing how to unflatten the output.
+        out_tree: The pytree describing how to unflatten the output.
 
     Note:
         `self` will manage the passed `tsdfg` object. Modifying it results is undefined
-        behavior. Although `JaCeWrapped` is composable with Jax transformations
+        behavior. Although `JaCeWrapped` is composable with JAX transformations
         `JaCeLowered` is not.
     """
 
-    _translated_sdfg: jace.TranslatedJaxprSDFG
-    _outtree: jax_tree.PyTreeDef
+    _translated_sdfg: tjsdfg.TranslatedJaxprSDFG
+    _out_tree: jax_tree.PyTreeDef
 
     def __init__(
         self,
-        tsdfg: jace.TranslatedJaxprSDFG,
-        outtree: jax_tree.PyTreeDef,
+        tsdfg: tjsdfg.TranslatedJaxprSDFG,
+        out_tree: jax_tree.PyTreeDef,
     ) -> None:
         super().__init__()
         self._translated_sdfg = tsdfg
-        self._outtree = outtree
+        self._out_tree = out_tree
 
     @tcache.cached_transition
-    def compile(self, compiler_options: CompilerOptions | None = None) -> JaCeCompiled[_RetrunType]:
+    def compile(self, compiler_options: CompilerOptions | None = None) -> JaCeCompiled[_ReturnType]:
         """
         Optimize and compile the lowered SDFG using `compiler_options`.
 
@@ -251,15 +251,15 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"], Generic[_RetrunType]):
         """
         # We **must** deepcopy before we do any optimization, because all optimizations
         #  are in place, to properly cache stages, stages needs to be immutable.
-        tsdfg: jace.TranslatedJaxprSDFG = copy.deepcopy(self._translated_sdfg)
+        tsdfg: tjsdfg.TranslatedJaxprSDFG = copy.deepcopy(self._translated_sdfg)
         optimization.jace_optimize(tsdfg=tsdfg, **finalize_compilation_options(compiler_options))
 
         return JaCeCompiled(
-            csdfg=translated_jaxpr_sdfg.compile_jaxpr_sdfg(tsdfg),
-            outtree=self._outtree,
+            csdfg=tjsdfg.compile_jaxpr_sdfg(tsdfg),
+            out_tree=self._out_tree,
         )
 
-    def compiler_ir(self, dialect: str | None = None) -> jace.TranslatedJaxprSDFG:
+    def compiler_ir(self, dialect: str | None = None) -> tjsdfg.TranslatedJaxprSDFG:
         """
         Returns the internal SDFG.
 
@@ -279,7 +279,7 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"], Generic[_RetrunType]):
         return self.compiler_ir().sdfg
 
     def _make_call_description(
-        self, intree: jax_tree.PyTreeDef, flat_call_args: Sequence[Any]
+        self, in_tree: jax_tree.PyTreeDef, flat_call_args: Sequence[Any]
     ) -> tcache.StageTransformationSpec:
         """
         Creates the key for the `self.compile()` transition function.
@@ -287,17 +287,17 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"], Generic[_RetrunType]):
         The key will depend on the final values that were used for optimization, i.e.
         they it will also include the global set of optimization options.
         """
-        unflatted_args, unflatted_kwargs = jax_tree.tree_unflatten(intree, flat_call_args)
+        unflatted_args, unflatted_kwargs = jax_tree.tree_unflatten(in_tree, flat_call_args)
         assert (not unflatted_kwargs) and (len(unflatted_args) <= 1)
 
         options = finalize_compilation_options(unflatted_args[0] if unflatted_args else {})
-        flat_options, optiontree = jax_tree.tree_flatten(options)
+        flat_options, option_tree = jax_tree.tree_flatten(options)
         return tcache.StageTransformationSpec(
-            stage_id=id(self), flat_call_args=tuple(flat_options), intree=optiontree
+            stage_id=id(self), flat_call_args=tuple(flat_options), in_tree=option_tree
         )
 
 
-class JaCeCompiled(Generic[_RetrunType]):
+class JaCeCompiled(Generic[_ReturnType]):
     """
     Compiled version of the SDFG.
 
@@ -312,27 +312,27 @@ class JaCeCompiled(Generic[_RetrunType]):
         csdfg: The compiled SDFG object.
         inp_names: SDFG variables used as inputs.
         out_names: SDFG variables used as outputs.
-        outtree: Pytree describing how to unflatten the output.
+        out_tree: Pytree describing how to unflatten the output.
 
     Note:
         The class assumes ownership of its input arguments.
 
     Todo:
-        - Automatic strides adaption.
+        - Automatic strides adaptation.
     """
 
-    _csdfg: jace.CompiledJaxprSDFG
-    _outtree: jax_tree.PyTreeDef
+    _csdfg: tjsdfg.CompiledJaxprSDFG
+    _out_tree: jax_tree.PyTreeDef
 
     def __init__(
         self,
-        csdfg: jace.CompiledJaxprSDFG,
-        outtree: jax_tree.PyTreeDef,
+        csdfg: tjsdfg.CompiledJaxprSDFG,
+        out_tree: jax_tree.PyTreeDef,
     ) -> None:
         self._csdfg = csdfg
-        self._outtree = outtree
+        self._out_tree = out_tree
 
-    def __call__(self, *args: Any, **kwargs: Any) -> _RetrunType:
+    def __call__(self, *args: Any, **kwargs: Any) -> _ReturnType:
         """
         Calls the embedded computation.
 
@@ -346,7 +346,7 @@ class JaCeCompiled(Generic[_RetrunType]):
         flat_output = self._csdfg(flat_call_args)
         if flat_output is None:
             return None  # type: ignore[return-value]  # Type confusion.
-        return jax_tree.tree_unflatten(self._outtree, flat_output)
+        return jax_tree.tree_unflatten(self._out_tree, flat_output)
 
 
 # <--------------------------- Compilation/Optimization options management

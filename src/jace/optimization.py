@@ -15,7 +15,7 @@ from typing_extensions import Unpack
 
 
 if TYPE_CHECKING:
-    import jace
+    from jace import translated_jaxpr_sdfg as tjsdfg
 
 
 class CompilerOptions(TypedDict, total=False):
@@ -31,24 +31,23 @@ class CompilerOptions(TypedDict, total=False):
 
     auto_optimize: bool
     simplify: bool
-    persistent: bool
+    persistent_transients: bool
 
 
-# TODO(phimuell): Add a context manager to modify the default.
 DEFAULT_OPTIMIZATIONS: Final[CompilerOptions] = {
     "auto_optimize": True,
     "simplify": True,
-    "persistent": True,
+    "persistent_transients": True,
 }
 
 NO_OPTIMIZATIONS: Final[CompilerOptions] = {
     "auto_optimize": False,
     "simplify": False,
-    "persistent": False,
+    "persistent_transients": False,
 }
 
 
-def jace_optimize(tsdfg: jace.TranslatedJaxprSDFG, **kwargs: Unpack[CompilerOptions]) -> None:  # noqa: D417  # Missing description for kwargs
+def jace_optimize(tsdfg: tjsdfg.TranslatedJaxprSDFG, **kwargs: Unpack[CompilerOptions]) -> None:  # noqa: D417 [undocumented-param]
     """
     Performs optimization of the translated SDFG _in place_.
 
@@ -60,9 +59,9 @@ def jace_optimize(tsdfg: jace.TranslatedJaxprSDFG, **kwargs: Unpack[CompilerOpti
         tsdfg: The translated SDFG that should be optimized.
         simplify: Run the simplification pipeline.
         auto_optimize: Run the auto optimization pipeline (currently does nothing)
-        persistent:  Make the memory allocation persistent, i.e. allocate the
-            transients only once at the beginning and then reuse the memory across
-            the lifetime of the SDFG.
+        persistent_transients: Set the allocation lifetime of (non register) transients
+            in the SDFG to `AllocationLifetime.Persistent`, i.e. keep them allocated
+            between different invocations.
     """
     # Currently this function exists primarily for the same of existing.
 

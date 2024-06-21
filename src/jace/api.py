@@ -10,7 +10,6 @@
 from __future__ import annotations
 
 import functools
-import inspect
 from typing import TYPE_CHECKING, Literal, ParamSpec, TypedDict, TypeVar, overload
 
 from jax import grad, jacfwd, jacrev
@@ -23,14 +22,14 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
 
 
-__all__ = ["JitOptions", "grad", "jacfwd", "jacrev", "jit"]
+__all__ = ["JITOptions", "grad", "jacfwd", "jacrev", "jit"]
 
 # Used for type annotation, see the notes in `jace.stages` for more.
 _P = ParamSpec("_P")
-_RetrunType = TypeVar("_RetrunType")
+_ReturnType = TypeVar("_ReturnType")
 
 
-class JitOptions(TypedDict, total=False):
+class JITOptions(TypedDict, total=False):
     """
     All known options to `jace.jit` that influence tracing.
 
@@ -46,27 +45,27 @@ def jit(
     fun: Literal[None] = None,
     /,
     primitive_translators: Mapping[str, translator.PrimitiveTranslator] | None = None,
-    **kwargs: Unpack[JitOptions],
-) -> Callable[[Callable[_P, _RetrunType]], stages.JaCeWrapped[_P, _RetrunType]]: ...
+    **kwargs: Unpack[JITOptions],
+) -> Callable[[Callable[_P, _ReturnType]], stages.JaCeWrapped[_P, _ReturnType]]: ...
 
 
 @overload
 def jit(
-    fun: Callable[_P, _RetrunType],
+    fun: Callable[_P, _ReturnType],
     /,
     primitive_translators: Mapping[str, translator.PrimitiveTranslator] | None = None,
-    **kwargs: Unpack[JitOptions],
-) -> stages.JaCeWrapped[_P, _RetrunType]: ...
+    **kwargs: Unpack[JITOptions],
+) -> stages.JaCeWrapped[_P, _ReturnType]: ...
 
 
 def jit(
-    fun: Callable[_P, _RetrunType] | None = None,
+    fun: Callable[_P, _ReturnType] | None = None,
     /,
     primitive_translators: Mapping[str, translator.PrimitiveTranslator] | None = None,
-    **kwargs: Unpack[JitOptions],
+    **kwargs: Unpack[JITOptions],
 ) -> (
-    Callable[[Callable[_P, _RetrunType]], stages.JaCeWrapped[_P, _RetrunType]]
-    | stages.JaCeWrapped[_P, _RetrunType]
+    Callable[[Callable[_P, _ReturnType]], stages.JaCeWrapped[_P, _ReturnType]]
+    | stages.JaCeWrapped[_P, _ReturnType]
 ):
     """
     JaCe's replacement for `jax.jit` (just-in-time) wrapper.
@@ -91,12 +90,7 @@ def jit(
             f"The following arguments to 'jace.jit' are not yet supported: {', '.join(kwargs)}."
         )
 
-    def wrapper(f: Callable[_P, _RetrunType]) -> stages.JaCeWrapped[_P, _RetrunType]:
-        if any(
-            param.default is not param.empty for param in inspect.signature(f).parameters.values()
-        ):
-            raise NotImplementedError("Default values are not yet supported.")
-
+    def wrapper(f: Callable[_P, _ReturnType]) -> stages.JaCeWrapped[_P, _ReturnType]:
         jace_wrapper = stages.JaCeWrapped(
             fun=f,
             primitive_translators=(

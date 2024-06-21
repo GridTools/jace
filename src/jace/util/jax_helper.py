@@ -6,9 +6,9 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 """
-Implements all utility functions that are related to Jax.
+Implements all utility functions that are related to JAX.
 
-Most of the functions defined here allow an unified access to Jax' internal in
+Most of the functions defined here allow an unified access to JAX' internal in
 a consistent and stable way.
 """
 
@@ -37,12 +37,12 @@ class JaCeVar:
 
     This class can be seen as some kind of substitute `jax.core.Var`. The main
     intention of this class is as an internal representation of values, as they
-    are used in Jax, but without the Jax machinery. As abstract values in Jax
+    are used in JAX, but without the JAX machinery. As abstract values in JAX
     this class has a datatype, which is a `dace.typeclass` instance and a shape.
     In addition it has an optional name, which allows to create variables with
     a certain name using `JaxprTranslationBuilder.add_array()`.
 
-    If it is expected that code must handle both Jax variables and `JaCeVar`
+    If it is expected that code must handle both JAX variables and `JaCeVar`
     then the `get_jax_var_*()` functions should be used.
 
     Args:
@@ -52,7 +52,7 @@ class JaCeVar:
 
     Note:
         If the name of a `JaCeVar` is '_' it is considered a drop variable. The
-        definitions of `__hash__` and `__eq__` are in accordance with how Jax
+        definitions of `__hash__` and `__eq__` are in accordance with how JAX
         variable works.
 
     Todo:
@@ -94,7 +94,7 @@ def get_jax_var_name(jax_var: jax_core.Atom | JaCeVar) -> str:
             #  but leads to stable and valid names.
             return f"jax{jax_var.count}{jax_var.suffix}"
         case jax_core.Literal():
-            raise TypeError("Can not derive a name from a Jax Literal.")
+            raise TypeError("Can not derive a name from a JAX Literal.")
         case _:
             raise TypeError(
                 f"Does not know how to transform '{jax_var}' (type: '{type(jax_var).__name__}') "
@@ -133,23 +133,26 @@ def is_tracing_ongoing(*args: Any, **kwargs: Any) -> bool:
     While a return value `True` guarantees that a translation is ongoing, a
     value of `False` does not guarantees that no tracing is ongoing.
     """
-    # To detect if there is tracing ongoing, we check the internal tracing stack of Jax.
+    # To detect if there is tracing ongoing, we check the internal tracing stack of JAX.
     #  Note that this is highly internal and depends on the precise implementation of
-    #  Jax. For that reason we first look at all arguments and check if they are
-    #  tracers. Furthermore, it seems that Jax always have a bottom interpreter on the
+    #  JAX. For that reason we first look at all arguments and check if they are
+    #  tracers. Furthermore, it seems that JAX always have a bottom interpreter on the
     #  stack, thus it is empty if `len(...) == 1`!
     #  See also: https://github.com/google/jax/pull/3370
     if any(isinstance(x, jax_core.Tracer) for x in itertools.chain(args, kwargs.values())):
         return True
-    if len(jax._src.core.thread_local_state.trace_state.trace_stack.stack) == 1:
+    if (
+        trace_stack_length := (len(jax._src.core.thread_local_state.trace_state.trace_stack.stack))
+        == 1
+    ):
         return False
-    if len(jax._src.core.thread_local_state.trace_state.trace_stack.stack) > 1:
+    if trace_stack_length > 1:
         return True
     raise RuntimeError("Failed to determine if tracing is ongoing.")
 
 
 def translate_dtype(dtype: Any) -> dace.typeclass:
-    """Turns a Jax datatype into a DaCe datatype."""
+    """Turns a JAX datatype into a DaCe datatype."""
     if dtype is None:
         raise NotImplementedError  # Handling a special case in DaCe.
     if isinstance(dtype, dace.typeclass):
@@ -179,7 +182,7 @@ def propose_jax_name(
 
     Args:
         jax_var: The variable for which a name to propose.
-        jax_name_map: A mapping of all Jax variables that were already named.
+        jax_name_map: A mapping of all JAX variables that were already named.
 
     Note:
         The function guarantees that the returned name passes `VALID_SDFG_VAR_NAME`
@@ -195,7 +198,7 @@ def propose_jax_name(
     if isinstance(jax_var, JaCeVar) and (jax_var.name is not None):
         return jax_var.name
 
-    # This code is taken from Jax so it will generate similar ways, the difference is
+    # This code is taken from JAX so it will generate similar ways, the difference is
     #  that we do the counting differently.
     #  Note that `z` is followed by `ba` and not `aa` as it is in Excel.
     c = len(jax_name_map)

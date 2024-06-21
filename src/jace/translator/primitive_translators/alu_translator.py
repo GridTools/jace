@@ -61,7 +61,7 @@ class ALUTranslator(translator.PrimitiveTranslator):
             builder:         The builder object of the translation.
             in_var_names:   List of the names of the arrays created inside the SDFG for the inpts or 'None' in case of a literal.
             out_var_names:  List of the names of the arrays created inside the SDFG for the outputs.
-            eqn:            The Jax equation that is translated.
+            eqn:            The JAX equation that is translated.
             eqn_state:      State into which the primitive's SDFG representation is constructed.
         """
         assert self._prim_name == eqn.primitive.name
@@ -101,7 +101,7 @@ class ALUTranslator(translator.PrimitiveTranslator):
         else:
             # This is the general broadcasting case
             #  We assume that both inputs and the output have the same rank but different sizes in each dimension.
-            #  It seems that Jax ensures this.
+            #  It seems that JAX ensures this.
             #  We further assume that if the size in a dimension differs then one must have size 1.
             #  This is the size we broadcast over, i.e. conceptually replicated.
             out_shps = tuple(util.get_jax_var_shape(eqn.outvars[0]))  # Shape of the output

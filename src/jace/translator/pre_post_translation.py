@@ -14,8 +14,7 @@ from typing import TYPE_CHECKING, Any
 
 import dace
 
-import jace
-from jace import util
+from jace import translated_jaxpr_sdfg as tjsdfg, util
 
 
 if TYPE_CHECKING:
@@ -26,10 +25,10 @@ if TYPE_CHECKING:
 
 def postprocess_jaxpr_sdfg(
     trans_ctx: translator.TranslationContext,
-    fun: Callable,  # noqa: ARG001  # Currently unused
+    fun: Callable,  # noqa: ARG001 [unused-function-argument]  # Currently unused.
     flat_call_args: Sequence[Any],
     validate: bool = True,
-) -> jace.TranslatedJaxprSDFG:
+) -> tjsdfg.TranslatedJaxprSDFG:
     """
     Final post processing steps on the `TranslationContext`.
 
@@ -77,17 +76,17 @@ def _create_output_state(trans_ctx: translator.TranslationContext) -> None:
     The function will create a new terminal state, in which all outputs, denoted
     in `trans_ctx.out_names`, will be written into new SDFG variables. In case the
     output variable is a scalar, the output will be replaced by an array of length one.
-    This behaviour is consistent with Jax.
+    This behaviour is consistent with JAX.
 
     Args:
         trans_ctx: The translation context to process.
     """
     assert trans_ctx.inp_names is not None and trans_ctx.out_names is not None
 
-    # NOTE: Currently we do not support to write back into an input argument, as Jax.
+    # NOTE: Currently we do not support to write back into an input argument, as JAX.
     #  However, this is a requirement for handling ICON stencils, that we will support
     #  eventually. If we get a translation context that lists a variable name in the
-    #  inputs and outputs, this means that it was returned unmodified. In Jax this
+    #  inputs and outputs, this means that it was returned unmodified. In JAX this
     #  will lead to a copy and we also do it. This is implemented by just naïvely
     #  creating a separate output variable for every output we have, irrespectively
     #  of its name inside the Jaxpr.
@@ -205,7 +204,7 @@ def _create_input_state(
 def finalize_translation_context(
     trans_ctx: translator.TranslationContext,
     validate: bool = True,
-) -> jace.TranslatedJaxprSDFG:
+) -> tjsdfg.TranslatedJaxprSDFG:
     """
     Finalizes the supplied translation context `trans_ctx`.
 
@@ -231,7 +230,7 @@ def finalize_translation_context(
         raise ValueError("No input nor output.")
 
     # We guarantee decoupling
-    tsdfg = jace.TranslatedJaxprSDFG(
+    tsdfg = tjsdfg.TranslatedJaxprSDFG(
         sdfg=copy.deepcopy(trans_ctx.sdfg),
         inp_names=trans_ctx.inp_names,
         out_names=trans_ctx.out_names,
