@@ -5,7 +5,12 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""JaCe specific optimizations."""
+"""
+JaCe specific optimizations.
+
+Todo:
+    Organize this module once it is a package.
+"""
 
 from __future__ import annotations
 
@@ -16,6 +21,19 @@ from typing_extensions import Unpack
 
 if TYPE_CHECKING:
     from jace import translated_jaxpr_sdfg as tjsdfg
+
+
+DEFAULT_OPTIMIZATIONS: Final[CompilerOptions] = {
+    "auto_optimize": True,
+    "simplify": True,
+    "persistent_transients": True,
+}
+
+NO_OPTIMIZATIONS: Final[CompilerOptions] = {
+    "auto_optimize": False,
+    "simplify": False,
+    "persistent_transients": False,
+}
 
 
 class CompilerOptions(TypedDict, total=False):
@@ -32,19 +50,6 @@ class CompilerOptions(TypedDict, total=False):
     auto_optimize: bool
     simplify: bool
     persistent_transients: bool
-
-
-DEFAULT_OPTIMIZATIONS: Final[CompilerOptions] = {
-    "auto_optimize": True,
-    "simplify": True,
-    "persistent_transients": True,
-}
-
-NO_OPTIMIZATIONS: Final[CompilerOptions] = {
-    "auto_optimize": False,
-    "simplify": False,
-    "persistent_transients": False,
-}
 
 
 def jace_optimize(tsdfg: tjsdfg.TranslatedJaxprSDFG, **kwargs: Unpack[CompilerOptions]) -> None:  # noqa: D417 [undocumented-param]

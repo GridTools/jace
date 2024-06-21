@@ -444,9 +444,9 @@ class JaxprTranslationBuilder:
         Creates the input variables of `jaxpr`.
 
         Notes:
-            The function will populate the `inp_names` member of the current context.
+            The function will populate the `input_names` member of the current context.
         """
-        assert self._ctx.inp_names is None
+        assert self._ctx.input_names is None
 
         # Handle the initial input arguments
         init_in_var_names: Sequence[str] = self.create_jax_var_list(
@@ -458,7 +458,7 @@ class JaxprTranslationBuilder:
         self.sdfg.arg_names = []
 
         # The output list is populated by `self._translate_jaxpr_internal()`
-        self._ctx.inp_names = tuple(init_in_var_names)
+        self._ctx.input_names = tuple(init_in_var_names)
 
     def _create_constants(self, jaxpr: jax_core.ClosedJaxpr) -> None:
         """
@@ -634,7 +634,7 @@ class JaxprTranslationBuilder:
             The function will _not_ update the `out_names` field of the current context.
         """
         assert self._ctx.terminal_state is self._ctx.start_state
-        assert isinstance(self._ctx.inp_names, tuple)
+        assert isinstance(self._ctx.input_names, tuple)
         assert self._ctx.out_names is None
 
         # There is not output so we do not have to copy anything around.
@@ -662,10 +662,10 @@ class JaxprTranslationBuilder:
 
             # Now we perform the copy from the input variable in the newly created
             #  output variable.
-            inp_acc = self._start_state.add_read(sdfg_in_name)
+            input_acc = self._start_state.add_read(sdfg_in_name)
             out_acc = self._start_state.add_write(sdfg_out_name)
             self._start_state.add_nedge(
-                src=inp_acc,
+                src=input_acc,
                 dst=out_acc,
                 data=dace.Memlet.from_array(sdfg_in_name, self.get_array(sdfg_in_name)),
             )
@@ -703,7 +703,7 @@ class TranslationContext:
 
     Attributes:
         sdfg: The encapsulated SDFG object.
-        inp_names: A list of the SDFG variables that are used as input
+        input_names: A list of the SDFG variables that are used as input
         out_names: A list of the SDFG variables that are used as output.
         start_state: The first state in the SDFG state machine.
         terminal_state: The (currently) last state in the state machine.
@@ -718,7 +718,7 @@ class TranslationContext:
     """
 
     sdfg: dace.SDFG
-    inp_names: tuple[str, ...] | None
+    input_names: tuple[str, ...] | None
     out_names: tuple[str, ...] | None
     start_state: dace.SDFGState
     terminal_state: dace.SDFGState
@@ -729,7 +729,7 @@ class TranslationContext:
             raise ValueError(f"'{name}' is not a valid SDFG name.")
 
         self.sdfg = dace.SDFG(name=(name or f"unnamed_SDFG_{id(self)}"))
-        self.inp_names = None
+        self.input_names = None
         self.out_names = None
         self.start_state = self.sdfg.add_state(label="initial_state", is_start_block=True)
         self.terminal_state = self.start_state
@@ -757,11 +757,11 @@ class TranslationContext:
                 self.sdfg.node_id(self.terminal_state),
             )
         if not (
-            self.inp_names is None
-            or all(inp_name in self.sdfg.arrays for inp_name in self.inp_names)
+            self.input_names is None
+            or all(input_name in self.sdfg.arrays for input_name in self.input_names)
         ):
             raise dace.sdfg.InvalidSDFGError(
-                f"Missing input arguments: {(inp_name for inp_name in self.inp_names if inp_name not in self.sdfg.arrays)}",
+                f"Missing input arguments: {(input_name for input_name in self.input_names if input_name not in self.sdfg.arrays)}",
                 self.sdfg,
                 self.sdfg.node_id(self.terminal_state),
             )

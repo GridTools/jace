@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import copy
+from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any
 
 import dace
@@ -18,8 +19,6 @@ from jace import translated_jaxpr_sdfg as tjsdfg, util
 
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Sequence
-
     from jace import translator
 
 
@@ -81,7 +80,7 @@ def _create_output_state(trans_ctx: translator.TranslationContext) -> None:
     Args:
         trans_ctx: The translation context to process.
     """
-    assert trans_ctx.inp_names is not None and trans_ctx.out_names is not None
+    assert trans_ctx.input_names is not None and trans_ctx.out_names is not None
 
     # NOTE: Currently we do not support to write back into an input argument, as JAX.
     #  However, this is a requirement for handling ICON stencils, that we will support
@@ -149,21 +148,21 @@ def _create_input_state(
     Todo:
         Handle transfer of scalar input in GPU mode.
     """
-    assert trans_ctx.inp_names is not None and trans_ctx.out_names is not None
+    assert trans_ctx.input_names is not None and trans_ctx.out_names is not None
 
     # NOTE: This function will create a distinct variable for every input. Once we
     #  allow write back arguments they will be handled in the `_create_output_state()`
     #  function anyway, also see the comment in that function.
 
-    if len(flat_call_args) != len(trans_ctx.inp_names):
-        raise ValueError(f"Expected {len(trans_ctx.inp_names)}, but got {len(flat_call_args)}.")
+    if len(flat_call_args) != len(trans_ctx.input_names):
+        raise ValueError(f"Expected {len(trans_ctx.input_names)}, but got {len(flat_call_args)}.")
 
     sdfg = trans_ctx.sdfg
     new_input_state: dace.SDFGState = sdfg.add_state(f"{sdfg.name}__start_state")
     new_input_names: list[str] = []
     input_pattern = "__jace_input_{}"
 
-    for i, (org_input_name, call_arg) in enumerate(zip(trans_ctx.inp_names, flat_call_args)):
+    for i, (org_input_name, call_arg) in enumerate(zip(trans_ctx.input_names, flat_call_args)):
         org_input_desc: dace.data.Data = sdfg.arrays[org_input_name]
         new_input_name = input_pattern.format(i)
 
@@ -198,7 +197,7 @@ def _create_input_state(
     sdfg.add_edge(new_input_state, trans_ctx.start_state, dace.InterstateEdge())
     sdfg.start_block = sdfg.node_id(new_input_state)
     trans_ctx.start_state = new_input_state
-    trans_ctx.inp_names = tuple(new_input_names)
+    trans_ctx.input_names = tuple(new_input_names)
 
 
 def finalize_translation_context(
@@ -222,23 +221,23 @@ def finalize_translation_context(
         validate: Call the validate function after the finalizing.
     """
     trans_ctx.validate()
-    if trans_ctx.inp_names is None:
+    if trans_ctx.input_names is None:
         raise ValueError("Input names are not specified.")
     if trans_ctx.out_names is None:
         raise ValueError("Output names are not specified.")
-    if not (trans_ctx.out_names or trans_ctx.inp_names):
+    if not (trans_ctx.out_names or trans_ctx.input_names):
         raise ValueError("No input nor output.")
 
     # We guarantee decoupling
     tsdfg = tjsdfg.TranslatedJaxprSDFG(
         sdfg=copy.deepcopy(trans_ctx.sdfg),
-        inp_names=trans_ctx.inp_names,
+        input_names=trans_ctx.input_names,
         out_names=trans_ctx.out_names,
     )
 
     # Make inputs and outputs to globals.
     sdfg_arg_names: list[str] = []
-    for arg_name in tsdfg.inp_names + tsdfg.out_names:
+    for arg_name in tsdfg.input_names + tsdfg.out_names:
         if arg_name in sdfg_arg_names:
             continue
         tsdfg.sdfg.arrays[arg_name].transient = False

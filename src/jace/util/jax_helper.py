@@ -16,7 +16,8 @@ from __future__ import annotations
 
 import dataclasses
 import itertools
-from typing import TYPE_CHECKING, Any
+from collections.abc import Mapping
+from typing import Any
 
 import dace
 import jax
@@ -24,10 +25,6 @@ import jax.core as jax_core
 import numpy as np
 
 from jace import util
-
-
-if TYPE_CHECKING:
-    from collections.abc import Mapping
 
 
 @dataclasses.dataclass(repr=True, frozen=True, eq=False)

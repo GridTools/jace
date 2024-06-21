@@ -16,6 +16,7 @@ functionality for this in JaCe.
 from __future__ import annotations
 
 import inspect
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, Literal, ParamSpec, TypeVar, overload
 
 import jax
@@ -23,8 +24,6 @@ from jax import core as jax_core, tree_util as jax_tree
 
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-
     from jace import api
 
 _P = ParamSpec("_P")

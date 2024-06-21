@@ -10,16 +10,13 @@
 from __future__ import annotations
 
 import functools
-from typing import TYPE_CHECKING, Literal, ParamSpec, TypedDict, TypeVar, overload
+from collections.abc import Callable, Mapping
+from typing import Literal, ParamSpec, TypedDict, TypeVar, overload
 
 from jax import grad, jacfwd, jacrev
 from typing_extensions import Unpack
 
 from jace import stages, translator
-
-
-if TYPE_CHECKING:
-    from collections.abc import Callable, Mapping
 
 
 __all__ = ["JITOptions", "grad", "jacfwd", "jacrev", "jit"]

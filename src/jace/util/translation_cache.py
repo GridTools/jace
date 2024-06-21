@@ -33,14 +33,21 @@ from jace import util
 if TYPE_CHECKING:
     from jace import stages
 
-#: Caches used to store the state transition.
-#: The caches are on a per stage and not per instant basis.
 _TRANSLATION_CACHES: dict[type[CachingStage], StageCache] = {}
+"""Caches used to store the state transition.
+
+The caches are on a per stage and not per instant basis.
+"""
 
 
-# Denotes the stage that follows the current one.
-#  Used by the `CachingStage` mixin.
+# Type annotation for the caching.
+P = ParamSpec("P")
 NextStage = TypeVar("NextStage", bound="stages.Stage")
+TransitionFunction: TypeAlias = "Callable[Concatenate[CachingStage[NextStage], P], NextStage]"
+CachingStageType = TypeVar("CachingStageType", bound="CachingStage")
+
+# Type to describe a single argument either in an abstract or concrete way.
+CallArgsSpec: TypeAlias = tuple["_AbstractCallArgument | Hashable"]
 
 
 class CachingStage(Generic[NextStage]):
@@ -81,12 +88,6 @@ class CachingStage(Generic[NextStage]):
                 annotated function.
         """
         ...
-
-
-# Type annotation for the caching.
-P = ParamSpec("P")
-TransitionFunction = Callable[Concatenate[CachingStage[NextStage], P], NextStage]
-CachingStageType = TypeVar("CachingStageType", bound=CachingStage)
 
 
 def cached_transition(
@@ -191,10 +192,6 @@ class _AbstractCallArgument:
         raise TypeError(f"Can not make 'an abstract description from '{type(value).__name__}'.")
 
 
-#: Type to describe a single argument either in an abstract or concrete way.
-CallArgsSpec: TypeAlias = tuple[_AbstractCallArgument | Hashable]
-
-
 @dataclasses.dataclass(frozen=True)
 class StageTransformationSpec:
     """
@@ -241,9 +238,12 @@ class StageCache(Generic[StageType]):
     _memory: collections.OrderedDict[StageTransformationSpec, StageType]
     _capacity: int
 
-    def __init__(self, capachity: int = 256) -> None:
+    def __init__(
+        self,
+        capacity: int = 256,
+    ) -> None:
+        self._capacity = capacity
         self._memory = collections.OrderedDict()
-        self._capacity = capachity
 
     def __contains__(self, key: StageTransformationSpec) -> bool:
         return key in self._memory

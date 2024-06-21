@@ -191,8 +191,11 @@ def test_caching_compilation() -> None:
     # Because of the way how things work the optimized must have more than the
     #  unoptimized. If there is sharing, then this would not be the case.
     assert unoptiCompiled is not optiCompiled
-    assert optiCompiled._csdfg.sdfg.number_of_nodes() == 1
-    assert optiCompiled._csdfg.sdfg.number_of_nodes() < unoptiCompiled._csdfg.sdfg.number_of_nodes()
+    assert optiCompiled._compiled_sdfg.sdfg.number_of_nodes() == 1
+    assert (
+        optiCompiled._compiled_sdfg.sdfg.number_of_nodes()
+        < unoptiCompiled._compiled_sdfg.sdfg.number_of_nodes()
+    )
 
 
 def test_caching_dtype():

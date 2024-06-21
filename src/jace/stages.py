@@ -29,19 +29,18 @@ from __future__ import annotations
 
 import copy
 import inspect
+from collections.abc import Callable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, Generic, ParamSpec, TypeVar, Union
 
 from jax import tree_util as jax_tree
 
 from jace import api, optimization, tracing, translated_jaxpr_sdfg as tjsdfg, translator, util
 from jace.optimization import CompilerOptions
-from jace.translator import pre_post_translation as pptrans
+from jace.translator import post_translation as ptrans
 from jace.util import translation_cache as tcache
 
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Mapping, Sequence
-
     import dace
 
 __all__ = [
@@ -169,7 +168,7 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"], Generic[_P, _ReturnType]):
         trans_ctx: translator.TranslationContext = builder.translate_jaxpr(jaxpr)
 
         flat_call_args = jax_tree.tree_leaves((args, kwargs))
-        tsdfg: tjsdfg.TranslatedJaxprSDFG = pptrans.postprocess_jaxpr_sdfg(
+        tsdfg: tjsdfg.TranslatedJaxprSDFG = ptrans.postprocess_jaxpr_sdfg(
             trans_ctx=trans_ctx,
             fun=self.wrapped_fun,
             flat_call_args=flat_call_args,
@@ -255,7 +254,7 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"], Generic[_ReturnType]):
         optimization.jace_optimize(tsdfg=tsdfg, **finalize_compilation_options(compiler_options))
 
         return JaCeCompiled(
-            csdfg=tjsdfg.compile_jaxpr_sdfg(tsdfg),
+            compiled_sdfg=tjsdfg.compile_jaxpr_sdfg(tsdfg),
             out_tree=self._out_tree,
         )
 
@@ -309,8 +308,8 @@ class JaCeCompiled(Generic[_ReturnType]):
     called with compatible arguments.
 
     Args:
-        csdfg: The compiled SDFG object.
-        inp_names: SDFG variables used as inputs.
+        compiled_sdfg: The compiled SDFG object.
+        input_names: SDFG variables used as inputs.
         out_names: SDFG variables used as outputs.
         out_tree: Pytree describing how to unflatten the output.
 
@@ -321,15 +320,15 @@ class JaCeCompiled(Generic[_ReturnType]):
         - Automatic strides adaptation.
     """
 
-    _csdfg: tjsdfg.CompiledJaxprSDFG
+    _compiled_sdfg: tjsdfg.CompiledJaxprSDFG
     _out_tree: jax_tree.PyTreeDef
 
     def __init__(
         self,
-        csdfg: tjsdfg.CompiledJaxprSDFG,
+        compiled_sdfg: tjsdfg.CompiledJaxprSDFG,
         out_tree: jax_tree.PyTreeDef,
     ) -> None:
-        self._csdfg = csdfg
+        self._compiled_sdfg = compiled_sdfg
         self._out_tree = out_tree
 
     def __call__(self, *args: Any, **kwargs: Any) -> _ReturnType:
@@ -343,9 +342,7 @@ class JaCeCompiled(Generic[_ReturnType]):
             compatible with the ones that were used for lowering.
         """
         flat_call_args = jax_tree.tree_leaves((args, kwargs))
-        flat_output = self._csdfg(flat_call_args)
-        if flat_output is None:
-            return None  # type: ignore[return-value]  # Type confusion.
+        flat_output = self._compiled_sdfg(flat_call_args)
         return jax_tree.tree_unflatten(self._out_tree, flat_output)
 
 
