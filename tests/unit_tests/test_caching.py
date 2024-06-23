@@ -201,10 +201,10 @@ def test_caching_compilation() -> None:
     # Because of the way how things work the optimized must have more than the
     #  unoptimized. If there is sharing, then this would not be the case.
     assert unoptized_compiled is not optized_compiled
-    assert optized_compiled._csdfg.sdfg.number_of_nodes() == 1
+    assert optized_compiled._compiled_sdfg.sdfg.number_of_nodes() == 1
     assert (
-        optized_compiled._csdfg.sdfg.number_of_nodes()
-        < unoptized_compiled._csdfg.sdfg.number_of_nodes()
+        optized_compiled._compiled_sdfg.sdfg.number_of_nodes()
+        < unoptized_compiled._compiled_sdfg.sdfg.number_of_nodes()
     )
 
     # Now we check if they are still inside the cache.

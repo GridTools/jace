@@ -59,8 +59,8 @@ def test_empty_unused_argument() -> None:
     compiled = lowered.compile()
     res = compiled(a, b)
 
-    assert len(lowered._translated_sdfg.inp_names) == 2
-    assert len(compiled._csdfg.inp_names) == 2
+    assert len(lowered._translated_sdfg.input_names) == 2
+    assert len(compiled._compiled_sdfg.input_names) == 2
     assert isinstance(res, np.ndarray)
     assert np.all(res == a)
     assert res.__array_interface__["data"][0] != a.__array_interface__["data"][0]

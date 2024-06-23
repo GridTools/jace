@@ -50,7 +50,7 @@ def _roundtrip_implementation(shape: Sequence[int], axis: int | Sequence[int]) -
         assert ref.shape == res.shape, f"a.shape = {shape}; Expected: {ref.shape}; Got: {res.shape}"
         assert ref.dtype == res.dtype
         assert np.all(ref == res), f"Value error for shape '{shape}' and axis={axis}"
-        a = np.array(ref, copy=True)  # It is a Jax array, and we have to reverse this.
+        a = np.array(ref, copy=True)  # It is a JAX array, and we have to reverse this.
     assert a_org.shape == res.shape
     assert np.all(a_org == res)
 

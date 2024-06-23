@@ -231,7 +231,7 @@ def test_builder_nested(translation_builder: translator.JaxprTranslationBuilder)
     with pytest.raises(
         expected_exception=KeyError,
         match=re.escape(
-            f"Jax variable '{array1}' was supposed to map to '{name_1}', but no such SDFG variable is known."
+            f"JAX variable '{array1}' was supposed to map to '{name_1}', but no such SDFG variable is known."
         ),
     ):
         _ = translation_builder.map_jax_var_to_sdfg(array1)
@@ -265,7 +265,7 @@ def test_builder_nested(translation_builder: translator.JaxprTranslationBuilder)
     with pytest.raises(
         expected_exception=KeyError,
         match=re.escape(
-            f"Jax variable '{array2}' was supposed to map to '{name_2}', but no such SDFG variable is known."
+            f"JAX variable '{array2}' was supposed to map to '{name_2}', but no such SDFG variable is known."
         ),
     ):
         _ = translation_builder.map_jax_var_to_sdfg(array2)
@@ -514,7 +514,7 @@ def test_builder_scalar_return_value() -> None:
 
 
 def test_builder_scalar_return_type() -> None:
-    """As Jax we always return an array, even for a scalar."""
+    """As JAX we always return an array, even for a scalar."""
 
     @jace.jit
     def wrapped(a: np.float64) -> np.float64:
@@ -546,10 +546,10 @@ def test_builder_multiple_return_values() -> None:
     ref = (a + b, a - b)
     res = compiled(a, b)
 
-    assert len(lowered._translated_sdfg.inp_names) == 2
-    assert len(compiled._csdfg.inp_names) == 2
+    assert len(lowered._translated_sdfg.input_names) == 2
+    assert len(compiled._compiled_sdfg.input_names) == 2
     assert len(lowered._translated_sdfg.out_names) == 2
-    assert len(compiled._csdfg.out_names) == 2
+    assert len(compiled._compiled_sdfg.out_names) == 2
     assert isinstance(res, tuple), f"Expected 'tuple', but got '{type(res).__name__}'."
     assert len(res) == 2
     assert np.allclose(ref, res)
@@ -562,7 +562,7 @@ def test_builder_direct_return() -> None:
         The test function below will not return a reference to its input,
         but perform an actual copy. This behaviour does look strange from a
         Python point of view, however, it is (at the time of writing)
-        consistent with what Jax does, even when passing Jax arrays directly.
+        consistent with what JAX does, even when passing JAX arrays directly.
     """
 
     @jace.jit
@@ -619,8 +619,8 @@ def test_builder_unused_arg() -> None:
     res1 = compiled(a, b)  # Correct call
     res2 = compiled(a, c)  # wrong call to show that nothing is affected.
 
-    assert len(lowered._translated_sdfg.inp_names) == 2
-    assert len(compiled._csdfg.inp_names) == 2
+    assert len(lowered._translated_sdfg.input_names) == 2
+    assert len(compiled._compiled_sdfg.input_names) == 2
     assert np.all(res1 == res2)
     assert np.allclose(ref, res1)
 

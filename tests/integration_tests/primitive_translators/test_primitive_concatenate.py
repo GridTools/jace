@@ -59,11 +59,11 @@ def test_cat_nd() -> None:
         assert np.all(ref == res)
 
 
-@pytest.mark.skip(reason="Jax does not support scalars as inputs.")
+@pytest.mark.skip(reason="JAX does not support scalars as inputs.")
 def test_cat_1d_array_scalars():
     """Concatenate an 1d array with scalars.
 
-    This does not work, it is to observe Jax.
+    This does not work, it is to observe JAX.
     """
 
     a1 = testutil.make_array(10)

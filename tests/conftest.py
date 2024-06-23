@@ -29,11 +29,11 @@ if TYPE_CHECKING:
 
 @pytest.fixture(autouse=True)
 def _enable_x64_mode_in_jax() -> Generator[None, None, None]:
-    """Fixture of enable the `x64` mode in Jax.
+    """Fixture of enable the `x64` mode in JAX.
 
-    Currently, JaCe requires that `x64` mode is enabled and will do all Jax
-    things with it enabled. However, if we use Jax with the intend to compare
-    it against JaCe we must also enable it for Jax.
+    Currently, JaCe requires that `x64` mode is enabled and will do all JAX
+    things with it enabled. However, if we use JAX with the intend to compare
+    it against JaCe we must also enable it for JAX.
     """
     with jax.experimental.enable_x64():
         yield
@@ -41,9 +41,9 @@ def _enable_x64_mode_in_jax() -> Generator[None, None, None]:
 
 @pytest.fixture(autouse=True)
 def _disable_jit() -> Generator[None, None, None]:
-    """Fixture for disable the dynamic jiting in Jax.
+    """Fixture for disable the dynamic jiting in JAX.
 
-    For certain reasons Jax puts certain primitives inside a `pjit` primitive,
+    For certain reasons JAX puts certain primitives inside a `pjit` primitive,
     i.e. nested Jaxpr. The intent is, that these operations can/should run on
     an accelerator.
 

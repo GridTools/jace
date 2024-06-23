@@ -5,7 +5,7 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Tests the compatibility of the JaCe api to Jax."""
+"""Tests the compatibility of the JaCe api to JAX."""
 
 from __future__ import annotations
 
@@ -78,7 +78,7 @@ def test_composition_itself() -> None:
 
 @pytest.mark.skip(reason="Nested Jaxpr are not handled.")
 def test_composition_with_jax() -> None:
-    """Tests if JaCe can interact with Jax and vice versa."""
+    """Tests if JaCe can interact with JAX and vice versa."""
 
     def base_fun(a, b, c):
         return a + b * jnp.sin(c) - a * b
@@ -97,7 +97,7 @@ def test_composition_with_jax() -> None:
 
 @pytest.mark.skip(reason="Nested Jaxpr are not handled.")
 def test_composition_with_jax_2() -> None:
-    """Second test if JaCe can interact with Jax and vice versa."""
+    """Second test if JaCe can interact with JAX and vice versa."""
 
     @jax.jit
     def f1_jax(a, b):
@@ -121,7 +121,7 @@ def test_composition_with_jax_2() -> None:
     res_jax = f3_jax(a, b, c, d)
     res_jace = f3_jace(a, b, c, d)
 
-    assert np.allclose(ref, res_jax), "Jax failed."
+    assert np.allclose(ref, res_jax), "JAX failed."
     assert np.allclose(ref, res_jace), "JaCe Failed."
 
 
@@ -202,7 +202,7 @@ def test_disabled_x64() -> None:
         trans_ctx=trans_ctx, fun=testee, flat_call_args=flat_call_args
     )
 
-    # Because x64 is disabled Jax traces the input as float32, even if we have passed
+    # Because x64 is disabled JAX traces the input as float32, even if we have passed
     #  float64 as input! Calling the resulting SDFG with the arguments we used for
     #  lowering will result in an error, because of the situation,
     #  `sizeof(float32) < sizeof(float64)`, no out of bound error would result, but the
@@ -252,7 +252,7 @@ def test_no_input() -> None:
 
 
 def test_jax_array_as_input() -> None:
-    """This function tests if we use Jax arrays as inputs."""
+    """This function tests if we use JAX arrays as inputs."""
 
     def testee(a: jax.Array) -> jax.Array:
         return jnp.sin(a + 1.0)

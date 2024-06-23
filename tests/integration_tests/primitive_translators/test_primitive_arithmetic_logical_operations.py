@@ -44,7 +44,7 @@ if TYPE_CHECKING:
 def _only_alt_translators() -> Generator[None, None, None]:
     """Removes all non arithmetic/logical translator from the registry.
 
-    This ensures that Jax is not doing some stuff that is supposed to be handled by the
+    This ensures that JAX is not doing some stuff that is supposed to be handled by the
     test class, such as broadcasting. It makes writing tests a bit harder, but it is
     worth. For some reasons also type conversion s allowed.
     """
