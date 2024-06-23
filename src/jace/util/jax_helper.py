@@ -146,12 +146,10 @@ def is_tracing_ongoing(*args: Any, **kwargs: Any) -> bool:
     #  See also: https://github.com/google/jax/pull/3370
     if any(isinstance(x, jax_core.Tracer) for x in itertools.chain(args, kwargs.values())):
         return True
-    if (
-        trace_stack_length := (len(jax._src.core.thread_local_state.trace_state.trace_stack.stack))
-        == 1
-    ):
+    trace_stack_height = len(jax._src.core.thread_local_state.trace_state.trace_stack.stack)
+    if trace_stack_height == 1:
         return False
-    if trace_stack_length > 1:
+    if trace_stack_height > 1:
         return True
     raise RuntimeError("Failed to determine if tracing is ongoing.")
 
