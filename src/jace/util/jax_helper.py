@@ -17,14 +17,17 @@ from __future__ import annotations
 import dataclasses
 import itertools
 from collections.abc import Mapping
-from typing import Any, overload
+from typing import TYPE_CHECKING, Any, overload
 
 import dace
 import jax
 import jax.core as jax_core
-import numpy as np
 
 from jace import util
+
+
+if TYPE_CHECKING:
+    import numpy as np
 
 
 @dataclasses.dataclass(repr=True, frozen=True, eq=False)
@@ -225,9 +228,12 @@ def get_jax_literal_value(lit: jax_core.Atom) -> bool | float | int | np.generic
     if not isinstance(lit, jax_core.Literal):
         raise TypeError(f"Can only extract literals not '{type(lit)}'.")
     val = lit.val
-    if isinstance(val, np.ndarray):
+    # In previous versions of JAX literals were always 0-dim arrays, but it seems
+    #  that in newer versions the values are either arrays or scalars.
+    #  I saw both thus we have to keep both branches.
+    if util.is_array(val):
         assert val.shape == ()
-        return val.max()
-    if isinstance(val, (bool, float, int)):
+        return val.dtype.type(val.max())
+    if util.is_scalar(val):
         return val
-    raise TypeError(f"Failed to extract value from '{lit}'.")
+    raise TypeError(f"Failed to extract value from '{lit}' ('{val}' type: {type(val).__name__}).")
