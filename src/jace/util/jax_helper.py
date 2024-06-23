@@ -17,7 +17,7 @@ from __future__ import annotations
 import dataclasses
 import itertools
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, overload
 
 import dace
 import jax
@@ -100,6 +100,14 @@ def get_jax_var_name(jax_var: jax_core.Atom | JaCeVar) -> str:
                 f"Does not know how to transform '{jax_var}' (type: '{type(jax_var).__name__}') "
                 "into a string."
             )
+
+
+@overload
+def get_jax_var_shape(jax_var: jax_core.Atom) -> tuple[int, ...]: ...
+
+
+@overload
+def get_jax_var_shape(jax_var: JaCeVar) -> tuple[int | dace.symbol | str, ...]: ...
 
 
 def get_jax_var_shape(jax_var: jax_core.Atom | JaCeVar) -> tuple[int | dace.symbol | str, ...]:

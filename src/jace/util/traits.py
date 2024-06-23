@@ -32,16 +32,17 @@ def is_jax_array(obj: Any) -> TypeGuard[jax.Array]:
     """
     Tests if `obj` is a JAX array.
 
-    Note:
-     JAX arrays are special as they can not be mutated. Furthermore, they always
-     allocate on the CPU _and_ on the GPU, if present.
+    Notes:
+        JAX arrays are special as they can not be mutated. Furthermore, they always
+        allocate on the CPU _and_ on the GPU, if present.
     """
     return isinstance(obj, jax.Array)
 
 
-def is_array(obj: Any) -> TypeGuard[jax.typing.ArrayLike]:
+def is_array(obj: Any) -> TypeGuard[jax.Array]:
     """Identifies arrays, this also includes JAX arrays."""
-    return dace.is_array(obj) or is_jax_array(obj)
+    # `dace.is_array()` does not seem to recognise shape zero arrays.
+    return isinstance(obj, np.ndarray) or dace.is_array(obj) or is_jax_array(obj)
 
 
 def is_scalar(obj: Any) -> bool:
