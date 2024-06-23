@@ -33,14 +33,21 @@ from jace import util
 if TYPE_CHECKING:
     from jace import stages
 
-#: Caches used to store the state transition.
-#: The caches are on a per stage and not per instant basis.
 _TRANSLATION_CACHES: dict[type[CachingStage], StageCache] = {}
+"""Caches used to store the state transition.
+
+The caches are on a per stage and not per instant basis.
+"""
 
 
-# Denotes the stage that follows the current one.
-#  Used by the `CachingStage` mixin.
+# Type annotation for the caching.
+P = ParamSpec("P")
 NextStage = TypeVar("NextStage", bound="stages.Stage")
+TransitionFunction: TypeAlias = "Callable[Concatenate[CachingStage[NextStage], P], NextStage]"
+CachingStageType = TypeVar("CachingStageType", bound="CachingStage")
+
+# Type to describe a single argument either in an abstract or concrete way.
+CallArgsSpec: TypeAlias = tuple["_AbstractCallArgument | Hashable"]
 
 
 class CachingStage(Generic[NextStage]):
@@ -65,7 +72,7 @@ class CachingStage(Generic[NextStage]):
 
     @abc.abstractmethod
     def _make_call_description(
-        self: CachingStage, intree: jax_tree.PyTreeDef, flat_call_args: Sequence[Any]
+        self: CachingStage, in_tree: jax_tree.PyTreeDef, flat_call_args: Sequence[Any]
     ) -> StageTransformationSpec:
         """
         Computes the key used to represent the call.
@@ -76,17 +83,11 @@ class CachingStage(Generic[NextStage]):
         there for more information.
 
         Args:
-            intree: Pytree object describing how the input arguments were flattened.
+            in_tree: Pytree object describing how the input arguments were flattened.
             flat_call_args: The flattened arguments that were passed to the
                 annotated function.
         """
         ...
-
-
-# Type annotation for the caching.
-P = ParamSpec("P")
-TransitionFunction = Callable[Concatenate[CachingStage[NextStage], P], NextStage]
-CachingStageType = TypeVar("CachingStageType", bound=CachingStage)
 
 
 def cached_transition(
@@ -107,8 +108,8 @@ def cached_transition(
 
     @functools.wraps(transition)
     def transition_wrapper(self: CachingStageType, *args: P.args, **kwargs: P.kwargs) -> NextStage:
-        flat_call_args, intree = jax_tree.tree_flatten((args, kwargs))
-        key = self._make_call_description(flat_call_args=flat_call_args, intree=intree)
+        flat_call_args, in_tree = jax_tree.tree_flatten((args, kwargs))
+        key = self._make_call_description(flat_call_args=flat_call_args, in_tree=in_tree)
         if key not in self._cache:
             self._cache[key] = transition(self, *args, **kwargs)
         return self._cache[key]
@@ -137,7 +138,7 @@ class _AbstractCallArgument:
 
     As noted in `StageTransformationSpec` there are two ways to describe an
     argument, either by using its concrete value or an abstract description,
-    which is similar to tracers in Jax. This class represents the second way.
+    which is similar to tracers in JAX. This class represents the second way.
     To create an instance you should use `_AbstractCallArgument.from_value()`.
 
     Attributes:
@@ -162,7 +163,7 @@ class _AbstractCallArgument:
         if not util.is_fully_addressable(value):
             raise NotImplementedError("Distributed arrays are not addressed yet.")
         if isinstance(value, jax_core.Literal):
-            raise TypeError("Jax Literals are not supported as cache keys.")
+            raise TypeError("JAX Literals are not supported as cache keys.")
 
         if util.is_array(value):
             if util.is_jax_array(value):
@@ -191,10 +192,6 @@ class _AbstractCallArgument:
         raise TypeError(f"Can not make 'an abstract description from '{type(value).__name__}'.")
 
 
-#: Type to describe a single argument either in an abstract or concrete way.
-CallArgsSpec: TypeAlias = tuple[_AbstractCallArgument | Hashable]
-
-
 @dataclasses.dataclass(frozen=True)
 class StageTransformationSpec:
     """
@@ -204,7 +201,7 @@ class StageTransformationSpec:
     result is cached. They key to locate them inside the cache is represented
     by this class and computed by the `CachingStage._make_call_description()`
     function. The actual key is consists of three parts, `stage_id`, `call_args`
-    and `intree`, see below for more.
+    and `in_tree`, see below for more.
 
     Args:
         stage_id: Origin of the call, for which the id of the stage object should
@@ -213,16 +210,16 @@ class StageTransformationSpec:
             describes a single argument. To describe an argument there are two ways:
             - Abstract description: In this way, the actual value of the argument
                 is irrelevant, its structure is important, similar to the tracers
-                used in Jax. To represent it, use `_AbstractCallArgument`.
+                used in JAX. To represent it, use `_AbstractCallArgument`.
             - Concrete description: Here the actual value of the argument is
-                considered, this is similar to how static arguments in Jax works.
+                considered, this is similar to how static arguments in JAX works.
                 The only requirement is that they can be hashed.
-        intree: A pytree structure that describes how the input was flatten.
+        in_tree: A pytree structure that describes how the input was flatten.
     """
 
     stage_id: int
     flat_call_args: CallArgsSpec
-    intree: jax_tree.PyTreeDef
+    in_tree: jax_tree.PyTreeDef
 
 
 #: Denotes the stage that is stored inside the cache.
@@ -241,9 +238,12 @@ class StageCache(Generic[StageType]):
     _memory: collections.OrderedDict[StageTransformationSpec, StageType]
     _capacity: int
 
-    def __init__(self, capachity: int = 256) -> None:
+    def __init__(
+        self,
+        capacity: int = 256,
+    ) -> None:
+        self._capacity = capacity
         self._memory = collections.OrderedDict()
-        self._capacity = capachity
 
     def __contains__(self, key: StageTransformationSpec) -> bool:
         return key in self._memory
@@ -277,14 +277,14 @@ class StageCache(Generic[StageType]):
             self._memory.move_to_end(key, last=False)
             self._memory.popitem(last=False)
 
-    def clear(self) -> None:  # noqa: D102  # Missing description.
+    def clear(self) -> None:  # noqa: D102 [undocumented-public-method]
         self._memory.clear()
 
     def __len__(self) -> int:
         return len(self._memory)
 
     @property
-    def capacity(self) -> int:  # noqa: D102  # No docstring needed.
+    def capacity(self) -> int:  # noqa: D102 [undocumented-public-method]
         return self._capacity
 
     def front(self) -> tuple[StageTransformationSpec, StageType]:

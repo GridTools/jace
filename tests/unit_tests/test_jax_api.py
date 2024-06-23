@@ -15,8 +15,8 @@ import pytest
 from jax import numpy as jnp, tree_util as jax_tree
 
 import jace
-from jace import translator, util
-from jace.translator import pre_post_translation as ptrans
+from jace import translated_jaxpr_sdfg as tjsdfg, translator, util
+from jace.translator import post_translation as ptrans
 
 from tests import util as testutil
 
@@ -198,7 +198,7 @@ def test_disabled_x64() -> None:
     )
     trans_ctx: translator.TranslationContext = builder.translate_jaxpr(jaxpr)
 
-    tsdfg: jace.TranslatedJaxprSDFG = ptrans.postprocess_jaxpr_sdfg(
+    tsdfg: tjsdfg.TranslatedJaxprSDFG = ptrans.postprocess_jaxpr_sdfg(
         trans_ctx=trans_ctx, fun=testee, flat_call_args=flat_call_args
     )
 
@@ -208,8 +208,8 @@ def test_disabled_x64() -> None:
     #  `sizeof(float32) < sizeof(float64)`, no out of bound error would result, but the
     #  values are garbage.
     assert all(
-        tsdfg.sdfg.arrays[inp_name].dtype.as_numpy_dtype().type is np.float32
-        for inp_name in tsdfg.inp_names
+        tsdfg.sdfg.arrays[input_name].dtype.as_numpy_dtype().type is np.float32
+        for input_name in tsdfg.input_names
     )
 
 

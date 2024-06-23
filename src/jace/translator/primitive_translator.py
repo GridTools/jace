@@ -14,20 +14,15 @@ Todo:
 from __future__ import annotations
 
 import abc
+from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Literal, Protocol, cast, overload, runtime_checkable
 
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Sequence
-
     import dace
     from jax import core as jax_core
 
     from jace import translator
-
-#: Global registry of the active primitive translators.
-#:  The `dict` maps the name of a primitive to its associated translators.
-_PRIMITIVE_TRANSLATORS_REGISTRY: dict[str, translator.PrimitiveTranslator] = {}
 
 
 class PrimitiveTranslatorCallable(Protocol):
@@ -43,7 +38,7 @@ class PrimitiveTranslatorCallable(Protocol):
         eqn_state: dace.SDFGState,
     ) -> dace.SDFGState | None:
         """
-        Translates the Jax primitive into its SDFG equivalent.
+        Translates the JAX primitive into its SDFG equivalent.
 
         Before the builder calls this function it will perform the following
         preparatory tasks:
@@ -82,7 +77,7 @@ class PrimitiveTranslatorCallable(Protocol):
                 SDFG for the inpts or `None` in case of a literal.
             out_var_names: List of the names of the arrays created inside the
                 SDFG for the outputs.
-            eqn: The Jax primitive that should be translated.
+            eqn: The JAX primitive that should be translated.
             eqn_state: State into which the primitive`s SDFG representation
                 should be constructed.
         """
@@ -92,7 +87,7 @@ class PrimitiveTranslatorCallable(Protocol):
 @runtime_checkable
 class PrimitiveTranslator(PrimitiveTranslatorCallable, Protocol):
     """
-    Interface for all Jax primitive translators.
+    Interface for all JAX primitive translators.
 
     A translator for a primitive translates a single equation of a Jaxpr into
     its SDFG equivalent. For satisfying this interface a concrete implementation
@@ -111,7 +106,7 @@ class PrimitiveTranslator(PrimitiveTranslatorCallable, Protocol):
     @property
     @abc.abstractmethod
     def primitive(self) -> str:
-        """Returns the name of the Jax primitive that `self` is able to handle."""
+        """Returns the name of the JAX primitive that `self` is able to handle."""
         ...
 
 
@@ -156,6 +151,17 @@ def make_primitive_translator(
         return cast("translator.PrimitiveTranslator", primitive_translator)
 
     return wrapper if primitive_translator is None else wrapper(primitive_translator)
+
+
+# <--------------------------- Managing translators
+
+
+_PRIMITIVE_TRANSLATORS_REGISTRY: dict[str, translator.PrimitiveTranslator] = {}
+"""Global registry of the active primitive translators.
+
+Use `register_primitive_translator()` to add a translator to the registry and
+`get_registered_primitive_translators()` get the current active set.
+"""
 
 
 @overload
