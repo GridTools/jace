@@ -49,8 +49,8 @@ __all__ = [
     "JaCeLowered",
     "JaCeWrapped",
     "Stage",
-    "finalize_compilation_options",
     "get_active_compiler_options",
+    "make_final_compilation_options",
     "update_active_compiler_options",
 ]
 
@@ -243,7 +243,7 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"], Generic[_ReturnType]):
 
         To perform the optimizations `jace_optimize()` is used. The actual options that
         are forwarded to it are obtained by passing `compiler_options` to
-        `finalize_compilation_options()`.
+        `make_final_compilation_options()`.
 
         Args:
             compiler_options: The optimization options to use.
@@ -251,7 +251,7 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"], Generic[_ReturnType]):
         # We **must** deepcopy before we do any optimization, because all optimizations
         #  are in place, to properly cache stages, stages needs to be immutable.
         tsdfg: tjsdfg.TranslatedJaxprSDFG = copy.deepcopy(self._translated_sdfg)
-        optimization.jace_optimize(tsdfg=tsdfg, **finalize_compilation_options(compiler_options))
+        optimization.jace_optimize(tsdfg=tsdfg, **make_final_compilation_options(compiler_options))
 
         return JaCeCompiled(
             compiled_sdfg=tjsdfg.compile_jaxpr_sdfg(tsdfg),
@@ -289,7 +289,7 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"], Generic[_ReturnType]):
         unflatted_args, unflatted_kwargs = jax_tree.tree_unflatten(in_tree, flat_call_args)
         assert (not unflatted_kwargs) and (len(unflatted_args) <= 1)
 
-        options = finalize_compilation_options(unflatted_args[0] if unflatted_args else {})
+        options = make_final_compilation_options(unflatted_args[0] if unflatted_args else {})
         flat_options, option_tree = jax_tree.tree_flatten(options)
         return tcache.StageTransformationSpec(
             stage_id=id(self), flat_call_args=tuple(flat_options), in_tree=option_tree
@@ -354,7 +354,7 @@ _JACELOWERED_ACTIVE_COMPILE_OPTIONS: CompilerOptions = optimization.DEFAULT_OPTI
 The global set is initialized with `jace.optimization.DEFAULT_OPTIMIZATIONS`. It can be
 managed through `update_active_compiler_options()` and accessed through
 `get_active_compiler_options()`, however, it is advised that a user should use
-`finalize_compilation_options()` for getting the final options that should be used
+`make_final_compilation_options()` for getting the final options that should be used
 for optimization.
 """
 
@@ -383,7 +383,7 @@ def get_active_compiler_options() -> CompilerOptions:
     return _JACELOWERED_ACTIVE_COMPILE_OPTIONS.copy()
 
 
-def finalize_compilation_options(compiler_options: CompilerOptions | None) -> CompilerOptions:
+def make_final_compilation_options(compiler_options: CompilerOptions | None) -> CompilerOptions:
     """
     Returns the final compilation options.
 
