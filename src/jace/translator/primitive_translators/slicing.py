@@ -193,8 +193,6 @@ class DynamicSlicingTranslator(translator.PrimitiveTranslator):
             )
             map_entry.add_in_connector(window_start_index_name)
 
-        builder.sdfg.view()
-
 
 translator.register_primitive_translator(SlicingTranslator())
 translator.register_primitive_translator(DynamicSlicingTranslator())
