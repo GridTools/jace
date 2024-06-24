@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import dace
+from typing_extensions import override
 
 from jace import translator, util
 
@@ -22,7 +23,7 @@ if TYPE_CHECKING:
     from jax import core as jax_core
 
 
-class ConcatenateTranslator:
+class ConcatenateTranslator(translator.PrimitiveTranslator):
     """
     Implements the `concatenate` primitive.
 
@@ -34,9 +35,10 @@ class ConcatenateTranslator:
     def primitive(self) -> str:  # noqa: D102  # No docstring needed.
         return "concatenate"
 
-    def __call__(  # noqa: D102  # No docstring
+    @override
+    def __call__(
         self,
-        builder: translator.JaxprTranslationBuilder,  # noqa: ARG002  # Unused.
+        builder: translator.JaxprTranslationBuilder,
         in_var_names: Sequence[str | None],
         out_var_names: Sequence[str],
         eqn: jax_core.JaxprEqn,

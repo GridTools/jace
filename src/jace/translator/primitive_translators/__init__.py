@@ -13,7 +13,7 @@ from .arithmetic_logical_translators import (
     LogicalOperationTranslator,
 )
 from .broadcast_in_dim_translator import BroadcastInDimTranslator
-from .concatenate import ConcatenateTranslator
+from .concatenate_translator import ConcatenateTranslator
 from .convert_element_type_translator import ConvertElementTypeTranslator
 from .copy_translator import CopyTranslator, DevicePutTranslator
 from .iota_translator import IotaTranslator
