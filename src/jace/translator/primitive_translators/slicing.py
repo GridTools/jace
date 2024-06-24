@@ -31,7 +31,7 @@ class SlicingTranslator(mapped_base.MappedOperationTranslatorBase):
     This is the classical slicing operation which extracts a fixed sized window
     from a fixed initial position. The slicing is implemented using a partial copy.
 
-    Notes:
+    Note:
         Slices are essentially optimization barriers as they can not be fused
         with Maps before them.
     """

@@ -53,7 +53,7 @@ class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
     Args:
         primitive_name:     The name of the primitive `self` should bind to.
 
-    Notes:
+    Note:
         This class will always generate a mapped Tasklet, even if a scalar is handled.
     """
 

@@ -32,7 +32,7 @@ def is_jax_array(obj: Any) -> TypeGuard[jax.Array]:
     """
     Tests if `obj` is a JAX array.
 
-    Notes:
+    Note:
         JAX arrays are special as they can not be mutated. Furthermore, they always
         allocate on the CPU _and_ on the GPU, if present.
     """
@@ -83,7 +83,7 @@ def get_strides_for_dace(obj: Any) -> tuple[int, ...] | None:
     DaCe and not in bytes as it is inside NumPy. As in NumPy and DaCe the function
     returns `None` to indicate standard C order.
 
-    Notes:
+    Note:
         If `obj` is not array like an error is generated.
     """
     if not is_array(obj):

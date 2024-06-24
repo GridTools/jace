@@ -191,7 +191,7 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"], Generic[_P, _ReturnType]):
         For all non static arguments the function will generate an abstract description
         of an argument and for all static arguments the concrete value.
 
-        Notes:
+        Note:
             The abstract description also includes storage location, i.e. if on CPU or
             on GPU, and the strides of the arrays.
         """

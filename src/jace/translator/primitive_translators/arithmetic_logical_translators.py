@@ -92,7 +92,7 @@ class LogicalOperationTranslator(mapped_base.MappedOperationTranslatorBase):
         int_tmpl:       The template used for the integer case.
         bool_tmpl:      The template used for the bool case.
 
-    Notes:
+    Note:
         Since it does not make sense to single out `not` and keep the other
         logical operations in `ArithmeticOperationTranslator` all of them are
         handled by this class.

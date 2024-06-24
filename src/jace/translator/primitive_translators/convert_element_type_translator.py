@@ -33,7 +33,7 @@ class ConvertElementTypeTranslator(mapped_base.MappedOperationTranslatorBase):
     However, in cases where the input type is the same as the output type,
     the Tasklet will just be a copy Tasklet, that can then be removed by DaCe.
 
-    Notes:
+    Note:
         This translator ignores the `new_dtype` and `weak_type` parameters of
         the equation and only performs the casting based on the type of the fields.
     """
