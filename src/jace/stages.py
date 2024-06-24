@@ -42,6 +42,7 @@ from jace.util import translation_cache as tcache
 
 if TYPE_CHECKING:
     import dace
+    from jax import core as jax_core
 
 __all__ = [
     "CompilerOptions",  # export for compatibility with JAX.
@@ -128,7 +129,8 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"], Generic[_P, _ReturnType]):
         Note:
             This function is also aware if a JAX tracing is going on. In this
             case, it will forward the computation.
-            Currently, this function ignores the value of `jax.disable_jit()`.
+            Currently, this function ignores the value of `jax.disable_jit()`,
+            however, tracing will consider this value.
         """
         if util.is_tracing_ongoing(*args, **kwargs):
             return self._fun(*args, **kwargs)
@@ -175,7 +177,7 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"], Generic[_P, _ReturnType]):
         )
 
         # NOTE: `tsdfg` is deepcopied as a side effect of post processing.
-        return JaCeLowered(tsdfg, out_tree)
+        return JaCeLowered(tsdfg, out_tree, trans_ctx.jaxpr)
 
     @property
     def wrapped_fun(self) -> Callable:
@@ -217,6 +219,7 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"], Generic[_ReturnType]):
     Args:
         tsdfg: The lowered SDFG with metadata.
         out_tree: The pytree describing how to unflatten the output.
+        jaxpr: The Jaxpr expression that was translated.
 
     Note:
         `self` will manage the passed `tsdfg` object. Modifying it results is undefined
@@ -226,15 +229,18 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"], Generic[_ReturnType]):
 
     _translated_sdfg: tjsdfg.TranslatedJaxprSDFG
     _out_tree: jax_tree.PyTreeDef
+    _jaxpr: jax_core.ClosedJaxpr
 
     def __init__(
         self,
         tsdfg: tjsdfg.TranslatedJaxprSDFG,
         out_tree: jax_tree.PyTreeDef,
+        jaxpr: jax_core.ClosedJaxpr,
     ) -> None:
         super().__init__()
         self._translated_sdfg = tsdfg
         self._out_tree = out_tree
+        self._jaxpr = jaxpr
 
     @tcache.cached_transition
     def compile(self, compiler_options: CompilerOptions | None = None) -> JaCeCompiled[_ReturnType]:
