@@ -330,6 +330,24 @@ def test_alt_general_binary_float(
     _perform_alt_test(testee, *alt_binary_ops_float[1])
 
 
+def test_alt_ternary_clamp() -> None:
+    """Tests `jax.lax.clamp()` primitive.
+
+    This primitive is similar to `numpy.clip()` but with a different signature.
+    Furthermore, this is a ternary operation.
+    """
+
+    def testee(min_: np.ndarray, val_: np.ndarray, max_: np.ndarray) -> np.ndarray:
+        return jax.lax.clamp(min_, val_, max_)  # type: ignore[return-value]
+
+    shape = (20, 20)
+    min_ = testutil.make_array(shape) / 2.0
+    max_ = testutil.make_array(shape) / 2.0 + 0.5
+    val_ = testutil.make_array(shape)
+
+    _perform_alt_test(testee, min_, val_, max_)
+
+
 def test_alt_compare_operation(
     alt_binary_compare_ops: tuple[Callable, tuple[np.ndarray, np.ndarray]],
 ) -> None:

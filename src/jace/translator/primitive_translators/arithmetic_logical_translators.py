@@ -175,6 +175,9 @@ _ARITMETIC_OPERATION_TEMPLATES: Final[dict[str, str]] = {
     "atan2": "__out = atan2((__in0), (__in1))",
 
     "nextafter": "__out = nextafter((__in0), (__in1))",
+
+    # Ternary operations
+    "clamp": "__out = (__in0 if __in1 < __in0 else (__in1 if __in1 < __in2 else __in2))"
 }
 
 
