@@ -179,9 +179,34 @@ def alt_binary_compare_ops(request) -> tuple[Callable, tuple[np.ndarray, np.ndar
         [(5, 1, 3, 4, 1, 5), (5, 1, 3, 1, 2, 5)],
     ]
 )
-def broadcast_input(request) -> tuple[np.ndarray, np.ndarray]:
-    """Inputs to be used for the broadcast test."""
+def binary_broadcast_input(request) -> tuple[np.ndarray, np.ndarray]:
+    """Inputs to be used for the binary broadcast test."""
     return tuple(testutil.make_array(shape) for shape in request.param)  # type: ignore[return-value] # can not deduce that it is only size 2.
+
+
+@pytest.fixture(
+    params=[
+        [(100, 100), (100, 100), (100, 100)],
+        [(100, 1), (100, 100), (100, 100)],
+        [(100, 100), (100, 1), (100, 100)],
+        [(100, 100), (100, 100), (100, 1)],
+        [(100, 1), (100, 1), (100, 100)],
+        [(100, 100), (100, 1), (100, 1)],
+        [(100, 1), (100, 100), (100, 1)],
+        [(100, 100), (), ()],
+        [(), (100, 100), ()],
+        [(), (), (100, 100)],
+        [(), (100, 100), (100, 100)],
+        [(100, 100), (), (100, 100)],
+    ]
+)
+def ternary_broadcast_input(request) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Inputs to be used for the ternary broadcast test."""
+
+    min_val = testutil.make_array(request.param[0]) / 2.0
+    value = testutil.make_array(request.param[1])
+    max_val = testutil.make_array(request.param[2]) / 2.0 + 0.5
+    return (min_val, value, max_val)
 
 
 def _perform_alt_test(testee: Callable, *args: Any) -> Any:
@@ -289,14 +314,23 @@ def test_mapped_binary_array_constants() -> None:
     _perform_alt_test(testee, a)
 
 
-def test_mapped_broadcast(broadcast_input: tuple[np.ndarray, np.ndarray]) -> None:
+def test_mapped_broadcast_binary(binary_broadcast_input: tuple[np.ndarray, np.ndarray]) -> None:
     def testee(a: np.ndarray, b: np.ndarray) -> np.ndarray:
         return a + b
 
-    a = broadcast_input[0]
-    b = broadcast_input[1]
+    a = binary_broadcast_input[0]
+    b = binary_broadcast_input[1]
     _perform_alt_test(testee, a, b)
     _perform_alt_test(testee, b, a)
+
+
+def test_mapped_broadcast_ternary(
+    ternary_broadcast_input: tuple[np.ndarray, np.ndarray, np.ndarray],
+) -> None:
+    def testee(min_val: np.ndarray, value: np.ndarray, max_val: np.ndarray) -> np.ndarray:
+        return jax.numpy.clip(value, min_val, max_val)  # type: ignore[return-value]  # JAX returns JAX Arrays.
+
+    _perform_alt_test(testee, *ternary_broadcast_input)
 
 
 # <------------ Tests for arithmetic and logical translators/operations
