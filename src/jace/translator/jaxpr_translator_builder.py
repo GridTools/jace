@@ -35,8 +35,11 @@ class JaxprTranslationBuilder:
     - there are only transient variables inside the SDFG,
     - it lacks the special `__return` variable,
     - the `arg_names` parameter is not set,
-    - for all scalar values a ` Scalar` SDFG variable is used, thus they cannot
-        be used to return anything.
+    - for all scalar values a `Scalar` SDFG variable is used, thus they cannot
+        be used for return values,
+    - for every transient there is exactly one access node that writes to it,
+        except the name of the array starts with `__jace_mutable_`, which can
+        be written to multiple times.
 
     For these reasons the SDFG is not directly usable, and further manipulations
     have to be performed. Especially, DaCe's validation function will fail and
