@@ -16,7 +16,7 @@ from jax import numpy as jnp, tree_util as jax_tree
 
 import jace
 from jace import translated_jaxpr_sdfg as tjsdfg, translator, util
-from jace.translator import post_translation as ptrans
+from jace.translator import post_translation as ptranslation
 
 from tests import util as testutil
 
@@ -198,7 +198,7 @@ def test_disabled_x64() -> None:
     )
     trans_ctx: translator.TranslationContext = builder.translate_jaxpr(jaxpr)
 
-    tsdfg: tjsdfg.TranslatedJaxprSDFG = ptrans.postprocess_jaxpr_sdfg(
+    tsdfg: tjsdfg.TranslatedJaxprSDFG = ptranslation.postprocess_jaxpr_sdfg(
         trans_ctx=trans_ctx, fun=testee, flat_call_args=flat_call_args
     )
 

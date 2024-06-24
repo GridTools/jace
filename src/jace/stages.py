@@ -36,7 +36,7 @@ from jax import tree_util as jax_tree
 
 from jace import api, optimization, tracing, translated_jaxpr_sdfg as tjsdfg, translator, util
 from jace.optimization import CompilerOptions
-from jace.translator import post_translation as ptrans
+from jace.translator import post_translation as ptranslation
 from jace.util import translation_cache as tcache
 
 
@@ -168,7 +168,7 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"], Generic[_P, _ReturnType]):
         trans_ctx: translator.TranslationContext = builder.translate_jaxpr(jaxpr)
 
         flat_call_args = jax_tree.tree_leaves((args, kwargs))
-        tsdfg: tjsdfg.TranslatedJaxprSDFG = ptrans.postprocess_jaxpr_sdfg(
+        tsdfg: tjsdfg.TranslatedJaxprSDFG = ptranslation.postprocess_jaxpr_sdfg(
             trans_ctx=trans_ctx,
             fun=self.wrapped_fun,
             flat_call_args=flat_call_args,
