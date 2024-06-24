@@ -58,7 +58,7 @@ def _only_alt_translators() -> Generator[None, None, None]:
     allowed_translators = (
         _LOGICAL_OPERATION_TEMPLATES.keys()
         | _ARITMETIC_OPERATION_TEMPLATES.keys()
-        | {"convert_element_type"}
+        | {"convert_element_type", "pjit"}
     )
     testutil.set_active_primitive_translators_to({
         p: t for p, t in primitive_translators.items() if p in allowed_translators

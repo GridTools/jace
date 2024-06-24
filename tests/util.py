@@ -40,7 +40,7 @@ def make_array(
     """
 
     if shape == ():
-        return make_array((1,), dtype)[0]
+        return dtype(make_array((1,), dtype)[0])
     if isinstance(shape, int):
         shape = (shape,)
 

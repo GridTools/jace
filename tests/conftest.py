@@ -41,21 +41,22 @@ def _enable_x64_mode_in_jax() -> Generator[None, None, None]:
 
 @pytest.fixture(autouse=True)
 def _disable_jit() -> Generator[None, None, None]:
-    """Fixture for disable the dynamic jiting in JAX.
+    """Fixture for disable the dynamic jiting in JAX, used by default.
 
-    For certain reasons JAX puts certain primitives inside a `pjit` primitive,
-    i.e. nested Jaxpr. The intent is, that these operations can/should run on
-    an accelerator.
+    Using this fixture has two effects.
+    - JAX will not cache the results, i.e. every call to a jitted function will
+        result in a tracing operation.
+    - JAX will not use implicit jit operations, i.e. nested Jaxpr expressions
+        using `pjit` are avoided.
 
-    But this is a problem, since JaCe can not handle this primitive, it leads
-    to an error. To overcome this problem, we will globally disable this feature
-    until we can handle `pjit`.
-
-    Note this essentially disable the `jax.jit` decorator, however, the `jace.jit`
+    This essentially disable the `jax.jit` decorator, however, the `jace.jit`
     decorator is still working.
 
-    Todo:
-        Remove as soon as we can handle nested `jit`.
+    Note:
+        The second point, i.e. preventing JAX from running certain things in `pjit`,
+        is the main reason why this fixture is used by default, without it
+        literal substitution is useless and essentially untestable.
+        In certain situation it can be disabled.
     """
     with jax.disable_jit(disable=True):
         yield
@@ -66,6 +67,7 @@ def _enable_jit() -> Generator[None, None, None]:
     """Fixture to enable jit compilation.
 
     Essentially it undoes the effects of the `_disable_jit()` fixture.
+    It is important that this fixture is not automatically activated.
     """
     with jax.disable_jit(disable=False):
         yield

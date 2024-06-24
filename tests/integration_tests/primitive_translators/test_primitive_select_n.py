@@ -9,7 +9,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from collections.abc import Callable
+from typing import Any
 
 import jax
 import numpy as np
@@ -18,10 +19,6 @@ from jax import numpy as jnp
 import jace
 
 from tests import util as testutil
-
-
-if TYPE_CHECKING:
-    from collections.abc import Callable
 
 
 def _perform_test(testee: Callable, *args: Any) -> None:
