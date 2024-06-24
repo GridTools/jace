@@ -14,7 +14,7 @@ the inverse relationship between `expand_dims` and `squeeze`.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from collections.abc import Sequence
 
 import jax
 import numpy as np
@@ -24,10 +24,6 @@ from jax import numpy as jnp
 import jace
 
 from tests import util as testutil
-
-
-if TYPE_CHECKING:
-    from collections.abc import Sequence
 
 
 def _roundtrip_implementation(shape: Sequence[int], axis: int | Sequence[int]) -> None:
@@ -45,7 +41,7 @@ def _roundtrip_implementation(shape: Sequence[int], axis: int | Sequence[int]) -
     for ops in [jnp.expand_dims, jnp.squeeze]:
         with jax.experimental.enable_x64():
             ref = ops(a, axis)  # type: ignore[operator]  # Function of unknown type.
-            res = jace.jit(lambda a: ops(a, axis))(a)  # type: ignore[operator]  # noqa: B023
+            res = jace.jit(lambda a: ops(a, axis))(a)  # type: ignore[operator]  # noqa: B023 [function-uses-loop-variable]
 
         assert ref.shape == res.shape, f"a.shape = {shape}; Expected: {ref.shape}; Got: {res.shape}"
         assert ref.dtype == res.dtype

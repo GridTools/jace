@@ -604,7 +604,7 @@ def test_builder_literal_return_value() -> None:
 def test_builder_unused_arg() -> None:
     """Tests if there is an unused argument."""
 
-    def testee(a: np.ndarray, b: np.ndarray) -> np.ndarray:  # noqa: ARG001  # Explicitly unused.
+    def testee(a: np.ndarray, b: np.ndarray) -> np.ndarray:  # noqa: ARG001 [unused-function-argument]
         return a + 3.0
 
     a = testutil.make_array((10, 10))
@@ -634,7 +634,7 @@ def test_builder_jace_var() -> None:
             _ = JaCeVar((), dace.int8, name=iname)
 
 
-def test_builder_FORTRAN_strides() -> None:  # noqa: N802  # Function name
+def test_builder_FORTRAN_strides() -> None:  # noqa: N802 [invalid-function-name]
     """Tests if we can lower without a standard stride.
 
     Notes:

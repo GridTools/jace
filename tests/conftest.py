@@ -13,7 +13,7 @@ Todo:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from collections.abc import Generator
 
 import jax
 import numpy as np
@@ -21,10 +21,6 @@ import pytest
 
 from jace import optimization, stages
 from jace.util import translation_cache as tcache
-
-
-if TYPE_CHECKING:
-    from collections.abc import Generator
 
 
 @pytest.fixture(autouse=True)
@@ -91,7 +87,7 @@ def _reset_random_seed() -> None:
     This ensures that for every test the random seed of NumPy is reset.
     This seed is used by the `util.mkarray()` helper.
     """
-    np.random.seed(42)  # noqa: NPY002  # We use this seed for the time being.
+    np.random.seed(42)  # noqa: NPY002 [numpy-legacy-random]
 
 
 @pytest.fixture(autouse=True)

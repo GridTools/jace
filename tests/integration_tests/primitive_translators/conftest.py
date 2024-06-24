@@ -9,15 +9,11 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from collections.abc import Generator
 
 import pytest
 
 from jace import optimization, stages
-
-
-if TYPE_CHECKING:
-    from collections.abc import Generator
 
 
 @pytest.fixture(

@@ -9,22 +9,21 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from collections.abc import Mapping, Sequence
+from typing import Literal
 
 import numpy as np
 
 from jace import translator
 
 
-if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
-
-
 __all__ = ["make_array"]
 
 
 def make_array(
-    shape: Sequence[int] | int, dtype: type = np.float64, order: str = "C"
+    shape: Sequence[int] | int,
+    dtype: type = np.float64,
+    order: Literal[None, "K", "A", "C", "F"] = "C",
 ) -> np.ndarray:
     """Generates a NumPy ndarray with shape `shape`.
 
@@ -45,17 +44,17 @@ def make_array(
         shape = (shape,)
 
     if dtype == np.bool_:
-        res = np.random.random(shape) > 0.5  # noqa: NPY002
+        res = np.random.random(shape) > 0.5  # noqa: NPY002 [numpy-legacy-random]
     elif np.issubdtype(dtype, np.integer):
         iinfo: np.iinfo = np.iinfo(dtype)
-        res = np.random.randint(  # noqa: NPY002
+        res = np.random.randint(  # noqa: NPY002 [numpy-legacy-random]
             low=iinfo.min, high=iinfo.max, size=shape, dtype=dtype
         )
     elif np.issubdtype(dtype, np.complexfloating):
         res = make_array(shape, np.float64) + 1.0j * make_array(shape, np.float64)
     else:
-        res = np.random.random(shape)  # type: ignore[assignment]  # noqa: NPY002
-    return np.array(res, order=order, dtype=dtype)  # type: ignore[call-overload]
+        res = np.random.random(shape)  # type: ignore[assignment]  # noqa: NPY002 [numpy-legacy-random]
+    return np.array(res, order=order, dtype=dtype)
 
 
 def set_active_primitive_translators_to(

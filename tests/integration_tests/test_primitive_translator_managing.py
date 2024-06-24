@@ -10,7 +10,8 @@
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING, Any
+from collections.abc import Generator, Mapping
+from typing import Any
 
 import numpy as np
 import pytest
@@ -19,10 +20,6 @@ import jace
 from jace import translator
 
 from tests import util as testutil
-
-
-if TYPE_CHECKING:
-    from collections.abc import Generator, Mapping
 
 
 @pytest.fixture(autouse=True)
@@ -34,7 +31,7 @@ def _conserve_builtin_translators() -> Generator[None, None, None]:
 
 
 @pytest.fixture()
-def no_builtin_translators() -> Generator[None, None, None]:  # noqa: PT004  # This is how you should do it: https://docs.pytest.org/en/7.1.x/how-to/fixtures.html#use-fixtures-in-classes-and-modules-with-usefixtures
+def no_builtin_translators() -> Generator[None, None, None]:  # noqa: PT004 [pytest-missing-fixture-name-underscore] # This is how you should do it: https://docs.pytest.org/en/7.1.x/how-to/fixtures.html#use-fixtures-in-classes-and-modules-with-usefixtures
     """This fixture can be used if the test does not want any builtin translators."""
     initial_translators = testutil.set_active_primitive_translators_to({})
     yield
@@ -63,12 +60,12 @@ class SubTrans2(translator.PrimitiveTranslator):
 
 
 @translator.make_primitive_translator("non_existing_callable_primitive3")
-def primitive_translator_3_callable(*args: Any, **kwargs: Any) -> None:  # noqa: ARG001
+def primitive_translator_3_callable(*args: Any, **kwargs: Any) -> None:  # noqa: ARG001 [unused-function-argument]
     raise NotImplementedError
 
 
 @translator.make_primitive_translator("add")
-def fake_add_translator(*args: Any, **kwargs: Any) -> None:  # noqa: ARG001
+def fake_add_translator(*args: Any, **kwargs: Any) -> None:  # noqa: ARG001 [unused-function-argument]
     raise NotImplementedError("'fake_add_translator()' was called.")
 
 
@@ -131,7 +128,7 @@ def test_subtranslatior_managing_callable_annotation() -> None:
     prim_name = "non_existing_property"
 
     @translator.make_primitive_translator(prim_name)
-    def non_existing_translator(*args: Any, **kwargs: Any) -> None:  # noqa: ARG001
+    def non_existing_translator(*args: Any, **kwargs: Any) -> None:  # noqa: ARG001 [unused-function-argument]
         raise NotImplementedError
 
     assert hasattr(non_existing_translator, "primitive")
@@ -170,7 +167,7 @@ def test_subtranslatior_managing_overwriting_2() -> None:
 
     @translator.register_primitive_translator(overwrite=True)
     @translator.make_primitive_translator("add")
-    def still_useless_but_a_bit_less(*args: Any, **kwargs: Any) -> None:  # noqa: ARG001
+    def still_useless_but_a_bit_less(*args: Any, **kwargs: Any) -> None:  # noqa: ARG001 [unused-function-argument]
         trans_cnt[0] += 1
 
     @jace.jit

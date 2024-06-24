@@ -50,7 +50,7 @@ def test_empty_unused_argument() -> None:
     """Empty body and an unused input argument."""
 
     @jace.jit
-    def wrapped(a: np.ndarray, b: np.float64) -> np.ndarray:  # noqa: ARG001  # Explicitly unused.
+    def wrapped(a: np.ndarray, b: np.float64) -> np.ndarray:  # noqa: ARG001 [unused-function-argument]
         return a
 
     a = np.arange(12, dtype=np.float64).reshape((4, 3))

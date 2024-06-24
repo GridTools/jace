@@ -23,7 +23,8 @@ on the validity of the template of the ALT.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from collections.abc import Callable, Generator
+from typing import Any
 
 import dace
 import jax
@@ -36,10 +37,6 @@ import jace
 from tests import util as testutil
 
 
-if TYPE_CHECKING:
-    from collections.abc import Callable, Generator
-
-
 @pytest.fixture(autouse=True)
 def _only_alt_translators() -> Generator[None, None, None]:
     """Removes all non arithmetic/logical translator from the registry.
@@ -48,9 +45,9 @@ def _only_alt_translators() -> Generator[None, None, None]:
     test class, such as broadcasting. It makes writing tests a bit harder, but it is
     worth. For some reasons also type conversion s allowed.
     """
-    from jace.translator.primitive_translators.arithmetic_logical_translators import (  # noqa: PLC0415  # Direct import.
-        _ARITMETIC_OPERATION_TEMPLATES,  # noqa: PLC2701  # Import of private variables.
-        _LOGICAL_OPERATION_TEMPLATES,  # noqa: PLC2701
+    from jace.translator.primitive_translators.arithmetic_logical_translators import (  # noqa: PLC0415  [import-outside-top-level]
+        _ARITMETIC_OPERATION_TEMPLATES,  # noqa: PLC2701 [import-private-name]
+        _LOGICAL_OPERATION_TEMPLATES,  # noqa: PLC2701 [import-private-name]
     )
 
     # Remove all non ALU translators from the registry

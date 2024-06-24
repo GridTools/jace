@@ -38,5 +38,5 @@ def test_mismatch_in_datatype_calling() -> None:
     callee = testee.lower(a1).compile()
 
     # But calling with the second type
-    with pytest.raises(Exception):  # noqa: B017, PT011 # Unknown exception.
+    with pytest.raises(Exception):  # noqa: B017, PT011 [assert-raises-exception, pytest-raises-too-broad]  # Unknown exception.
         _ = callee(a2)

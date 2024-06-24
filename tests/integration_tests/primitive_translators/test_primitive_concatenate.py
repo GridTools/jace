@@ -50,7 +50,7 @@ def test_cat_nd() -> None:
             input_arrays.append(testutil.make_array(shape))
 
         def testee(inputs: list[np.ndarray]) -> np.ndarray | jax.Array:
-            return jax.lax.concatenate(inputs, cat_dim)  # noqa: B023  # Iteration variable capture.
+            return jax.lax.concatenate(inputs, cat_dim)  # noqa: B023 [function-uses-loop-variable]
 
         ref = testee(input_arrays)
         res = jace.jit(testee)(input_arrays)

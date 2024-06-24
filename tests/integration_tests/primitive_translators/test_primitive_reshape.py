@@ -9,7 +9,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from collections.abc import Sequence
 
 import jax
 import numpy as np
@@ -19,10 +19,6 @@ from jax import numpy as jnp
 import jace
 
 from tests import util as testutil
-
-
-if TYPE_CHECKING:
-    from collections.abc import Sequence
 
 
 def _test_impl_reshaping(
