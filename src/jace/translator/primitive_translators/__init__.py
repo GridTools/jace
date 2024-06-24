@@ -17,6 +17,7 @@ from .concatenate_translator import ConcatenateTranslator
 from .convert_element_type_translator import ConvertElementTypeTranslator
 from .copy_translator import CopyTranslator, DevicePutTranslator
 from .iota_translator import IotaTranslator
+from .pjit_translator import PJITTranslator
 from .reshape_translator import ReshapeTranslator
 from .select_n_translator import SelectNTranslator
 from .slicing import SlicingTranslator
@@ -32,6 +33,7 @@ __all__ = [
     "DevicePutTranslator",
     "IotaTranslator",
     "LogicalOperationTranslator",
+    "PJITTranslator",
     "ReshapeTranslator",
     "SelectNTranslator",
     "SlicingTranslator",
