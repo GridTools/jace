@@ -110,7 +110,7 @@ class CompiledJaxprSDFG:
         input_names: Names of the SDFG variables used as inputs.
         out_names: Names of the SDFG variables used as outputs.
 
-    Notes:
+    Note:
         Currently the strides of the input arguments must match the ones that were used
         for lowering the SDFG.
         In DaCe the return values are allocated on a per `CompiledSDFG` basis. Thus

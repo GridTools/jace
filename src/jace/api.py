@@ -30,7 +30,7 @@ class JITOptions(TypedDict, total=False):
     """
     All known options to `jace.jit` that influence tracing.
 
-    Notes:
+    Note:
         Currently there are no known options, but essentially it is a subset of some
         of the options that are supported by `jax.jit` together with some additional
         JaCe specific ones.

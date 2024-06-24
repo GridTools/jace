@@ -66,7 +66,7 @@ class JaxprTranslationBuilder:
     Args:
         primitive_translators: Primitive translators to use in the translation.
 
-    Notes:
+    Note:
         After a translation has been performed the translator object can be used
         again.
     """
@@ -147,7 +147,7 @@ class JaxprTranslationBuilder:
             assignments: Symbol assignments on the `InterstateEdge`.
             prev_state: Alternative state at which we append.
 
-        Notes:
+        Note:
             It is potentially dangerous to not append to the current terminal
             state, as a canonical SDFG only has one sink state. If this is done
             the user has to ensure, that at the end of the processing the SDFG
@@ -180,7 +180,7 @@ class JaxprTranslationBuilder:
         """
         Get all data descriptors that are currently known to the SDFG.
 
-        Notes:
+        Note:
             Essentially a shorthand and preferred way for `self.sdfg.arrays`.
             For getting a specific data descriptor use `self.get_array()`.
         """
@@ -443,7 +443,7 @@ class JaxprTranslationBuilder:
         """
         Creates the input variables of `jaxpr`.
 
-        Notes:
+        Note:
             The function will populate the `input_names` member of the current context.
         """
         assert self._ctx.input_names is None
@@ -586,7 +586,7 @@ class JaxprTranslationBuilder:
         Args:
             jaxpr: The Jaxpr to translate.
 
-        Notes:
+        Note:
             Equations that store into drop variables, i.e. with name `_`,
             will be ignored.
         """

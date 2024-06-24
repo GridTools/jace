@@ -135,7 +135,7 @@ def make_primitive_translator(
     that it satisfy the `PrimitiveTranslator` protocol. However, it does not add
     it to the registry, for that `register_primitive_translator()` has to be used.
 
-    Notes:
+    Note:
         This function can also be used as decorator.
     """
 
