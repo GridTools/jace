@@ -184,8 +184,11 @@ def broadcast_input(request) -> tuple[np.ndarray, np.ndarray]:
     return tuple(testutil.make_array(shape) for shape in request.param)  # type: ignore[return-value] # can not deduce that it is only size 2.
 
 
-def _perform_alt_test(testee: Callable, *args: Any) -> None:
-    """General function that just performs the test."""
+def _perform_alt_test(testee: Callable, *args: Any) -> Any:
+    """General function that just performs the test.
+
+    The function returns the JaCe result.
+    """
     wrapped = jace.jit(testee)
 
     ref = testee(*args)
@@ -197,6 +200,7 @@ def _perform_alt_test(testee: Callable, *args: Any) -> None:
         assert ref.shape == res.shape
     assert ref.dtype == res.dtype
     assert np.allclose(ref, res), f"Expected '{ref.tolist()}' got '{res.tolist()}'"
+    return res
 
 
 # <------------ Tests for `MappedOperationTranslatorBase`
@@ -345,7 +349,10 @@ def test_alt_ternary_clamp() -> None:
     max_ = testutil.make_array(shape) / 2.0 + 0.5
     val_ = testutil.make_array(shape)
 
-    _perform_alt_test(testee, min_, val_, max_)
+    jace_res = _perform_alt_test(testee, min_, val_, max_)
+
+    # Ensure that all branches were taken.
+    assert not any(np.all(jace_res == x) for x in (min_, val_, max_))
 
 
 def test_alt_compare_operation(
