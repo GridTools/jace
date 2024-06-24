@@ -24,6 +24,52 @@ if TYPE_CHECKING:
     from jax._src import core as jax_core
 
 
+def _promote_literals_to_constants(
+    builder: translator.JaxprTranslationBuilder,
+    var_names: Sequence[str | None],
+    jax_vars: Sequence[jax_core.Atom],
+    name_pattern: str,
+) -> list[str]:
+    """
+    Promotes all literals in `var_names` to DaCe constants and add them to the SDFG.
+
+    The function assumes that `var_names` are the SDFG variables equivalents of
+    `jax_vars`, as by convention `None` indicates a literal. The function will create
+    a constant for each literal and return `var_names` cleared of all literals.
+    For naming the variables the function will use `name_pattern`.
+
+    Args:
+        builder: The builder that is used for translation.
+        var_names: Names of the SDFG variables, `None` indicates a literal.
+        jax_vars: The JAX variables, in the same order than `var_names`.
+        name_pattern: A pattern to generate a unique name for the variables.
+
+    Todo:
+        Is a constant the right idea or should we generate a symbol?
+    """
+    promoted_var_names: list[str] = []
+    for i, var_name in enumerate(var_names):
+        if var_name is None:
+            promoted_var_name = f"__const_{name_pattern}_literal_promotion_{i}"
+            jax_var = jax_vars[i]
+            promoted_jace_var = util.JaCeVar.from_atom(
+                jax_var=jax_var,
+                name=promoted_var_name,
+            )
+            builder.add_array(promoted_jace_var)
+            builder.sdfg.add_constant(
+                promoted_var_name,
+                util.get_jax_literal_value(jax_var),
+                builder.arrays[promoted_var_name],
+            )
+
+        else:
+            # Already an SDFG variable, so nothing to do.
+            promoted_var_name = var_name
+        promoted_var_names.append(promoted_var_name)
+    return promoted_var_names
+
+
 @translator.register_primitive_translator()
 @translator.make_primitive_translator("pjit")
 def PJITTranslator(  # noqa: N802 [invalid-function-name]
@@ -77,27 +123,13 @@ def PJITTranslator(  # noqa: N802 [invalid-function-name]
     # Name in SDFG must be unique, thus we mangle it, furthermore, we have to clean it.
     sdfg_name = f"pjit_{re.subn('[^a-zA-Z0-9_]', '_', pjit_name)[0]}__{'_'.join(out_var_names)}"
 
-    # If needed turn literal inputs into constants.
-    # TODO(phimuell): Is using constants really a good idea?
-    if any(in_var_name is None for in_var_name in in_var_names):
-        final_input_names: list[str] = []
-        for i, in_var_name in enumerate(in_var_names):
-            if in_var_name is None:
-                new_input_name = f"__const_{sdfg_name}_literal_input_{i}"
-                jax_input: jax_core.Atom = eqn.invars[i]
-                new_input_var = util.JaCeVar.from_atom(
-                    jax_var=jax_input,
-                    name=new_input_name,
-                )
-                builder.add_array(new_input_var)
-                builder.sdfg.add_constant(
-                    new_input_name,
-                    util.get_jax_literal_value(jax_input),
-                    builder.arrays[new_input_name],
-                )
-                in_var_name = new_input_name  # noqa: PLW2901 [redefined-loop-name]
-            final_input_names.append(in_var_name)
-        in_var_names = final_input_names
+    # Ensure that all inputs are SDFG variables
+    final_input_names = _promote_literals_to_constants(
+        builder=builder,
+        var_names=in_var_names,
+        jax_vars=eqn.invars,
+        name_pattern=sdfg_name,
+    )
 
     # Now get the translated SDFG.
     nested_context: translator.TranslationContext = builder.translate_jaxpr(
@@ -110,6 +142,6 @@ def PJITTranslator(  # noqa: N802 [invalid-function-name]
         state=eqn_state,
         child_ctx=nested_context,
         parent_ctx=builder._ctx,
-        in_var_names=in_var_names,  # type: ignore[arg-type]  # Is checked above.
+        in_var_names=final_input_names,
         out_var_names=out_var_names,
     )
