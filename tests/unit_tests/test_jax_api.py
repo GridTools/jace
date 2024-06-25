@@ -76,7 +76,6 @@ def test_composition_itself() -> None:
         assert np.allclose(ref, res), f"f: Expected '{ref}', got '{res}'."
 
 
-@pytest.mark.skip(reason="Nested Jaxpr are not handled.")
 def test_composition_with_jax() -> None:
     """Tests if JaCe can interact with JAX and vice versa."""
 
@@ -95,7 +94,6 @@ def test_composition_with_jax() -> None:
     assert np.allclose(jace_fun(a, b, c), jax_fun(a, b, c))
 
 
-@pytest.mark.skip(reason="Nested Jaxpr are not handled.")
 def test_composition_with_jax_2() -> None:
     """Second test if JaCe can interact with JAX and vice versa."""
 

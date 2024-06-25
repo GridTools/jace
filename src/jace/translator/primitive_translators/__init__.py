@@ -14,6 +14,7 @@ from .arithmetic_logical_translators import (
 )
 from .broadcast_in_dim_translator import BroadcastInDimTranslator
 from .concatenate_translator import ConcatenateTranslator
+from .conditions import condition_translator
 from .convert_element_type_translator import ConvertElementTypeTranslator
 from .copy_translator import CopyTranslator, DevicePutTranslator
 from .iota_translator import IotaTranslator
@@ -38,4 +39,5 @@ __all__ = [
     "SelectNTranslator",
     "SlicingTranslator",
     "SqueezeTranslator",
+    "condition_translator",
 ]

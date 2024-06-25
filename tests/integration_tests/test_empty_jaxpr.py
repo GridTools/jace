@@ -76,7 +76,6 @@ def test_empty_scalar() -> None:
     assert np.all(wrapped(a) == a)
 
 
-@pytest.mark.skip(reason="Nested Jaxpr are not handled.")
 def test_empty_nested() -> None:
     @jace.jit
     def wrapped(a: np.float64) -> np.float64:
