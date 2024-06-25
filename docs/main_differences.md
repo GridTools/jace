@@ -13,6 +13,7 @@ We will now list the main differences between them, furthermore, you should also
 - Currently JaCe is not able to run distributed (will be lifted later).
 - Currently not all primitives are supported.
 - JaCe does not return `jax.Array` instances, but NumPy/CuPy arrays.
+- The execution is not asynchronous.
 
 ### DaCe vs. JaCe:
 
