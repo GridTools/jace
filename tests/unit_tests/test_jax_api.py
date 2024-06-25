@@ -213,6 +213,7 @@ def test_disabled_x64() -> None:
     )
 
 
+@pytest.mark.usefixtures("_enable_jit")
 def test_tracing_detection() -> None:
     """Tests our ability to detect if tracing is going on."""
     expected_tracing_state = False
