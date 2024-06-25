@@ -27,12 +27,12 @@ if TYPE_CHECKING:
     from jace import api
 
 _P = ParamSpec("_P")
-_ReturnType = TypeVar("_ReturnType")
+_R = TypeVar("_R")
 
 
 @overload
 def make_jaxpr(
-    fun: Callable[_P, _ReturnType],
+    fun: Callable[_P, _R],
     trace_options: api.JITOptions,
     return_out_tree: Literal[True],
 ) -> Callable[_P, tuple[jax_core.ClosedJaxpr, jax_tree.PyTreeDef]]: ...
@@ -40,7 +40,7 @@ def make_jaxpr(
 
 @overload
 def make_jaxpr(
-    fun: Callable[_P, _ReturnType],
+    fun: Callable[_P, _R],
     trace_options: api.JITOptions,
     return_out_tree: Literal[False] = False,
 ) -> Callable[_P, jax_core.ClosedJaxpr]: ...

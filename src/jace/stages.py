@@ -68,10 +68,10 @@ Stage = Union["JaCeWrapped", "JaCeLowered", "JaCeCompiled"]
 #  changing that, but from a semantic point they behave the same so it should not
 #  matter too much.
 _P = ParamSpec("_P")
-_ReturnType = TypeVar("_ReturnType")
+_R = TypeVar("_R")
 
 
-class JaCeWrapped(tcache.CachingStage["JaCeLowered"], Generic[_P, _ReturnType]):
+class JaCeWrapped(tcache.CachingStage["JaCeLowered"], Generic[_P, _R]):
     """
     A function ready to be specialized, lowered, and compiled.
 
@@ -101,16 +101,17 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"], Generic[_P, _ReturnType]):
         which is implicitly and temporary activated during tracing.
     """
 
-    _fun: Callable[_P, _ReturnType]
+    _fun: Callable[_P, _R]
     _primitive_translators: dict[str, translator.PrimitiveTranslator]
     _jit_options: api.JITOptions
 
     def __init__(
         self,
-        fun: Callable[_P, _ReturnType],
+        fun: Callable[_P, _R],
         primitive_translators: Mapping[str, translator.PrimitiveTranslator],
         jit_options: api.JITOptions,
     ) -> None:
+        # TODO(phimuell): Test if this restriction is needed.
         assert all(
             param.default is param.empty for param in inspect.signature(fun).parameters.values()
         )
@@ -119,7 +120,7 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"], Generic[_P, _ReturnType]):
         self._jit_options = {**jit_options}
         self._fun = fun
 
-    def __call__(self, *args: _P.args, **kwargs: _P.kwargs) -> _ReturnType:
+    def __call__(self, *args: _P.args, **kwargs: _P.kwargs) -> _R:
         """
         Executes the wrapped function, lowering and compiling as needed in one step.
 
@@ -141,7 +142,7 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"], Generic[_P, _ReturnType]):
         return compiled(*args, **kwargs)
 
     @tcache.cached_transition
-    def lower(self, *args: _P.args, **kwargs: _P.kwargs) -> JaCeLowered[_ReturnType]:
+    def lower(self, *args: _P.args, **kwargs: _P.kwargs) -> JaCeLowered[_R]:
         """
         Lower the wrapped computation for the given arguments.
 
@@ -204,7 +205,7 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"], Generic[_P, _ReturnType]):
         )
 
 
-class JaCeLowered(tcache.CachingStage["JaCeCompiled"], Generic[_ReturnType]):
+class JaCeLowered(tcache.CachingStage["JaCeCompiled"], Generic[_R]):
     """
     Represents the original computation as an SDFG.
 
@@ -243,7 +244,7 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"], Generic[_ReturnType]):
         self._jaxpr = jaxpr
 
     @tcache.cached_transition
-    def compile(self, compiler_options: CompilerOptions | None = None) -> JaCeCompiled[_ReturnType]:
+    def compile(self, compiler_options: CompilerOptions | None = None) -> JaCeCompiled[_R]:
         """
         Optimize and compile the lowered SDFG using `compiler_options`.
 
@@ -302,7 +303,7 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"], Generic[_ReturnType]):
         )
 
 
-class JaCeCompiled(Generic[_ReturnType]):
+class JaCeCompiled(Generic[_R]):
     """
     Compiled version of the SDFG.
 
@@ -337,7 +338,7 @@ class JaCeCompiled(Generic[_ReturnType]):
         self._compiled_sdfg = compiled_sdfg
         self._out_tree = out_tree
 
-    def __call__(self, *args: Any, **kwargs: Any) -> _ReturnType:
+    def __call__(self, *args: Any, **kwargs: Any) -> _R:
         """
         Calls the embedded computation.
 

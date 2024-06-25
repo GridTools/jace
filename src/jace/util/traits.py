@@ -80,8 +80,8 @@ def get_strides_for_dace(obj: Any) -> tuple[int, ...] | None:
     Get the strides of `obj` in a DaCe compatible format.
 
     The function returns the strides in number of elements, as it is used inside
-    DaCe and not in bytes as it is inside NumPy. As in NumPy and DaCe the function
-    returns `None` to indicate standard C order.
+    DaCe and not in bytes as it is inside NumPy. As in DaCe `None` is returned to
+    indicate standard C order.
 
     Note:
         If `obj` is not array like an error is generated.
