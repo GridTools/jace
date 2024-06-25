@@ -23,8 +23,7 @@ from jace import util
 
 if TYPE_CHECKING:
     import numpy as np
-    from dace.codegen import compiled_sdfg
-    from dace.codegen.compiled_sdfg import CompiledSDFG
+    from dace.codegen import compiled_sdfg as dace_csdfg
 
 
 @dataclasses.dataclass(frozen=True, kw_only=True)
@@ -100,12 +99,12 @@ class CompiledJaxprSDFG:
     `compile_jaxpr_sdfg()`.
 
     Args:
-        compiled_sdfg: The `CompiledSDFG` object.
+        dace_csdfg: The `CompiledSDFG` object.
         input_names: Names of the SDFG variables used as inputs.
         out_names: Names of the SDFG variables used as outputs.
 
     Attributes:
-        compiled_sdfg: The `CompiledSDFG` object.
+        dace_csdfg: The `CompiledSDFG` object.
         sdfg: The encapsulated SDFG object.
         input_names: Names of the SDFG variables used as inputs.
         out_names: Names of the SDFG variables used as outputs.
@@ -119,13 +118,13 @@ class CompiledJaxprSDFG:
         arrays of length one.
     """
 
-    compiled_sdfg: compiled_sdfg.CompiledSDFG
+    csdfg: dace_csdfg.CompiledSDFG
     input_names: tuple[str, ...]
     out_names: tuple[str, ...]
 
     @property
     def sdfg(self) -> dace.SDFG:  # noqa: D102 [undocumented-public-method]
-        return self.compiled_sdfg.sdfg
+        return self.csdfg.sdfg
 
     def __call__(
         self,
@@ -138,7 +137,7 @@ class CompiledJaxprSDFG:
         the output.
 
         Args:
-            compiled_sdfg: The compiled SDFG to call.
+            dace_csdfg: The compiled SDFG to call.
             flat_call_args: Flattened input arguments.
         """
         if len(self.input_names) != len(flat_call_args):
@@ -164,25 +163,24 @@ class CompiledJaxprSDFG:
             else:
                 sdfg_call_args[out_name] = dace_data.make_array_from_descriptor(sdfg_array)
 
-        assert len(sdfg_call_args) == len(self.compiled_sdfg.argnames), (
+        assert len(sdfg_call_args) == len(self.csdfg.argnames), (
             "Failed to construct the call arguments,"
-            f" expected {len(self.compiled_sdfg.argnames)} but got {len(flat_call_args)}."
-            f"\nExpected: {self.compiled_sdfg.argnames}\nGot: {list(sdfg_call_args.keys())}"
+            f" expected {len(self.csdfg.argnames)} but got {len(flat_call_args)}."
+            f"\nExpected: {self.csdfg.argnames}\nGot: {list(sdfg_call_args.keys())}"
         )
 
         # Calling the SDFG
         with dace.config.temporary_config():
             dace.Config.set("compiler", "allow_view_arguments", value=True)
-            self.compiled_sdfg(**sdfg_call_args)
+            self.csdfg(**sdfg_call_args)
 
         return [sdfg_call_args[out_name] for out_name in self.out_names]
 
 
-def compile_jaxpr_sdfg(tsdfg: TranslatedJaxprSDFG) -> CompiledJaxprSDFG:
+def compile_jaxpr_sdfg(tsdfg: TranslatedJaxprSDFG) -> dace_csdfg.CompiledJaxprSDFG:
     """Compile `tsdfg` and return a `CompiledJaxprSDFG` object with the result."""
     if any(  # We do not support the DaCe return mechanism
-        array_name.startswith("__return")
-        for array_name in tsdfg.sdfg.arrays.keys()  # noqa: SIM118 [in-dict-keys]  # We can not use `in` because we are not interested in `my_mangled_variable__return_zulu`!
+        array_name.startswith("__return") for array_name in tsdfg.sdfg.arrays
     ):
         raise ValueError("Only support SDFGs without '__return' members.")
     if tsdfg.sdfg.free_symbols:  # This is a simplification that makes our life simple.
@@ -211,13 +209,11 @@ def compile_jaxpr_sdfg(tsdfg: TranslatedJaxprSDFG) -> CompiledJaxprSDFG:
             dace.Config.set("default_build_folder", value=pathlib.Path(".jacecache").resolve())
             sdfg._recompile = True
             sdfg._regenerate_code = True
-            compiled_sdfg: CompiledSDFG = sdfg.compile()
+            csdfg: dace_csdfg.CompiledSDFG = sdfg.compile()
 
     finally:
         sdfg.name = original_sdfg_name
         sdfg._recompile = original_recompile
         sdfg._regenerate_code = original_regenerate_code
 
-    return CompiledJaxprSDFG(
-        compiled_sdfg=compiled_sdfg, input_names=tsdfg.input_names, out_names=tsdfg.out_names
-    )
+    return CompiledJaxprSDFG(csdfg=csdfg, input_names=tsdfg.input_names, out_names=tsdfg.out_names)

@@ -23,7 +23,7 @@ __all__ = ["JITOptions", "grad", "jacfwd", "jacrev", "jit"]
 
 # Used for type annotation, see the notes in `jace.stages` for more.
 _P = ParamSpec("_P")
-_ReturnType = TypeVar("_ReturnType")
+_R = TypeVar("_R")
 
 
 class JITOptions(TypedDict, total=False):
@@ -43,27 +43,24 @@ def jit(
     /,
     primitive_translators: Mapping[str, translator.PrimitiveTranslator] | None = None,
     **kwargs: Unpack[JITOptions],
-) -> Callable[[Callable[_P, _ReturnType]], stages.JaCeWrapped[_P, _ReturnType]]: ...
+) -> Callable[[Callable[_P, _R]], stages.JaCeWrapped[_P, _R]]: ...
 
 
 @overload
 def jit(
-    fun: Callable[_P, _ReturnType],
+    fun: Callable[_P, _R],
     /,
     primitive_translators: Mapping[str, translator.PrimitiveTranslator] | None = None,
     **kwargs: Unpack[JITOptions],
-) -> stages.JaCeWrapped[_P, _ReturnType]: ...
+) -> stages.JaCeWrapped[_P, _R]: ...
 
 
 def jit(
-    fun: Callable[_P, _ReturnType] | None = None,
+    fun: Callable[_P, _R] | None = None,
     /,
     primitive_translators: Mapping[str, translator.PrimitiveTranslator] | None = None,
     **kwargs: Unpack[JITOptions],
-) -> (
-    Callable[[Callable[_P, _ReturnType]], stages.JaCeWrapped[_P, _ReturnType]]
-    | stages.JaCeWrapped[_P, _ReturnType]
-):
+) -> Callable[[Callable[_P, _R]], stages.JaCeWrapped[_P, _R]] | stages.JaCeWrapped[_P, _R]:
     """
     JaCe's replacement for `jax.jit` (just-in-time) wrapper.
 
@@ -87,7 +84,7 @@ def jit(
             f"The following arguments to 'jace.jit' are not yet supported: {', '.join(kwargs)}."
         )
 
-    def wrapper(f: Callable[_P, _ReturnType]) -> stages.JaCeWrapped[_P, _ReturnType]:
+    def wrapper(f: Callable[_P, _R]) -> stages.JaCeWrapped[_P, _R]:
         jace_wrapper = stages.JaCeWrapped(
             fun=f,
             primitive_translators=(

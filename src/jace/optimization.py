@@ -68,7 +68,8 @@ def jace_optimize(tsdfg: tjsdfg.TranslatedJaxprSDFG, **kwargs: Unpack[CompilerOp
             in the SDFG to `AllocationLifetime.Persistent`, i.e. keep them allocated
             between different invocations.
     """
-    # Currently this function exists primarily for the same of existing.
+    # TODO(phimuell): Implement the functionality.
+    # Currently this function exists primarily for the sake of existing.
 
     simplify = kwargs.get("simplify", False)
     auto_optimize = kwargs.get("auto_optimize", False)
