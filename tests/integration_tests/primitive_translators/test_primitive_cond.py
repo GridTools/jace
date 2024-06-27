@@ -59,7 +59,7 @@ def _perform_cond_test(
         ref = testee(val, branch_args)
 
         assert np.all(res == ref)
-        assert ref.shape == res.shape
+        assert (1,) if ref.shape == () else ref.shape == res.shape
 
 
 def test_cond_full_branches() -> None:
@@ -72,6 +72,19 @@ def test_cond_full_branches() -> None:
         )
 
     branch_args = tuple(testutil.make_array(1) for _ in range(2))
+    _perform_cond_test(testee, branch_args)
+
+
+def test_cond_scalar_brnaches() -> None:
+    def testee(val: np.float64, branch_args: tuple[np.float64, np.float64]) -> np.float64:
+        return jax.lax.cond(
+            val < 0.5,
+            lambda arg: arg[0] + 2.0,
+            lambda arg: arg[1] + 3.0,
+            branch_args,
+        )
+
+    branch_args = tuple(testutil.make_array(()) for _ in range(2))
     _perform_cond_test(testee, branch_args)
 
 
