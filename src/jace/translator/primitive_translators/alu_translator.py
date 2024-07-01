@@ -10,7 +10,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Final, cast
+from collections.abc import Sequence
+from typing import Any, Final, cast
 
 import dace
 import numpy as np
@@ -18,10 +19,6 @@ from jax import core as jax_core
 from typing_extensions import override
 
 from jace import translator, util
-
-
-if TYPE_CHECKING:
-    from collections.abc import Sequence
 
 
 class ALUTranslator(translator.PrimitiveTranslator):
@@ -61,15 +58,15 @@ class ALUTranslator(translator.PrimitiveTranslator):
             builder:         The builder object of the translation.
             in_var_names:   List of the names of the arrays created inside the SDFG for the inpts or 'None' in case of a literal.
             out_var_names:  List of the names of the arrays created inside the SDFG for the outputs.
-            eqn:            The Jax equation that is translated.
+            eqn:            The JAX equation that is translated.
             eqn_state:      State into which the primitive's SDFG representation is constructed.
         """
         assert self._prim_name == eqn.primitive.name
 
         # Determine what kind of input we got and how we should proceed.
         is_scalar = len(util.get_jax_var_shape(eqn.outvars[0])) == 0
-        inp_scalars = [len(util.get_jax_var_shape(Inp)) == 0 for i, Inp in enumerate(eqn.invars)]
-        has_scalars_as_inputs = any(inp_scalars)
+        input_scalars = [len(util.get_jax_var_shape(Inp)) == 0 for i, Inp in enumerate(eqn.invars)]
+        has_scalars_as_inputs = any(input_scalars)
         has_some_literals = any(x is None for x in in_var_names)
         inps_same_shape = all(
             util.get_jax_var_shape(eqn.invars[0]) == util.get_jax_var_shape(eqn.invars[i])
@@ -101,19 +98,23 @@ class ALUTranslator(translator.PrimitiveTranslator):
         else:
             # This is the general broadcasting case
             #  We assume that both inputs and the output have the same rank but different sizes in each dimension.
-            #  It seems that Jax ensures this.
+            #  It seems that JAX ensures this.
             #  We further assume that if the size in a dimension differs then one must have size 1.
             #  This is the size we broadcast over, i.e. conceptually replicated.
             out_shps = tuple(util.get_jax_var_shape(eqn.outvars[0]))  # Shape of the output
-            inp_shpl = tuple(util.get_jax_var_shape(eqn.invars[0]))  # Shape of the left/first input
-            inp_shpr = tuple(
+            input_shpl = tuple(
+                util.get_jax_var_shape(eqn.invars[0])
+            )  # Shape of the left/first input
+            input_shpr = tuple(
                 util.get_jax_var_shape(eqn.invars[1])
             )  # Shape of the right/second input
 
-            if not ((len(inp_shpl) == len(inp_shpr)) and (len(out_shps) == len(inp_shpr))):
+            if not ((len(input_shpl) == len(input_shpr)) and (len(out_shps) == len(input_shpr))):
                 raise NotImplementedError("Can not broadcast over different ranks.")
 
-            for dim, (shp_lft, shp_rgt, out_shp) in enumerate(zip(inp_shpl, inp_shpr, out_shps)):
+            for dim, (shp_lft, shp_rgt, out_shp) in enumerate(
+                zip(input_shpl, input_shpr, out_shps)
+            ):
                 if shp_lft == shp_rgt:
                     assert out_shp == shp_lft
                 elif shp_lft == 1:
@@ -139,7 +140,7 @@ class ALUTranslator(translator.PrimitiveTranslator):
             if in_var_names[i] is None:  # Literal: No input needed.
                 tskl_inputs.append((None, None))
                 continue
-            if inp_scalars[i]:  # Scalar
+            if input_scalars[i]:  # Scalar
                 assert len(dims_to_bcast) == 0
                 i_memlet = dace.Memlet.simple(in_var_names[i], "0")
             else:  # Array: We may have to broadcast
