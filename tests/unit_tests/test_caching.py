@@ -214,25 +214,23 @@ def test_caching_compilation() -> None:
 
 def test_caching_compilation_options() -> None:
     """Tests if the global optimization managing works."""
-    original_compile_options = stages.get_active_compiler_options()
-    try:
-        lowering_cnt = [0]
+    lowering_cnt = [0]
 
-        @jace.jit
-        def wrapped(a: float) -> float:
-            lowering_cnt[0] += 1
-            return a + 1.0
+    @jace.jit
+    def wrapped(a: float) -> float:
+        lowering_cnt[0] += 1
+        return a + 1.0
 
-        lower_cache = wrapped._cache
-        lowered = wrapped.lower(1.0)
-        compile_cache = lowered._cache
+    lower_cache = wrapped._cache
+    lowered = wrapped.lower(1.0)
+    compile_cache = lowered._cache
 
-        assert len(lower_cache) == 1
-        assert len(compile_cache) == 0
-        assert lowering_cnt[0] == 1
+    assert len(lower_cache) == 1
+    assert len(compile_cache) == 0
+    assert lowering_cnt[0] == 1
 
-        # Using the first set of options.
-        stages.update_active_compiler_options(optimization.NO_OPTIMIZATIONS)
+    # Using the first set of options.
+    with stages.temporary_compiler_options(optimization.NO_OPTIMIZATIONS):
         _ = wrapped(2.0)
 
         # Except from one entry in the compile cache, nothing should have changed.
@@ -241,18 +239,15 @@ def test_caching_compilation_options() -> None:
         assert compile_cache.front()[0].stage_id == id(lowered)
         assert lowering_cnt[0] == 1
 
-        # Now we change the options again which then will lead to another compilation,
-        #  but not to another lowering.
-        stages.update_active_compiler_options(optimization.DEFAULT_OPTIMIZATIONS)
+    # Now we change the options again which then will lead to another compilation,
+    #  but not to another lowering.
+    with stages.temporary_compiler_options(optimization.DEFAULT_OPTIMIZATIONS):
         _ = wrapped(2.0)
 
         assert len(lower_cache) == 1
         assert len(compile_cache) == 2
         assert compile_cache.front()[0].stage_id == id(lowered)
         assert lowering_cnt[0] == 1
-
-    finally:
-        stages.update_active_compiler_options(original_compile_options)
 
 
 def test_caching_dtype() -> None:
@@ -396,7 +391,7 @@ def test_caching_strides() -> None:
         return a + 10.0
 
     shape = (10, 100, 1000)
-    array_c = testutil.make_array(shape, order="c")
+    array_c = testutil.make_array(shape, order="C")
     array_f = np.array(array_c, copy=True, order="F")
 
     # First we compile run it with c strides.

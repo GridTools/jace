@@ -548,8 +548,8 @@ def test_builder_multiple_return_values() -> None:
 
     assert len(lowered._translated_sdfg.input_names) == 2
     assert len(compiled._compiled_sdfg.input_names) == 2
-    assert len(lowered._translated_sdfg.out_names) == 2
-    assert len(compiled._compiled_sdfg.out_names) == 2
+    assert len(lowered._translated_sdfg.output_names) == 2
+    assert len(compiled._compiled_sdfg.output_names) == 2
     assert isinstance(res, tuple), f"Expected 'tuple', but got '{type(res).__name__}'."
     assert len(res) == 2
     assert np.allclose(ref, res)

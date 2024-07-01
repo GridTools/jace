@@ -98,6 +98,5 @@ def _set_compile_options() -> Generator[None, None, None]:
     perform any optimizations.
     Please not that certain tests might override this fixture.
     """
-    initial_compile_options = stages.update_active_compiler_options(optimization.NO_OPTIMIZATIONS)
-    yield
-    stages.update_active_compiler_options(initial_compile_options)
+    with stages.temporary_compiler_options(optimization.NO_OPTIMIZATIONS):
+        yield
