@@ -82,6 +82,7 @@ def make_jaxpr(
         raise NotImplementedError(
             f"Not supported tracing options: {', '.join(f'{k}' for k in trace_options)}"
         )
+    # TODO(phimuell): Test if this restriction is needed.
     assert all(param.default is param.empty for param in inspect.signature(fun).parameters.values())
 
     def tracer_impl(

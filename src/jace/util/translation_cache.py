@@ -44,7 +44,7 @@ The caches are on a per stage and not per instant basis.
 P = ParamSpec("P")
 NextStage = TypeVar("NextStage", bound="stages.Stage")
 TransitionFunction: TypeAlias = "Callable[Concatenate[CachingStage[NextStage], P], NextStage]"
-CachingStageType = TypeVar("CachingStageType", bound="CachingStage")
+CachingStageT = TypeVar("CachingStageT", bound="CachingStage")
 
 # Type to describe a single argument either in an abstract or concrete way.
 CallArgsSpec: TypeAlias = tuple["_AbstractCallArgument | Hashable"]
@@ -91,7 +91,7 @@ class CachingStage(Generic[NextStage]):
 
 
 def cached_transition(
-    transition: Callable[Concatenate[CachingStageType, P], NextStage],
+    transition: Callable[Concatenate[CachingStageT, P], NextStage],
 ) -> Callable[Concatenate[CachingStage[NextStage], P], NextStage]:
     """
     Decorator for making the transition function of the stage cacheable.
@@ -107,7 +107,7 @@ def cached_transition(
     """
 
     @functools.wraps(transition)
-    def transition_wrapper(self: CachingStageType, *args: P.args, **kwargs: P.kwargs) -> NextStage:
+    def transition_wrapper(self: CachingStageT, *args: P.args, **kwargs: P.kwargs) -> NextStage:
         flat_call_args, in_tree = jax_tree.tree_flatten((args, kwargs))
         key = self._make_call_description(flat_call_args=flat_call_args, in_tree=in_tree)
         if key not in self._cache:
@@ -223,10 +223,10 @@ class StageTransformationSpec:
 
 
 #: Denotes the stage that is stored inside the cache.
-StageType = TypeVar("StageType", bound="stages.Stage")
+StageT = TypeVar("StageT", bound="stages.Stage")
 
 
-class StageCache(Generic[StageType]):
+class StageCache(Generic[StageT]):
     """
     Simple LRU cache to cache the results of the stage transition function.
 
@@ -235,7 +235,7 @@ class StageCache(Generic[StageType]):
     """
 
     # The most recently used entry is at the end of the `OrderedDict`.
-    _memory: collections.OrderedDict[StageTransformationSpec, StageType]
+    _memory: collections.OrderedDict[StageTransformationSpec, StageT]
     _capacity: int
 
     def __init__(
@@ -248,13 +248,13 @@ class StageCache(Generic[StageType]):
     def __contains__(self, key: StageTransformationSpec) -> bool:
         return key in self._memory
 
-    def __getitem__(self, key: StageTransformationSpec) -> StageType:
+    def __getitem__(self, key: StageTransformationSpec) -> StageT:
         if key not in self:
             raise KeyError(f"Key '{key}' is unknown.")
         self._memory.move_to_end(key, last=True)
         return self._memory[key]
 
-    def __setitem__(self, key: StageTransformationSpec, res: StageType) -> None:
+    def __setitem__(self, key: StageTransformationSpec, res: StageT) -> None:
         if key in self:
             self._memory.move_to_end(key, last=True)
             self._memory[key] = res
@@ -287,7 +287,7 @@ class StageCache(Generic[StageType]):
     def capacity(self) -> int:  # noqa: D102 [undocumented-public-method]
         return self._capacity
 
-    def front(self) -> tuple[StageTransformationSpec, StageType]:
+    def front(self) -> tuple[StageTransformationSpec, StageT]:
         """Returns the front of the cache, i.e. its newest entry."""
         return next(reversed(self._memory.items()))
 

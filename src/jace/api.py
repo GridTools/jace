@@ -21,7 +21,6 @@ from jace import stages, translator
 
 __all__ = ["JITOptions", "grad", "jacfwd", "jacrev", "jit"]
 
-# Used for type annotation, see the notes in `jace.stages` for more.
 _P = ParamSpec("_P")
 _R = TypeVar("_R")
 

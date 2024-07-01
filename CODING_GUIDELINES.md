@@ -36,7 +36,7 @@ Inside JaCe the following convention is applied:
 
 - If the module has a standard abbreviation use that, e.g. `import numpy as np`.
 - For a JaCe module use:
-  - If the module name is only a single word use it directly, e.g. `from jace import translator`
+  - If the module name is only a single word use it directly, e.g. `from jace import translator`.
   - If the module name consists of multiple words use the last word prefixed with the first letters of the others, e.g. `from jace.translator import post_translator as ptranslator` or `from jace import translated_jaxpr_sdfg as tjsdfg`.
   - In case of a clash use your best judgment.
 - For an external module use the rule above, but prefix the name with the main package's name, e.g. `from dace.codegen import compiled_sdfg as dace_csdfg`.
@@ -116,7 +116,7 @@ We generate the API documentation automatically from the docstrings using [Sphin
 Sphinx supports the [reStructuredText][sphinx-rest] (reST) markup language for defining additional formatting options in the generated documentation, however section [_3.8 Comments and Docstrings_](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings) of the Google Python Style Guide does not specify how to use markups in docstrings. As a result, we decided to forbid reST markup in docstrings, except for the following cases:
 
 - Cross-referencing other objects using Sphinx text roles for the [Python domain](https://www.sphinx-doc.org/en/master/usage/restructuredtext/domains.html#the-python-domain) (as explained [here](https://www.sphinx-doc.org/en/master/usage/restructuredtext/domains.html#python-roles)).
-- Very basic formatting markup to improve _readability_ of the generated documentation without obscuring the source docstring (e.g. `"literal"` strings, bulleted lists).
+- Very basic formatting markup to improve _readability_ of the generated documentation without obscuring the source docstring (e.g. `` `literal` `` strings, bulleted lists).
 
 We highly encourage the [doctest] format for code examples in docstrings. In fact, doctest runs code examples and makes sure they are in sync with the codebase.
 
