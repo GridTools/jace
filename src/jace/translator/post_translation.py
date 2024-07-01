@@ -45,6 +45,7 @@ def postprocess_jaxpr_sdfg(
     Todo:
         - Fixing the scalar input problem on GPU.
         - Fixing stride problem of the input.
+        - Make it such that the context is not modified as a side effect.
     """
     trans_ctx.validate()  # Always validate, it is cheap.
     create_input_output_stages(trans_ctx=trans_ctx, flat_call_args=flat_call_args)
@@ -75,29 +76,21 @@ def _create_output_state(trans_ctx: translator.TranslationContext) -> None:
     Creates the output processing stage for the SDFG in place.
 
     The function will create a new terminal state, in which all outputs, denoted
-    in `trans_ctx.out_names`, will be written into new SDFG variables. In case the
+    in `trans_ctx.output_names`, will be written into new SDFG variables. In case the
     output variable is a scalar, the output will be replaced by an array of length one.
     This behaviour is consistent with JAX.
 
     Args:
         trans_ctx: The translation context to process.
     """
-    assert trans_ctx.input_names is not None and trans_ctx.out_names is not None
-
-    # NOTE: Currently we do not support to write back into an input argument, as JAX.
-    #  However, this is a requirement for handling ICON stencils, that we will support
-    #  eventually. If we get a translation context that lists a variable name in the
-    #  inputs and outputs, this means that it was returned unmodified. In JAX this
-    #  will lead to a copy and we also do it. This is implemented by just naïvely
-    #  creating a separate output variable for every output we have, irrespectively
-    #  of its name inside the Jaxpr.
+    assert trans_ctx.input_names is not None and trans_ctx.output_names is not None
 
     output_pattern = "__jace_output_{}"
     sdfg = trans_ctx.sdfg
     new_output_state: dace.SDFGState = sdfg.add_state("output_processing_stage")
     new_output_names: list[str] = []
 
-    for i, org_output_name in enumerate(trans_ctx.out_names):
+    for i, org_output_name in enumerate(trans_ctx.output_names):
         new_output_name = output_pattern.format(i)
         org_output_desc: dace.data.Data = sdfg.arrays[org_output_name]
         assert org_output_desc.transient
@@ -128,7 +121,7 @@ def _create_output_state(trans_ctx: translator.TranslationContext) -> None:
 
     sdfg.add_edge(trans_ctx.terminal_state, new_output_state, dace.InterstateEdge())
     trans_ctx.terminal_state = new_output_state
-    trans_ctx.out_names = tuple(new_output_names)
+    trans_ctx.output_names = tuple(new_output_names)
 
 
 def _create_input_state(
@@ -150,11 +143,7 @@ def _create_input_state(
     Todo:
         Handle transfer of scalar input in GPU mode.
     """
-    assert trans_ctx.input_names is not None and trans_ctx.out_names is not None
-
-    # NOTE: This function will create a distinct variable for every input. Once we
-    #  allow write back arguments they will be handled in the `_create_output_state()`
-    #  function anyway, also see the comment in that function.
+    assert trans_ctx.input_names is not None and trans_ctx.output_names is not None
 
     if len(flat_call_args) != len(trans_ctx.input_names):
         raise ValueError(f"Expected {len(trans_ctx.input_names)}, but got {len(flat_call_args)}.")
@@ -207,7 +196,7 @@ def finalize_translation_context(
     validate: bool = True,
 ) -> tjsdfg.TranslatedJaxprSDFG:
     """
-    Finalizes the supplied translation context `trans_ctx`.
+    Finalizes the translation context and returns a `TranslatedJaxprSDFG` object.
 
     The function will process the SDFG that is encapsulated inside the context, i.e. a
     canonical one, into a proper SDFG, as it is described in `TranslatedJaxprSDFG`. It
@@ -225,23 +214,21 @@ def finalize_translation_context(
     trans_ctx.validate()
     if trans_ctx.input_names is None:
         raise ValueError("Input names are not specified.")
-    if trans_ctx.out_names is None:
+    if trans_ctx.output_names is None:
         raise ValueError("Output names are not specified.")
-    if not (trans_ctx.out_names or trans_ctx.input_names):
+    if not (trans_ctx.output_names or trans_ctx.input_names):
         raise ValueError("No input nor output.")
 
     # We guarantee decoupling
     tsdfg = tjsdfg.TranslatedJaxprSDFG(
         sdfg=copy.deepcopy(trans_ctx.sdfg),
         input_names=trans_ctx.input_names,
-        out_names=trans_ctx.out_names,
+        output_names=trans_ctx.output_names,
     )
 
     # Make inputs and outputs to globals.
     sdfg_arg_names: list[str] = []
-    for arg_name in tsdfg.input_names + tsdfg.out_names:
-        if arg_name in sdfg_arg_names:
-            continue
+    for arg_name in tsdfg.input_names + tsdfg.output_names:
         tsdfg.sdfg.arrays[arg_name].transient = False
         sdfg_arg_names.append(arg_name)
     tsdfg.sdfg.arg_names = sdfg_arg_names
@@ -274,7 +261,7 @@ def add_nested_sdfg(
         in_var_names: Names of the variables in `parent_ctx` that are used as inputs for
             the nested SDFG, must have the same order as `child_ctx.input_names`.
         out_var_names: Names of the variables in `parent_ctx` that are used as outputs
-            for the nested SDFG, must have the same order as `child_ctx.out_names`.
+            for the nested SDFG, must have the same order as `child_ctx.output_names`.
 
     Returns:
         The nested SDFG object.
@@ -288,9 +275,9 @@ def add_nested_sdfg(
     """
     if child_ctx.sdfg.free_symbols:
         raise NotImplementedError("Symbol Mapping is not implemented.")
-    assert not (child_ctx.input_names is None or child_ctx.out_names is None)  # Silence mypy
+    assert not (child_ctx.input_names is None or child_ctx.output_names is None)  # Silence mypy
     assert len(child_ctx.input_names) == len(in_var_names)
-    assert len(child_ctx.out_names) == len(out_var_names)
+    assert len(child_ctx.output_names) == len(out_var_names)
     assert state in parent_ctx.sdfg.nodes()
     assert not set(in_var_names).intersection(out_var_names)
 
@@ -313,7 +300,7 @@ def add_nested_sdfg(
         parent=parent_ctx.sdfg,
         # Bug in DaCe must be a set.
         inputs=set(final_child_ctx.input_names),
-        outputs=set(final_child_ctx.out_names),
+        outputs=set(final_child_ctx.output_names),
     )
 
     # Now create the connections for the input.
@@ -328,7 +315,7 @@ def add_nested_sdfg(
         )
 
     # Now we create the output connections.
-    for outer_name, inner_name in zip(out_var_names, final_child_ctx.out_names):
+    for outer_name, inner_name in zip(out_var_names, final_child_ctx.output_names):
         outer_array = parent_ctx.sdfg.arrays[outer_name]
         state.add_edge(
             nested_sdfg,

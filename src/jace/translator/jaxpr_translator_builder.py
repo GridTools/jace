@@ -618,7 +618,7 @@ class JaxprTranslationBuilder:
                 jaxpr.jaxpr.outvars, prevent_creation=True, handle_literals=False
             )
 
-        self._ctx.out_names = tuple(out_var_names)
+        self._ctx.output_names = tuple(out_var_names)
 
         return cast(TranslationContext, self._clear_translation_ctx())
 
@@ -641,11 +641,12 @@ class JaxprTranslationBuilder:
             - Handle the case if if the output is a literal.
 
         Note:
-            The function will _not_ update the `out_names` field of the current context.
+            The function will _not_ update the `output_names` field of the current
+            context.
         """
         assert self._ctx.terminal_state is self._ctx.start_state
         assert isinstance(self._ctx.input_names, tuple)
-        assert self._ctx.out_names is None
+        assert self._ctx.output_names is None
 
         # There is not output so we do not have to copy anything around.
         if not jaxpr.out_avals:
@@ -755,7 +756,7 @@ class TranslationContext:
     Attributes:
         sdfg: The encapsulated SDFG object.
         input_names: A list of the SDFG variables that are used as input
-        out_names: A list of the SDFG variables that are used as output.
+        output_names: A list of the SDFG variables that are used as output.
         start_state: The first state in the SDFG state machine.
         terminal_state: The (currently) last state in the state machine.
         jaxpr: The Jaxpr that was used to translate.
@@ -766,11 +767,13 @@ class TranslationContext:
     Note:
         Access of any attribute of this class by an outside user is considered
         undefined behaviour.
+        Furthermore, the encapsulated SDFG should be seen as a verbatim translation
+        of the initial Jaxpr.
     """
 
     sdfg: dace.SDFG
     input_names: tuple[str, ...] | None
-    out_names: tuple[str, ...] | None
+    output_names: tuple[str, ...] | None
     start_state: dace.SDFGState
     terminal_state: dace.SDFGState
     jaxpr: jax_core.ClosedJaxpr
@@ -781,7 +784,7 @@ class TranslationContext:
 
         self.sdfg = dace.SDFG(name=(name or f"unnamed_SDFG_{id(self)}"))
         self.input_names = None
-        self.out_names = None
+        self.output_names = None
         self.start_state = self.sdfg.add_state(label="initial_state", is_start_block=True)
         self.terminal_state = self.start_state
         self.jaxpr = jaxpr
@@ -798,14 +801,14 @@ class TranslationContext:
                 f"Expected to find '{self.start_state}' as start state,"
                 f" but instead found '{self.sdfg.start_block}'.",
                 self.sdfg,
-                self.sdfg.node_id(self.start_state),
+                None,
             )
         if {self.terminal_state} != set(self.sdfg.sink_nodes()):
             raise dace.sdfg.InvalidSDFGError(
                 f"Expected to find as terminal state '{self.terminal_state}',"
                 f" but instead found '{self.sdfg.sink_nodes()}'.",
                 self.sdfg,
-                self.sdfg.node_id(self.terminal_state),
+                None,
             )
         if not (
             self.input_names is None
@@ -814,15 +817,15 @@ class TranslationContext:
             raise dace.sdfg.InvalidSDFGError(
                 f"Missing input arguments: {(input_name for input_name in self.input_names if input_name not in self.sdfg.arrays)}",
                 self.sdfg,
-                self.sdfg.node_id(self.terminal_state),
+                None,
             )
         if not (
-            self.out_names is None
-            or all(out_name in self.sdfg.arrays for out_name in self.out_names)
+            self.output_names is None
+            or all(output_name in self.sdfg.arrays for output_name in self.output_names)
         ):
             raise dace.sdfg.InvalidSDFGError(
-                f"Missing output arguments: {(out_name for out_name in self.out_names if out_name not in self.sdfg.arrays)}",
+                f"Missing output arguments: {(output_name for output_name in self.output_names if output_name not in self.sdfg.arrays)}",
                 self.sdfg,
-                self.sdfg.node_id(self.terminal_state),
+                None,
             )
         return True

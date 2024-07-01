@@ -27,15 +27,15 @@ staging out and lowering is handled as a single step.
 
 from __future__ import annotations
 
+import contextlib
 import copy
-import inspect
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Generator, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, Generic, ParamSpec, TypeVar, Union
 
 from jax import tree_util as jax_tree
 
 from jace import api, optimization, tracing, translated_jaxpr_sdfg as tjsdfg, translator, util
-from jace.optimization import CompilerOptions
+from jace.optimization import CompilerOptions  # Reexport for compatibility with JAX.
 from jace.translator import post_translation as ptranslation
 from jace.util import translation_cache as tcache
 
@@ -45,14 +45,14 @@ if TYPE_CHECKING:
     from jax import core as jax_core
 
 __all__ = [
-    "CompilerOptions",  # export for compatibility with JAX.
+    "CompilerOptions",
     "JaCeCompiled",
     "JaCeLowered",
     "JaCeWrapped",
     "Stage",
     "get_active_compiler_options",
-    "make_final_compilation_options",
-    "update_active_compiler_options",
+    "get_active_compiler_options",
+    "temporary_compiler_options",
 ]
 
 #: Known compilation stages in JaCe.
@@ -111,10 +111,6 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"], Generic[_P, _R]):
         primitive_translators: Mapping[str, translator.PrimitiveTranslator],
         jit_options: api.JITOptions,
     ) -> None:
-        # TODO(phimuell): Test if this restriction is needed.
-        assert all(
-            param.default is param.empty for param in inspect.signature(fun).parameters.values()
-        )
         super().__init__()
         self._primitive_translators = {**primitive_translators}
         self._jit_options = {**jit_options}
@@ -250,7 +246,8 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"], Generic[_R]):
 
         To perform the optimizations `jace_optimize()` is used. The actual options that
         are forwarded to it are obtained by passing `compiler_options` to
-        `make_final_compilation_options()`.
+        `get_active_compiler_options()`, these options are also included in the
+        key used to cache the result.
 
         Args:
             compiler_options: The optimization options to use.
@@ -258,7 +255,7 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"], Generic[_R]):
         # We **must** deepcopy before we do any optimization, because all optimizations
         #  are in place, to properly cache stages, stages needs to be immutable.
         tsdfg: tjsdfg.TranslatedJaxprSDFG = copy.deepcopy(self._translated_sdfg)
-        optimization.jace_optimize(tsdfg=tsdfg, **make_final_compilation_options(compiler_options))
+        optimization.jace_optimize(tsdfg=tsdfg, **get_active_compiler_options(compiler_options))
 
         return JaCeCompiled(
             compiled_sdfg=tjsdfg.compile_jaxpr_sdfg(tsdfg),
@@ -296,7 +293,7 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"], Generic[_R]):
         unflatted_args, unflatted_kwargs = jax_tree.tree_unflatten(in_tree, flat_call_args)
         assert (not unflatted_kwargs) and (len(unflatted_args) <= 1)
 
-        options = make_final_compilation_options(unflatted_args[0] if unflatted_args else {})
+        options = get_active_compiler_options(unflatted_args[0] if unflatted_args else None)
         flat_options, option_tree = jax_tree.tree_flatten(options)
         return tcache.StageTransformationSpec(
             stage_id=id(self), flat_call_args=tuple(flat_options), in_tree=option_tree
@@ -317,7 +314,7 @@ class JaCeCompiled(Generic[_R]):
     Args:
         compiled_sdfg: The compiled SDFG object.
         input_names: SDFG variables used as inputs.
-        out_names: SDFG variables used as outputs.
+        output_names: SDFG variables used as outputs.
         out_tree: Pytree describing how to unflatten the output.
 
     Note:
@@ -358,55 +355,54 @@ class JaCeCompiled(Generic[_R]):
 _JACELOWERED_ACTIVE_COMPILE_OPTIONS: CompilerOptions = optimization.DEFAULT_OPTIMIZATIONS.copy()
 """Global set of currently active compilation/optimization options.
 
-The global set is initialized with `jace.optimization.DEFAULT_OPTIMIZATIONS`. It can be
-managed through `update_active_compiler_options()` and accessed through
-`get_active_compiler_options()`, however, it is advised that a user should use
-`make_final_compilation_options()` for getting the final options that should be used
-for optimization.
+The global set is initialized to `jace.optimization.DEFAULT_OPTIMIZATIONS`.
+For modifying the set of active options the the `temporary_compiler_options()`
+context manager is provided.
+To obtain the currently active compiler options use `get_active_compiler_options()`.
 """
 
 
-def update_active_compiler_options(new_active_options: CompilerOptions) -> CompilerOptions:
+@contextlib.contextmanager
+def temporary_compiler_options(new_active_options: CompilerOptions) -> Generator[None, None, None]:
     """
-    Updates the set of active compiler options.
+    Temporary modifies the set of active compiler options.
 
-    Merges the options passed as `new_active_options` with the currently active
-    compiler options. This set is used by `JaCeLowered.compile()` to determine
-    which options should be used.
-    The function will return the set of options that was active before the call.
+    During the activation of this context the active set of active compiler option
+    consists of the set of option that were previously active merged with the ones
+    passed through `new_active_options`.
 
-    To obtain the set of currently active options use `get_active_compiler_options()`.
+    Args:
+        new_active_options: Options that should be temporary merged with the currently
+            active options.
 
-    Todo:
-        Make a proper context manager.
+    See Also:
+        `get_active_compiler_options()` to get the set of active options that is
+        currently active.
     """
+    global _JACELOWERED_ACTIVE_COMPILE_OPTIONS  # noqa: PLW0603 [global-statement]
     previous_active_options = _JACELOWERED_ACTIVE_COMPILE_OPTIONS.copy()
-    _JACELOWERED_ACTIVE_COMPILE_OPTIONS.update(new_active_options)
-    return previous_active_options
+    try:
+        _JACELOWERED_ACTIVE_COMPILE_OPTIONS.update(new_active_options)
+        yield None
+    finally:
+        _JACELOWERED_ACTIVE_COMPILE_OPTIONS = previous_active_options
 
 
-def get_active_compiler_options() -> CompilerOptions:
-    """Returns the set of currently active compiler options."""
-    return _JACELOWERED_ACTIVE_COMPILE_OPTIONS.copy()
-
-
-def make_final_compilation_options(compiler_options: CompilerOptions | None) -> CompilerOptions:
+def get_active_compiler_options(compiler_options: CompilerOptions | None) -> CompilerOptions:
     """
-    Returns the final compilation options.
+    Get the final compiler options.
 
     There are two different sources of optimization options. The first one is the global
-    set of currently active compiler options. The second one is the options that are
-    passed to this function, which takes precedence. Thus, the `compiler_options`
-    argument describes the difference from the currently active global options.
-
-    This function is used by `JaCeLowered` if it has to determine which options to use
-    for optimization, either for compiling the lowered SDFG or for computing the key.
+    set of currently active compiler options, which is returned if `None` is passed.
+    The second one is the options that are passed to this function, which takes
+    precedence. This mode is also used by `JaCeLowered.compile()` to determine the
+    final compiler options.
 
     Args:
         compiler_options: The local compilation options.
 
     See Also:
-        `get_active_compiler_options()` to inspect the set of currently active options
-        and `update_active_compiler_options()` to modify them.
+        `temporary_compiler_options()` to modify the currently active set of compiler
+        options.
     """
-    return get_active_compiler_options() | (compiler_options or {})
+    return _JACELOWERED_ACTIVE_COMPILE_OPTIONS | (compiler_options or {})
