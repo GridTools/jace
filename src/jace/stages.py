@@ -42,6 +42,7 @@ from jace.util import translation_cache as tcache
 
 if TYPE_CHECKING:
     import dace
+    from jax import core as jax_core
 
 __all__ = [
     "CompilerOptions",
@@ -49,9 +50,8 @@ __all__ = [
     "JaCeLowered",
     "JaCeWrapped",
     "Stage",
-    "get_active_compiler_options",
-    "get_active_compiler_options",
-    "temporary_compiler_options",
+    "get_compiler_options",
+    "set_compiler_options",
 ]
 
 #: Known compilation stages in JaCe.
@@ -125,7 +125,8 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"], Generic[_P, _R]):
         Note:
             This function is also aware if a JAX tracing is going on. In this
             case, it will forward the computation.
-            Currently, this function ignores the value of `jax.disable_jit()`.
+            Currently, this function ignores the value of `jax.disable_jit()`,
+            however, tracing will consider this value.
         """
         if util.is_tracing_ongoing(*args, **kwargs):
             return self._fun(*args, **kwargs)
@@ -172,7 +173,7 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"], Generic[_P, _R]):
         )
 
         # NOTE: `tsdfg` is deepcopied as a side effect of post processing.
-        return JaCeLowered(tsdfg, out_tree)
+        return JaCeLowered(tsdfg, out_tree, trans_ctx.jaxpr)
 
     @property
     def wrapped_fun(self) -> Callable:
@@ -214,6 +215,8 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"], Generic[_R]):
     Args:
         tsdfg: The lowered SDFG with metadata.
         out_tree: The pytree describing how to unflatten the output.
+        jaxpr: The Jaxpr expression that was translated into an SDFG. Intended to be
+            used during debugging and inspection.
 
     Note:
         `self` will manage the passed `tsdfg` object. Modifying it results is undefined
@@ -223,15 +226,18 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"], Generic[_R]):
 
     _translated_sdfg: tjsdfg.TranslatedJaxprSDFG
     _out_tree: jax_tree.PyTreeDef
+    _jaxpr: jax_core.ClosedJaxpr
 
     def __init__(
         self,
         tsdfg: tjsdfg.TranslatedJaxprSDFG,
         out_tree: jax_tree.PyTreeDef,
+        jaxpr: jax_core.ClosedJaxpr,
     ) -> None:
         super().__init__()
         self._translated_sdfg = tsdfg
         self._out_tree = out_tree
+        self._jaxpr = jaxpr
 
     @tcache.cached_transition
     def compile(self, compiler_options: CompilerOptions | None = None) -> JaCeCompiled[_R]:
@@ -240,7 +246,7 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"], Generic[_R]):
 
         To perform the optimizations `jace_optimize()` is used. The actual options that
         are forwarded to it are obtained by passing `compiler_options` to
-        `get_active_compiler_options()`, these options are also included in the
+        `get_compiler_options()`, these options are also included in the
         key used to cache the result.
 
         Args:
@@ -249,7 +255,7 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"], Generic[_R]):
         # We **must** deepcopy before we do any optimization, because all optimizations
         #  are in place, to properly cache stages, stages needs to be immutable.
         tsdfg: tjsdfg.TranslatedJaxprSDFG = copy.deepcopy(self._translated_sdfg)
-        optimization.jace_optimize(tsdfg=tsdfg, **get_active_compiler_options(compiler_options))
+        optimization.jace_optimize(tsdfg=tsdfg, **get_compiler_options(compiler_options))
 
         return JaCeCompiled(
             compiled_sdfg=tjsdfg.compile_jaxpr_sdfg(tsdfg),
@@ -287,7 +293,7 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"], Generic[_R]):
         unflatted_args, unflatted_kwargs = jax_tree.tree_unflatten(in_tree, flat_call_args)
         assert (not unflatted_kwargs) and (len(unflatted_args) <= 1)
 
-        options = get_active_compiler_options(unflatted_args[0] if unflatted_args else None)
+        options = get_compiler_options(unflatted_args[0] if unflatted_args else None)
         flat_options, option_tree = jax_tree.tree_flatten(options)
         return tcache.StageTransformationSpec(
             stage_id=id(self), flat_call_args=tuple(flat_options), in_tree=option_tree
@@ -350,39 +356,39 @@ _JACELOWERED_ACTIVE_COMPILE_OPTIONS: CompilerOptions = optimization.DEFAULT_OPTI
 """Global set of currently active compilation/optimization options.
 
 The global set is initialized to `jace.optimization.DEFAULT_OPTIMIZATIONS`.
-For modifying the set of active options the the `temporary_compiler_options()`
+For modifying the set of active options the the `set_compiler_options()`
 context manager is provided.
-To obtain the currently active compiler options use `get_active_compiler_options()`.
+To obtain the currently active compiler options use `get_compiler_options()`.
 """
 
 
 @contextlib.contextmanager
-def temporary_compiler_options(new_active_options: CompilerOptions) -> Generator[None, None, None]:
+def set_compiler_options(compiler_options: CompilerOptions) -> Generator[None, None, None]:
     """
     Temporary modifies the set of active compiler options.
 
     During the activation of this context the active set of active compiler option
     consists of the set of option that were previously active merged with the ones
-    passed through `new_active_options`.
+    passed through `compiler_options`.
 
     Args:
-        new_active_options: Options that should be temporary merged with the currently
+        compiler_options: Options that should be temporary merged with the currently
             active options.
 
     See Also:
-        `get_active_compiler_options()` to get the set of active options that is
+        `get_compiler_options()` to get the set of active options that is
         currently active.
     """
     global _JACELOWERED_ACTIVE_COMPILE_OPTIONS  # noqa: PLW0603 [global-statement]
-    previous_active_options = _JACELOWERED_ACTIVE_COMPILE_OPTIONS.copy()
+    previous_compiler_options = _JACELOWERED_ACTIVE_COMPILE_OPTIONS.copy()
     try:
-        _JACELOWERED_ACTIVE_COMPILE_OPTIONS.update(new_active_options)
+        _JACELOWERED_ACTIVE_COMPILE_OPTIONS.update(compiler_options)
         yield None
     finally:
-        _JACELOWERED_ACTIVE_COMPILE_OPTIONS = previous_active_options
+        _JACELOWERED_ACTIVE_COMPILE_OPTIONS = previous_compiler_options
 
 
-def get_active_compiler_options(compiler_options: CompilerOptions | None) -> CompilerOptions:
+def get_compiler_options(compiler_options: CompilerOptions | None) -> CompilerOptions:
     """
     Get the final compiler options.
 
@@ -396,7 +402,7 @@ def get_active_compiler_options(compiler_options: CompilerOptions | None) -> Com
         compiler_options: The local compilation options.
 
     See Also:
-        `temporary_compiler_options()` to modify the currently active set of compiler
+        `set_compiler_options()` to modify the currently active set of compiler
         options.
     """
     return _JACELOWERED_ACTIVE_COMPILE_OPTIONS | (compiler_options or {})

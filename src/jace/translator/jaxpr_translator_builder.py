@@ -708,7 +708,8 @@ class TranslationContext:
         output_names: A list of the SDFG variables that are used as output.
         start_state: The first state in the SDFG state machine.
         terminal_state: The (currently) last state in the state machine.
-        jaxpr: The Jaxpr that was used to translate.
+        jaxpr: The Jaxpr expression that was translated into an SDFG. Intended to be
+            used during debugging and inspection.
 
     Args:
         name: The name of the SDFG.
