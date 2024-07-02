@@ -22,14 +22,12 @@ from .primitive_translator import (
     make_primitive_translator,
     register_primitive_translator,
 )
-from .translated_jaxpr_sdfg import TranslatedJaxprSDFG
 
 
 __all__ = [
     "JaxprTranslationBuilder",
     "PrimitiveTranslator",
     "PrimitiveTranslatorCallable",
-    "TranslatedJaxprSDFG",
     "TranslationContext",
     "get_registered_primitive_translators",
     "make_primitive_translator",

@@ -12,6 +12,7 @@ from __future__ import annotations
 from .definitions import FORBIDDEN_SDFG_VAR_NAMES, VALID_SDFG_OBJ_NAME, VALID_SDFG_VAR_NAME
 from .jax_helper import (
     JaCeVar,
+    get_jax_literal_value,
     get_jax_var_dtype,
     get_jax_var_name,
     get_jax_var_shape,
@@ -20,7 +21,9 @@ from .jax_helper import (
     translate_dtype,
 )
 from .traits import (
+    get_strides_for_dace,
     is_array,
+    is_c_contiguous,
     is_drop_var,
     is_fully_addressable,
     is_jax_array,
@@ -34,10 +37,13 @@ __all__ = [
     "VALID_SDFG_OBJ_NAME",
     "VALID_SDFG_VAR_NAME",
     "JaCeVar",
+    "get_jax_literal_value",
     "get_jax_var_dtype",
     "get_jax_var_name",
     "get_jax_var_shape",
+    "get_strides_for_dace",
     "is_array",
+    "is_c_contiguous",
     "is_drop_var",
     "is_fully_addressable",
     "is_jax_array",

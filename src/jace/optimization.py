@@ -8,7 +8,8 @@
 """
 JaCe specific optimizations.
 
-Currently just a dummy exists for the sake of providing a callable function.
+Todo:
+    Organize this module once it is a package.
 """
 
 from __future__ import annotations
@@ -19,7 +20,20 @@ from typing_extensions import Unpack
 
 
 if TYPE_CHECKING:
-    from jace import translator
+    from jace import translated_jaxpr_sdfg as tjsdfg
+
+
+DEFAULT_OPTIMIZATIONS: Final[CompilerOptions] = {
+    "auto_optimize": True,
+    "simplify": True,
+    "persistent_transients": True,
+}
+
+NO_OPTIMIZATIONS: Final[CompilerOptions] = {
+    "auto_optimize": False,
+    "simplify": False,
+    "persistent_transients": False,
+}
 
 
 class CompilerOptions(TypedDict, total=False):
@@ -35,15 +49,10 @@ class CompilerOptions(TypedDict, total=False):
 
     auto_optimize: bool
     simplify: bool
+    persistent_transients: bool
 
 
-# TODO(phimuell): Add a context manager to modify the default.
-DEFAULT_OPTIMIZATIONS: Final[CompilerOptions] = {"auto_optimize": True, "simplify": True}
-
-NO_OPTIMIZATIONS: Final[CompilerOptions] = {"auto_optimize": False, "simplify": False}
-
-
-def jace_optimize(tsdfg: translator.TranslatedJaxprSDFG, **kwargs: Unpack[CompilerOptions]) -> None:  # noqa: D417  # Missing description for kwargs
+def jace_optimize(tsdfg: tjsdfg.TranslatedJaxprSDFG, **kwargs: Unpack[CompilerOptions]) -> None:  # noqa: D417 [undocumented-param]
     """
     Performs optimization of the translated SDFG _in place_.
 
@@ -55,8 +64,12 @@ def jace_optimize(tsdfg: translator.TranslatedJaxprSDFG, **kwargs: Unpack[Compil
         tsdfg: The translated SDFG that should be optimized.
         simplify: Run the simplification pipeline.
         auto_optimize: Run the auto optimization pipeline (currently does nothing)
+        persistent_transients: Set the allocation lifetime of (non register) transients
+            in the SDFG to `AllocationLifetime.Persistent`, i.e. keep them allocated
+            between different invocations.
     """
-    # Currently this function exists primarily for the same of existing.
+    # TODO(phimuell): Implement the functionality.
+    # Currently this function exists primarily for the sake of existing.
 
     simplify = kwargs.get("simplify", False)
     auto_optimize = kwargs.get("auto_optimize", False)

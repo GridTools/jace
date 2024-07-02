@@ -13,7 +13,7 @@ from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, Any, Literal, cast, overload
 
 import dace
-from dace import data as ddata, properties as dprop
+from dace import data as dace_data, properties as dace_properties
 from jax import core as jax_core
 
 from jace import util
@@ -31,10 +31,12 @@ class JaxprTranslationBuilder:
     canonical. The main features of such an SDFG are:
     - the SDFG is a list of states,
     - it has a single source and sink state.
-    - all variable names are derived from Jax names,
+    - all variable names are derived from JAX names,
     - there are only transient variables inside the SDFG,
-    - It lacks the special `__return` variable,
-    - the `arg_names` parameter is not set.
+    - it lacks the special `__return` variable,
+    - the `arg_names` parameter is not set,
+    - for all scalar values a ` Scalar` SDFG variable is used, thus they cannot
+        be used to return anything.
 
     For these reasons the SDFG is not directly usable, and further manipulations
     have to be performed. Especially, DaCe's validation function will fail and
@@ -64,10 +66,9 @@ class JaxprTranslationBuilder:
     Args:
         primitive_translators: Primitive translators to use in the translation.
 
-    Notes:
+    Note:
         After a translation has been performed the translator object can be used
-        again. Currently the builder will generate only Array as SDFG variables,
-        however, this is a temporary solution, see `add_array()`.
+        again.
     """
 
     _primitive_translators: Mapping[str, translator.PrimitiveTranslatorCallable]
@@ -80,7 +81,7 @@ class JaxprTranslationBuilder:
         # Maps name of primitives to the associated translator.
         self._primitive_translators = {**primitive_translators}
 
-        # Maps Jax variables to the name of its SDFG equivalent.
+        # Maps JAX variables to the name of its SDFG equivalent.
         #  Shared between all translation contexts, to ensure consecutive variable
         #  naming as seen as in a pretty printed Jaxpr. Will be cleared by
         #  `_clear_translation_ctx()` at the end of the root translation.
@@ -119,7 +120,7 @@ class JaxprTranslationBuilder:
         #  context. Thus the builder will start to translate a second (nested)
         #  SDFG. Also note that there is no mechanism that forces the integration
         #  of the nested SDFG/Jaxpr, this must be done manually.
-        self._allocate_translation_ctx(name=name)
+        self._allocate_translation_ctx(name=name, jaxpr=jaxpr)
         self._create_constants(jaxpr=jaxpr)
         self._create_initial_input(jaxpr=jaxpr)
 
@@ -128,7 +129,7 @@ class JaxprTranslationBuilder:
     def append_new_state(
         self,
         label: str | None = None,
-        condition: dprop.CodeBlock | None = None,
+        condition: dace_properties.CodeBlock | None = None,
         assignments: Mapping[str, Any] | None = None,
         prev_state: dace.SDFGState | None = None,
     ) -> dace.SDFGState:
@@ -146,7 +147,7 @@ class JaxprTranslationBuilder:
             assignments: Symbol assignments on the `InterstateEdge`.
             prev_state: Alternative state at which we append.
 
-        Notes:
+        Note:
             It is potentially dangerous to not append to the current terminal
             state, as a canonical SDFG only has one sink state. If this is done
             the user has to ensure, that at the end of the processing the SDFG
@@ -175,22 +176,22 @@ class JaxprTranslationBuilder:
         return new_state
 
     @property
-    def arrays(self) -> Mapping[str, ddata.Data]:
+    def arrays(self) -> Mapping[str, dace_data.Data]:
         """
         Get all data descriptors that are currently known to the SDFG.
 
-        Notes:
+        Note:
             Essentially a shorthand and preferred way for `self.sdfg.arrays`.
             For getting a specific data descriptor use `self.get_array()`.
         """
-        return cast(Mapping[str, ddata.Data], self._ctx.sdfg.arrays)
+        return cast(Mapping[str, dace_data.Data], self._ctx.sdfg.arrays)
 
-    def get_array(self, name: str | jax_core.Atom | util.JaCeVar) -> ddata.Data:
+    def get_array(self, name: str | jax_core.Atom | util.JaCeVar) -> dace_data.Data:
         """
         Returns the SDFG `Data` object `name` referees to.
 
         `name` can either be a string, in which case it is interpreted as a
-        verbatim SDFG name. If it is a Jax or JaCe variable, the function will
+        verbatim SDFG name. If it is a JAX or JaCe variable, the function will
         first perform a lookup using `self.map_jax_var_to_sdfg(name)`.
         """
         if isinstance(name, (jax_core.Var, util.JaCeVar)):
@@ -220,7 +221,7 @@ class JaxprTranslationBuilder:
         Get the name of the SDFG variable to which `jax_var` is referring to.
 
         Args:
-            jax_var: The Jax variable to look up.
+            jax_var: The JAX variable to look up.
             allow_fail: Return `None` instead of raising a `KeyError`.
         """
         if isinstance(jax_var, jax_core.Literal):
@@ -230,10 +231,10 @@ class JaxprTranslationBuilder:
         elif allow_fail:
             return None
         else:
-            raise KeyError(f"The Jax variable '{jax_var}' was never registered.")
+            raise KeyError(f"The JAX variable '{jax_var}' was never registered.")
         if sdfg_name not in self._ctx.sdfg.arrays:
             raise KeyError(
-                f"Jax variable '{jax_var}' was supposed to map to '{sdfg_name}',"
+                f"JAX variable '{jax_var}' was supposed to map to '{sdfg_name}',"
                 " but no such SDFG variable is known."
             )
         return sdfg_name
@@ -271,11 +272,11 @@ class JaxprTranslationBuilder:
         is not able to delete a variable mapping that was established before.
 
         Args:
-            jax_var: The Jax variable.
+            jax_var: The JAX variable.
             sdfg_name: The name of the corresponding SDFG variable.
         """
-        assert sdfg_name
-
+        if not sdfg_name:
+            raise ValueError("Supplied 'sdfg_name' is empty.")
         if jax_var in self._jax_name_map:
             raise ValueError(
                 f"Cannot change the mapping of '{jax_var}' from"
@@ -297,7 +298,7 @@ class JaxprTranslationBuilder:
         update_var_mapping: bool = False,
     ) -> str:
         """
-        Creates an SDFG variable for Jax variable `arg` and returns its SDFG name.
+        Creates an SDFG variable for JAX variable `arg` and returns its SDFG name.
 
         The SDFG object is always created as a transient. Furthermore, the
         function will not update the internal variable mapping, by default.
@@ -309,17 +310,9 @@ class JaxprTranslationBuilder:
         should be used.
 
         Args:
-            arg: The Jax object for which a SDFG equivalent should be created.
+            arg: The JAX object for which a SDFG equivalent should be created.
             name_prefix: If given it will be used as prefix for the name.
             update_var_mapping: Update the internal variable mapping.
-
-        Notes:
-            As a temporary fix for handling scalar return values, the function
-            will always generate arrays, even if `arg` is a scalar. According to
-            the DaCe developer, the majority of the backend, i.e. optimization
-            pipeline, should be able to handle it. But there are some special
-            parts that might explicitly want a scalar, it also might block
-            certain compiler optimization.
         """
         if isinstance(arg, jax_core.Literal):
             raise TypeError(f"Can not generate an SDFG variable for literal '{arg}'.")
@@ -330,9 +323,6 @@ class JaxprTranslationBuilder:
         offset = None
         as_transient = True
         strides = None
-
-        # Temporary fix for handling DaCe scalars, see above for more.
-        shape = shape or (1,)
 
         # Propose a name and if needed extend it.
         arg_name = util.propose_jax_name(arg, self._jax_name_map)
@@ -347,15 +337,20 @@ class JaxprTranslationBuilder:
         if arg_name in util.FORBIDDEN_SDFG_VAR_NAMES:
             raise ValueError(f"add_array({arg}): The proposed name '{arg_name}', is forbidden.")
 
-        self._ctx.sdfg.add_array(
-            name=arg_name,
-            shape=shape,
-            strides=strides,
-            offset=offset,
-            storage=storage,
-            dtype=dtype,
-            transient=as_transient,
-        )
+        if shape == ():
+            self._ctx.sdfg.add_scalar(
+                name=arg_name, storage=storage, dtype=dtype, transient=as_transient
+            )
+        else:
+            self._ctx.sdfg.add_array(
+                name=arg_name,
+                shape=shape,
+                strides=strides,
+                offset=offset,
+                storage=storage,
+                dtype=dtype,
+                transient=as_transient,
+            )
 
         if update_var_mapping:
             try:
@@ -396,9 +391,9 @@ class JaxprTranslationBuilder:
         **kwargs: Any,
     ) -> list[None | str]:
         """
-        Create SDFG variables from the passed Jax variables.
+        Create SDFG variables from the passed JAX variables.
 
-        If a Jax variable already has a SDFG equivalent then the function will
+        If a JAX variable already has a SDFG equivalent then the function will
         use this variable. If no corresponding SDFG variable is known the function
         will create one using `add_array()`.
 
@@ -412,7 +407,7 @@ class JaxprTranslationBuilder:
         to `True` literals will will be included in the output with the value `None`.
 
         Args:
-            jax_var_list: The list of Jax variables that should be processed.
+            jax_var_list: The list of JAX variables that should be processed.
             prevent_creation: Never create a variable, all must already be known.
             only_creation: Always create a variable.
             handle_literals: Allow the processing of literals.
@@ -448,11 +443,10 @@ class JaxprTranslationBuilder:
         """
         Creates the input variables of `jaxpr`.
 
-        Notes:
-            The function will populate the `inp_names` member of the current context.
+        Note:
+            The function will populate the `input_names` member of the current context.
         """
-        assert self.is_allocated(), "Builder is not allocated, can not create constants."
-        assert self._ctx.inp_names is None
+        assert self._ctx.input_names is None
 
         # Handle the initial input arguments
         init_in_var_names: Sequence[str] = self.create_jax_var_list(
@@ -464,7 +458,7 @@ class JaxprTranslationBuilder:
         self.sdfg.arg_names = []
 
         # The output list is populated by `self._translate_jaxpr_internal()`
-        self._ctx.inp_names = tuple(init_in_var_names)
+        self._ctx.input_names = tuple(init_in_var_names)
 
     def _create_constants(self, jaxpr: jax_core.ClosedJaxpr) -> None:
         """
@@ -473,7 +467,6 @@ class JaxprTranslationBuilder:
         The function will create an SDFG variable and add them as constant to
         the SDFG. Their value is deepcopied.
         """
-        assert self.is_allocated(), "Builder is not allocated, can not create constants."
         if len(jaxpr.consts) == 0:
             return
 
@@ -489,14 +482,17 @@ class JaxprTranslationBuilder:
                 sdfg_name, copy.deepcopy(const_value), self._ctx.sdfg.arrays[sdfg_name]
             )
 
-    def _allocate_translation_ctx(self, name: str | None = None) -> JaxprTranslationBuilder:
+    def _allocate_translation_ctx(
+        self, name: str | None, jaxpr: jax_core.ClosedJaxpr
+    ) -> JaxprTranslationBuilder:
         """
         Allocate a new context and activate it.
 
         Args:
             name: The name of the SDFG.
+            jaxpr: The Jaxpr that should be translated.
         """
-        self._ctx_stack.append(TranslationContext(name=name))
+        self._ctx_stack.append(TranslationContext(name=name, jaxpr=jaxpr))
         return self
 
     @property
@@ -590,7 +586,7 @@ class JaxprTranslationBuilder:
         Args:
             jaxpr: The Jaxpr to translate.
 
-        Notes:
+        Note:
             Equations that store into drop variables, i.e. with name `_`,
             will be ignored.
         """
@@ -612,7 +608,7 @@ class JaxprTranslationBuilder:
                 jaxpr.jaxpr.outvars, prevent_creation=True, handle_literals=False
             )
 
-        self._ctx.out_names = tuple(out_var_names)
+        self._ctx.output_names = tuple(out_var_names)
 
         return cast(TranslationContext, self._clear_translation_ctx())
 
@@ -635,11 +631,12 @@ class JaxprTranslationBuilder:
             - Handle the case if if the output is a literal.
 
         Note:
-            The function will _not_ update the `out_names` field of the current context.
+            The function will _not_ update the `output_names` field of the current
+            context.
         """
         assert self._ctx.terminal_state is self._ctx.start_state
-        assert self._ctx.inp_names
-        assert self._ctx.out_names is None
+        assert isinstance(self._ctx.input_names, tuple)
+        assert self._ctx.output_names is None
 
         # There is not output so we do not have to copy anything around.
         if not jaxpr.out_avals:
@@ -657,7 +654,7 @@ class JaxprTranslationBuilder:
             sdfg_in_name: str = self.map_jax_var_to_sdfg(jax_out_var)
 
             # Now we create a variable that serves as true output, however, since the
-            #  Jax variable is already known we can not update the variable mapping and
+            #  JAX variable is already known we can not update the variable mapping and
             #  must use another name.
             sdfg_out_name = self.add_array(
                 jax_out_var, name_prefix="_zero_equation_output_for_", update_var_mapping=False
@@ -666,10 +663,10 @@ class JaxprTranslationBuilder:
 
             # Now we perform the copy from the input variable in the newly created
             #  output variable.
-            inp_acc = self._start_state.add_read(sdfg_in_name)
+            input_acc = self._start_state.add_read(sdfg_in_name)
             out_acc = self._start_state.add_write(sdfg_out_name)
             self._start_state.add_nedge(
-                src=inp_acc,
+                src=input_acc,
                 dst=out_acc,
                 data=dace.Memlet.from_array(sdfg_in_name, self.get_array(sdfg_in_name)),
             )
@@ -707,10 +704,12 @@ class TranslationContext:
 
     Attributes:
         sdfg: The encapsulated SDFG object.
-        inp_names: A list of the SDFG variables that are used as input
-        out_names: A list of the SDFG variables that are used as output.
+        input_names: A list of the SDFG variables that are used as input
+        output_names: A list of the SDFG variables that are used as output.
         start_state: The first state in the SDFG state machine.
         terminal_state: The (currently) last state in the state machine.
+        jaxpr: The Jaxpr expression that was translated into an SDFG. Intended to be
+            used during debugging and inspection.
 
     Args:
         name: The name of the SDFG.
@@ -718,23 +717,27 @@ class TranslationContext:
     Note:
         Access of any attribute of this class by an outside user is considered
         undefined behaviour.
+        Furthermore, the encapsulated SDFG should be seen as a verbatim translation
+        of the initial Jaxpr.
     """
 
     sdfg: dace.SDFG
-    inp_names: tuple[str, ...] | None
-    out_names: tuple[str, ...] | None
+    input_names: tuple[str, ...] | None
+    output_names: tuple[str, ...] | None
     start_state: dace.SDFGState
     terminal_state: dace.SDFGState
+    jaxpr: jax_core.ClosedJaxpr
 
-    def __init__(self, name: str | None = None) -> None:
+    def __init__(self, name: str | None, jaxpr: jax_core.ClosedJaxpr) -> None:
         if isinstance(name, str) and not util.VALID_SDFG_OBJ_NAME.fullmatch(name):
             raise ValueError(f"'{name}' is not a valid SDFG name.")
 
         self.sdfg = dace.SDFG(name=(name or f"unnamed_SDFG_{id(self)}"))
-        self.inp_names = None
-        self.out_names = None
+        self.input_names = None
+        self.output_names = None
         self.start_state = self.sdfg.add_state(label="initial_state", is_start_block=True)
         self.terminal_state = self.start_state
+        self.jaxpr = jaxpr
 
     def validate(self) -> bool:
         """
@@ -748,13 +751,31 @@ class TranslationContext:
                 f"Expected to find '{self.start_state}' as start state,"
                 f" but instead found '{self.sdfg.start_block}'.",
                 self.sdfg,
-                self.sdfg.node_id(self.start_state),
+                None,
             )
         if {self.terminal_state} != set(self.sdfg.sink_nodes()):
             raise dace.sdfg.InvalidSDFGError(
                 f"Expected to find as terminal state '{self.terminal_state}',"
                 f" but instead found '{self.sdfg.sink_nodes()}'.",
                 self.sdfg,
-                self.sdfg.node_id(self.terminal_state),
+                None,
+            )
+        if not (
+            self.input_names is None
+            or all(input_name in self.sdfg.arrays for input_name in self.input_names)
+        ):
+            raise dace.sdfg.InvalidSDFGError(
+                f"Missing input arguments: {(input_name for input_name in self.input_names if input_name not in self.sdfg.arrays)}",
+                self.sdfg,
+                None,
+            )
+        if not (
+            self.output_names is None
+            or all(output_name in self.sdfg.arrays for output_name in self.output_names)
+        ):
+            raise dace.sdfg.InvalidSDFGError(
+                f"Missing output arguments: {(output_name for output_name in self.output_names if output_name not in self.sdfg.arrays)}",
+                self.sdfg,
+                None,
             )
         return True
