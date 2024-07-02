@@ -34,5 +34,5 @@ def _set_compile_options(request) -> Generator[None, None, None]:
     Todo:
         Implement a system that only runs the optimization case in CI.
     """
-    with stages.temporary_compiler_options(request.param):
+    with stages.set_compiler_options(request.param):
         yield

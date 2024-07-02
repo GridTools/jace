@@ -230,7 +230,7 @@ def test_caching_compilation_options() -> None:
     assert lowering_cnt[0] == 1
 
     # Using the first set of options.
-    with stages.temporary_compiler_options(optimization.NO_OPTIMIZATIONS):
+    with stages.set_compiler_options(optimization.NO_OPTIMIZATIONS):
         _ = wrapped(2.0)
 
         # Except from one entry in the compile cache, nothing should have changed.
@@ -241,7 +241,7 @@ def test_caching_compilation_options() -> None:
 
     # Now we change the options again which then will lead to another compilation,
     #  but not to another lowering.
-    with stages.temporary_compiler_options(optimization.DEFAULT_OPTIMIZATIONS):
+    with stages.set_compiler_options(optimization.DEFAULT_OPTIMIZATIONS):
         _ = wrapped(2.0)
 
         assert len(lower_cache) == 1
