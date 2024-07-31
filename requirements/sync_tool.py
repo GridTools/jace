@@ -21,81 +21,19 @@
 
 from __future__ import annotations
 
+import copy
 import pathlib
-import re
 import types
 from collections.abc import Iterable, Mapping
-from typing import NamedTuple, TypeAlias
+from typing import TypeAlias
 
 import tomlkit
 import typer
 import yamlpath
-from packaging import (
-    markers as pkg_markers,
-    requirements as pkg_requirements,
-    specifiers as pkg_specifiers,
-)
+from packaging import requirements as pkg_reqs
 
 
-# -- Classes --
-class RequirementSpec(NamedTuple):
-    """A parsed requirement specification."""
-
-    package: pkg_requirements.Requirement
-    specifiers: pkg_specifiers.SpecifierSet | None = None
-    marker: pkg_markers.Marker | None = None
-
-    @classmethod
-    def from_text(cls, req_text: str) -> RequirementSpec:
-        req_text = req_text.strip()
-        assert req_text, "Requirement string cannot be empty"
-
-        m = re.match(r"^([^><=~]*)\s*([^;]*)\s*;?\s*(.*)$", req_text)
-        return RequirementSpec(
-            pkg_requirements.Requirement(m[1]),
-            pkg_specifiers.Specifier(m[2]) if m[2] else None,
-            pkg_markers.Marker(m[3]) if m[3] else None,
-        )
-
-    def as_text(self) -> str:
-        return f"{self.package!s}{(self.specifiers or '')!s}{(self.marker or '')!s}".strip()
-
-
-class Requirement(NamedTuple):
-    """An item in a list of requirements and its parsed specification."""
-
-    text: str
-    spec: RequirementSpec
-
-    @classmethod
-    def from_text(cls, req_text: str) -> Requirement:
-        return Requirement(req_text, RequirementSpec.from_text(req_text))
-
-    @classmethod
-    def from_spec(cls, req: RequirementSpec) -> Requirement:
-        return Requirement(req.as_text(), req)
-
-    def as_text(self, *, template: str | None = None) -> str:
-        template = template or "{req.text}"
-        return template.format(req=self)
-
-
-class RequirementDumpSpec(NamedTuple):
-    value: Requirement | Iterable[Requirement]
-    template: str | None = None
-
-
-DumpSpec: TypeAlias = (
-    RequirementDumpSpec | tuple[Requirement | Iterable[Requirement], str | None] | str
-)
-
-
-# -- Functions --
-def make_requirements_map(requirements: Iterable[Requirement]) -> dict[str, Requirement]:
-    return {req.spec.package.name: req for req in requirements}
-
-
-def load_from_requirements(filename: str) -> list[Requirement]:
+def load_from_requirements(filename: str) -> list[pkg_reqs.Requirement]:
     requirements = []
     with pathlib.Path(filename).open(encoding="locale") as f:
         for raw_line in f:
@@ -103,12 +41,12 @@ def load_from_requirements(filename: str) -> list[Requirement]:
                 raw_line = raw_line[:end]  # noqa: PLW2901 [redefined-loop-name]
             line = raw_line.strip()
             if line and not line.startswith("-"):
-                requirements.append(Requirement.from_text(line))
+                requirements.append(pkg_reqs.Requirement(line))
 
     return requirements
 
 
-def load_from_toml(filename: str, key: str) -> list[Requirement]:
+def load_from_toml(filename: str, key: str) -> list[pkg_reqs.Requirement]:
     with pathlib.Path(filename).open(encoding="locale") as f:
         toml_data = tomlkit.loads(f.read())
 
@@ -116,15 +54,48 @@ def load_from_toml(filename: str, key: str) -> list[Requirement]:
     for part in key.split("."):
         section = section[part]
 
-    return [Requirement.from_text(req) for req in section]
+    return [pkg_reqs.Requirement(req) for req in section]
 
 
-def dump(requirements: Iterable[Requirement], *, template: str | None = None) -> None:
-    return [req.as_text(template=template) for req in requirements]
+def package_id(req: pkg_reqs.Requirement) -> str:
+    req = copy.copy(req)
+    req.specifier = pkg_reqs.SpecifierSet()
+    req.marker = None
+    return str(req)
+
+
+def version(req: pkg_reqs.Requirement, *, pos: int = 0) -> str:
+    return list(req.specifier)[pos].version
+
+
+def make_versions_map(
+    requirements: Iterable[pkg_reqs.Requirement],
+) -> dict[str, pkg_reqs.Requirement]:
+    result = {}
+    for r in requirements:
+        req_set = list(r.specifier)
+        assert (
+            len(req_set) == 1 and req_set[0].operator == "=="
+        ), f"Expected exact requirement, got: {req_set}"
+        result[package_id(r)] = r
+    return result
+
+
+def dump(
+    requirements: pkg_reqs.Requirement | Iterable[pkg_reqs.Requirement],
+    *,
+    template: str | None = None,
+) -> str | list[str]:
+    template = template or "{req!s}"
+    return (
+        [template.format(req=req) for req in requirements]
+        if isinstance(requirements, Iterable)
+        else template.format(req=requirements)
+    )
 
 
 def dump_to_requirements(
-    requirements: Iterable[Requirement],
+    requirements: Iterable[pkg_reqs.Requirement],
     filename: str,
     *,
     template: str | None = None,
@@ -140,6 +111,11 @@ def dump_to_requirements(
         f.write("\n")
 
 
+DumpSpec: TypeAlias = (
+    str | Iterable[str] | tuple[pkg_reqs.Requirement | Iterable[pkg_reqs.Requirement], str]
+)
+
+
 def dump_to_yaml(requirements_map: Mapping[str, DumpSpec], filename: str) -> None:
     file_path = pathlib.Path(filename)
     logging_args = types.SimpleNamespace(quiet=False, verbose=False, debug=False)
@@ -149,18 +125,24 @@ def dump_to_yaml(requirements_map: Mapping[str, DumpSpec], filename: str) -> Non
     assert doc_loaded
     processor = yamlpath.Processor(console_log, yaml_data)
 
-    for key_path, (value, template) in requirements_map.items():
+    for key_path, dump_spec in requirements_map.items():
+        if isinstance(dump_spec, tuple):
+            value, template = dump_spec
+        else:
+            assert isinstance(dump_spec, (str, Iterable)), f"Invalid dump spec: {dump_spec}"
+            value, template = (dump_spec, None)
         match value:
             case str():
                 processor.set_value(yamlpath.YAMLPath(key_path), value)
-            case Requirement():
-                processor.set_value(yamlpath.YAMLPath(key_path), value.as_text(template=template))
+            case pkg_reqs.Requirement():
+                processor.set_value(yamlpath.YAMLPath(key_path), dump(value, template=template))
             case Iterable():
                 for _ in processor.delete_nodes(yamlpath.YAMLPath(key_path)):
                     pass
-                for i, req in enumerate(dump(value, template=template)):
+                for i, req in enumerate(value):
+                    req_str = req if isinstance(req, str) else dump(req, template=template)
                     item_path = yamlpath.YAMLPath(f"{key_path}[{i}]")
-                    processor.set_value(item_path, req)
+                    processor.set_value(item_path, req_str)
 
     with file_path.open("w") as f:
         yaml.dump(yaml_data, f)
@@ -180,30 +162,26 @@ def pull():
 
 @app.command()
 def push():
-    base_names = {r.spec.package for r in load_from_toml("pyproject.toml", "project.dependencies")}
-    base_versions = [
-        r for r in load_from_requirements("requirements/base.txt") if r.spec.package in base_names
-    ]
-    dev_versions_map = make_requirements_map(load_from_requirements("requirements/dev.txt"))
-    mypy_req_versions = sorted(
-        base_versions + [dev_versions_map[r] for r in ("pytest", "typing-extensions")],
-        key=lambda r: str(r.spec.package),
-    )
+    base_names = {package_id(r) for r in load_from_toml("pyproject.toml", "project.dependencies")}
+    base_versions_map = make_versions_map([
+        r for r in load_from_requirements("requirements/base.txt") if package_id(r) in base_names
+    ])
+    dev_versions_map = make_versions_map(load_from_requirements("requirements/dev.txt"))
+    mypy_dev_versions_map = {k: dev_versions_map[k] for k in ("pytest", "typing-extensions")}
+
+    mypy_req_versions = list((base_versions_map | mypy_dev_versions_map).values())
+
     dump_to_yaml(
         {
             # ruff
             "repos[.repo%https://github.com/astral-sh/ruff-pre-commit].rev": (
-                dev_versions_map["ruff"],
-                "v{req.spec.specifiers.version}",
+                f"v{version(dev_versions_map['ruff'])}"
             ),
             # mypy
-            "repos[.repo%https://github.com/pre-commit/mirrors-mypy].rev": (
-                dev_versions_map["mypy"],
-                "v{req.spec.specifiers.version}",
-            ),
+            "repos[.repo%https://github.com/pre-commit/mirrors-mypy].rev": f"v{version(dev_versions_map['mypy'])}",
             "repos[.repo%https://github.com/pre-commit/mirrors-mypy].hooks[.id%mypy].additional_dependencies": (
                 mypy_req_versions,
-                None,
+                "{req!s}",
             ),
         },
         ".pre-commit-config.yaml",
