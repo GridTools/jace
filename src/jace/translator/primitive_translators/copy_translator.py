@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from jax import core as jax_core
 
 
-class CopyTranslator:
+class CopyTranslator(translator.PrimitiveTranslator):
     """
     Implements the `copy` primitive.
 
