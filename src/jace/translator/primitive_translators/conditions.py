@@ -52,41 +52,15 @@ def condition_translator(
         new states and will return the new SDFG state that serves as terminal state.
 
     Note:
-        The implementation assumes that the selector, i.e. the variables indicating
-        which branch should be taken is inside its bound.
+        This function essentially implements a C `switch` statement, however, there
+        is no default branch.
     """
     if util.get_jax_var_dtype(eqn.invars[0]) is dace.bool_:
-        return _cond_primitive_boolean_impl(
-            builder=builder,
-            in_var_names=in_var_names,
-            out_var_names=out_var_names,
-            eqn=eqn,
-            eqn_state=eqn_state,
-        )
-    return _cond_primitive_multi_switch_impl(
-        builder=builder,
-        in_var_names=in_var_names,
-        out_var_names=out_var_names,
-        eqn=eqn,
-        eqn_state=eqn_state,
-    )
+        # XLA explicitly provides this [form of the primitive](https://openxla.org/xla/operation_semantics#conditional)
+        # JAX however, does not seem to use it at the moment and instead forwards it
+        #  to the integer implementation.
+        raise NotImplementedError("The boolean conditional primitive is not implemented.")
 
-
-def _cond_primitive_multi_switch_impl(
-    builder: translator.JaxprTranslationBuilder,
-    in_var_names: Sequence[str | None],
-    out_var_names: Sequence[str],
-    eqn: jax_core.JaxprEqn,
-    eqn_state: dace.SDFGState,
-) -> dace.SDFGState:
-    """
-    Implements the integer version of the conditional primitive.
-
-    For arguments see `ConditionTranslator`.
-
-    This [version](https://openxla.org/xla/operation_semantics#conditional) is
-    essentially a C switch statement without a default branch.
-    """
     # To make names in the SDFG unique we use the name of the equation state
     name_pattern = eqn_state.name
 
@@ -160,23 +134,3 @@ def _cond_primitive_multi_switch_impl(
 
     # We return it, because otherwise the builder will assume that `eqn_state` was used.
     return terminal_state
-
-
-def _cond_primitive_boolean_impl(
-    builder: translator.JaxprTranslationBuilder,  # noqa: ARG001 [unused-function-argument]
-    in_var_names: Sequence[str | None],  # noqa: ARG001 [unused-function-argument]
-    out_var_names: Sequence[str],  # noqa: ARG001 [unused-function-argument]
-    eqn: jax_core.JaxprEqn,  # noqa: ARG001 [unused-function-argument]
-    eqn_state: dace.SDFGState,  # noqa: ARG001 [unused-function-argument]
-) -> dace.SDFGState:
-    """
-    Implements the case the selector of the primitive is a bool.
-
-    XLA explicitly provides this
-    [form of the primitive](https://openxla.org/xla/operation_semantics#conditional)
-    JAX however, does not seem to use it and instead forwards it to the integer
-    implementation.
-    JaCe will not implement it and instead generate an error.
-    """
-    # NOTE: This is mostly to notice if JAX decided to implement that branch.
-    raise NotImplementedError("The boolean conditional primitive is not implemented.")
