@@ -19,6 +19,8 @@ from jace import translated_jaxpr_sdfg as tjsdfg, util
 
 
 if TYPE_CHECKING:
+    from dace.sdfg import nodes as dace_nodes
+
     from jace import translator
 
 
@@ -234,3 +236,93 @@ def finalize_translation_context(
     if validate:
         tsdfg.validate()
     return tsdfg
+
+
+def add_nested_sdfg(
+    state: dace.SDFGState,
+    child_ctx: translator.TranslationContext,
+    parent_ctx: translator.TranslationContext,
+    in_var_names: Sequence[str],
+    out_var_names: Sequence[str],
+) -> dace_nodes.NestedSDFG:
+    """
+    Adds the SDFG in `child_ctx` as nested SDFG at state `state` in `parent_ctx`.
+
+    The function is a convenience wrapper that operates directly on translation
+    contexts instead of SDFGs. The function will also create the necessary Memlet
+    connections.
+
+    Args:
+        state: The state at which the nested SDFG should be inserted.
+            Must be part of `parent_ctx`.
+        child_ctx: The translation context representing the SDFG that should be added.
+        parent_ctx: The parent SDFG to which `child_ctx` should be added as nested
+            SDFG in state `state`.
+        in_var_names: Names of the variables in `parent_ctx` that are used as inputs for
+            the nested SDFG, must have the same order as `child_ctx.input_names`.
+        out_var_names: Names of the variables in `parent_ctx` that are used as outputs
+            for the nested SDFG, must have the same order as `child_ctx.output_names`.
+
+    Returns:
+        The nested SDFG object.
+
+    Note:
+        The function will not add `child_ctx` directly as nested SDFG. Instead it
+        will first pass it to `finalize_translation_context()` and operates on the
+        return values. This means that `child_ctx` will be modified in place, and
+        a copy will be added to `parent_ctx`.
+        It is highly recommended that `state` is empty.
+    """
+    if child_ctx.sdfg.free_symbols:
+        raise NotImplementedError("Symbol Mapping is not implemented.")
+    assert not (child_ctx.input_names is None or child_ctx.output_names is None)  # Silence mypy
+    assert len(child_ctx.input_names) == len(in_var_names)
+    assert len(child_ctx.output_names) == len(out_var_names)
+    assert state in parent_ctx.sdfg.nodes()
+    assert not set(in_var_names).intersection(out_var_names)
+
+    if any(input_name.startswith("__jace_mutable_") for input_name in in_var_names):
+        raise NotImplementedError(
+            "'__jace_mutable_' variables are not yet handled in 'add_nested_sdfg()'."
+        )
+    if len(set(in_var_names)) != len(in_var_names):
+        raise ValueError(
+            f"An input can only be passed once, but { {in_var_name for in_var_name in in_var_names if in_var_names.count(in_var_name) > 1} } were passed multiple times."
+        )
+    if len(set(out_var_names)) != len(out_var_names):
+        raise NotImplementedError(
+            f"Tried to write multiple times to variables: { {out_var_name for out_var_name in out_var_names if out_var_names.count(out_var_name) > 1} }."
+        )
+
+    final_child_ctx = finalize_translation_context(child_ctx)
+    nested_sdfg: dace_nodes.NestedSDFG = state.add_nested_sdfg(
+        sdfg=final_child_ctx.sdfg,
+        parent=parent_ctx.sdfg,
+        # Bug in DaCe must be a set.
+        inputs=set(final_child_ctx.input_names),
+        outputs=set(final_child_ctx.output_names),
+    )
+
+    # Now create the connections for the input.
+    for outer_name, inner_name in zip(in_var_names, final_child_ctx.input_names):
+        outer_array = parent_ctx.sdfg.arrays[outer_name]
+        state.add_edge(
+            state.add_read(outer_name),
+            None,
+            nested_sdfg,
+            inner_name,
+            dace.Memlet.from_array(outer_name, outer_array),
+        )
+
+    # Now we create the output connections.
+    for outer_name, inner_name in zip(out_var_names, final_child_ctx.output_names):
+        outer_array = parent_ctx.sdfg.arrays[outer_name]
+        state.add_edge(
+            nested_sdfg,
+            inner_name,
+            state.add_write(outer_name),
+            None,
+            dace.Memlet.from_array(outer_name, outer_array),
+        )
+
+    return nested_sdfg

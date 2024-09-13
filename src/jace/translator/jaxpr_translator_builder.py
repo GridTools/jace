@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any, Literal, cast, overload
 
 import dace
 from dace import data as dace_data, properties as dace_properties
+from dace.sdfg import propagation as dace_propagation
 from jax import core as jax_core
 
 from jace import util
@@ -35,8 +36,11 @@ class JaxprTranslationBuilder:
     - there are only transient variables inside the SDFG,
     - it lacks the special `__return` variable,
     - the `arg_names` parameter is not set,
-    - for all scalar values a ` Scalar` SDFG variable is used, thus they cannot
-        be used to return anything.
+    - for all scalar values a `Scalar` SDFG variable is used, thus they cannot
+        be used for return values,
+    - for every transient there is exactly one access node that writes to it,
+        except the name of the array starts with `__jace_mutable_`, which can
+        be written to multiple times.
 
     For these reasons the SDFG is not directly usable, and further manipulations
     have to be performed. Especially, DaCe's validation function will fail and
@@ -550,6 +554,7 @@ class JaxprTranslationBuilder:
         translator = self._primitive_translators[primitive_name]
 
         # Create the state into which the equation should be translated
+        prev_terminal_state = self._ctx.terminal_state
         eqn_state = self.append_new_state(
             label=f"{primitive_name}_{'_'.join(out_var_names)}",
             prev_state=None,  # forces the creation of a new terminal state
@@ -569,8 +574,13 @@ class JaxprTranslationBuilder:
             if eqn_state is not self._ctx.terminal_state:
                 raise RuntimeError("Inconsistent terminal state was detected.")
             new_sdfg_term_state = eqn_state
-        if not self._ctx.validate():
-            raise RuntimeError("Detected an invalid SDFG under construction.")
+
+        # Propagate the Memlets through the newly created state machine
+        self._propagate_memlets_in_new_states(
+            prev_terminal_state,
+            new_sdfg_term_state,
+        )
+        self._ctx.validate()
 
         # Modify terminal root state of 'self'
         self._ctx.terminal_state = new_sdfg_term_state
@@ -679,6 +689,47 @@ class JaxprTranslationBuilder:
             self._jax_name_map.pop(jax_out_var)
 
         return out_var_names
+
+    def _propagate_memlets_in_new_states(
+        self,
+        prev_terminal_state: dace.SDFGState,
+        new_terminal_state: dace.SDFGState,
+    ) -> None:
+        """
+        Propagate the Memlets inside the newly added parts of the state machine.
+
+        This function performs BFS starting at `prev_terminal_state` that is bound
+        by `new_terminal_state`.
+
+        Args:
+            prev_terminal_state: Terminal state before the expansion of the
+                state machine.
+            new_terminal_state: Terminal state after the expansion.
+        """
+        seen: set[dace.SDFGState] = {prev_terminal_state}
+        nodes_to_process: list[dace.SDFGState] = [
+            edge.dst for edge in self.sdfg.out_edges(prev_terminal_state)
+        ]
+
+        while nodes_to_process:
+            currently_processing = nodes_to_process.pop(-1)
+            if (
+                self.sdfg.out_degree(currently_processing) == 0
+                and currently_processing != new_terminal_state
+            ):
+                raise dace.sdfg.InvalidSDFGError(
+                    f"Found leaf node '{currently_processing}' that is not the terminal node.",
+                    self.sdfg,
+                    self.sdfg.node_id(currently_processing),
+                )
+
+            seen.add(currently_processing)
+            dace_propagation.propagate_memlets_state(self.sdfg, currently_processing)
+            nodes_to_process.extend(
+                edge.dst
+                for edge in self.sdfg.out_edges(currently_processing)
+                if edge.dst not in seen
+            )
 
     @property
     def _start_state(self) -> dace.SDFGState:
