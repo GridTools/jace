@@ -10,7 +10,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import Literal
+from typing import Any, Literal
 
 import numpy as np
 
@@ -24,6 +24,8 @@ def make_array(
     shape: Sequence[int] | int,
     dtype: type = np.float64,
     order: Literal[None, "K", "A", "C", "F"] = "C",
+    low: Any = None,
+    high: Any = None,
 ) -> np.ndarray:
     """Generates a NumPy ndarray with shape `shape`.
 
@@ -31,11 +33,17 @@ def make_array(
     fixture. Thus inside a function the value will be deterministic.
 
     Args:
-        shape:      The shape to use.
-        dtype:      The data type to use.
+        shape: The shape to use.
+        dtype: The data type to use.
+        order: The order of the underlying array
+        low: Minimal value.
+        high: Maximal value.
 
-    Notes:
-        Floating point based values are generated in the range 0 to 1.0.
+    Note:
+        The exact meaning of `low` and `high` depend on the type. For `bool` they
+        are ignored. For float both must be specified and then values inside
+        `[low, high)` are generated. For integer it is possible to specify only one.
+        The appropriate numeric limit is used for the other.
     """
 
     if shape == ():
@@ -48,12 +56,19 @@ def make_array(
     elif np.issubdtype(dtype, np.integer):
         iinfo: np.iinfo = np.iinfo(dtype)
         res = np.random.randint(  # noqa: NPY002 [numpy-legacy-random]
-            low=iinfo.min, high=iinfo.max, size=shape, dtype=dtype
+            low=iinfo.min if low is None else low,
+            high=iinfo.max if high is None else high,
+            size=shape,
+            dtype=dtype,
         )
     elif np.issubdtype(dtype, np.complexfloating):
         res = make_array(shape, np.float64) + 1.0j * make_array(shape, np.float64)
     else:
         res = np.random.random(shape)  # type: ignore[assignment]  # noqa: NPY002 [numpy-legacy-random]
+        if low is not None and high is not None:
+            res = low + (high - low) * res
+        assert (low is None) == (high is None)
+
     return np.array(res, order=order, dtype=dtype)
 
 
