@@ -17,6 +17,7 @@ from .concatenate_translator import ConcatenateTranslator
 from .conditions import condition_translator
 from .convert_element_type_translator import ConvertElementTypeTranslator
 from .copy_translator import CopyTranslator, DevicePutTranslator
+from .gather_translator import GatherTranslator
 from .iota_translator import IotaTranslator
 from .pjit_translator import PJITTranslator
 from .reshape_translator import ReshapeTranslator
@@ -32,6 +33,7 @@ __all__ = [
     "ConvertElementTypeTranslator",
     "CopyTranslator",
     "DevicePutTranslator",
+    "GatherTranslator",
     "IotaTranslator",
     "LogicalOperationTranslator",
     "PJITTranslator",
