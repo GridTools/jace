@@ -79,7 +79,7 @@ def condition_translator(
     # Make sure that the selection variable is a DaCe symbol.
     if in_var_names[0] is None:
         literal_selection_value = str(util.get_jax_literal_value(eqn.invars[0]))
-        selection_symbol = f"max({len(branches)}, min(0, {literal_selection_value}))"
+        selection_symbol = f"min({len(branches)}, max(0, {literal_selection_value}))"
         selection_state = eqn_state
     else:
         selection_variable_name = in_var_names[0]
@@ -87,7 +87,7 @@ def condition_translator(
         selection_state = builder.append_new_state(
             label=f"{name_pattern}_fork",
             assignments={
-                selection_symbol: f"max({len(branches)}, min(0, {selection_variable_name}[0]))"
+                selection_symbol: f"min({len(branches)}, max(0, {selection_variable_name}))"
             },
             prev_state=eqn_state,
         )
