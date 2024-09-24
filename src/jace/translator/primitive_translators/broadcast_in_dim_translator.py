@@ -5,7 +5,7 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""This implements the `broadcast_in_dim` primitive."""
+"""Primitive translator for broadcasting operations."""
 
 from __future__ import annotations
 
@@ -28,9 +28,8 @@ class BroadcastInDimTranslator(mapped_base.MappedOperationTranslatorBase):
     """
     Implements the `broadcast_in_dim` primitive.
 
-    The primitive is implemented through the `MappedOperationTranslatorBase` base.
-    Essentially it creates a copy, but also creates special Memlets that replicate
-    the content of the input.
+    Essentially creates a copy tasklet, however, the memlets are made in such a
+    way that some dimensions are replicated.
     """
 
     def __init__(self) -> None:
@@ -52,16 +51,14 @@ class BroadcastInDimTranslator(mapped_base.MappedOperationTranslatorBase):
         in_var_names: Sequence[str | None],
         eqn: jax_core.JaxprEqn,
     ) -> dict[str, dace.Memlet]:
-        if in_var_names[0] is None:
+        if in_var_names[0] is None:  # Broadcast a literal (scalar) to a matrix.
             return {}
-        return {
-            "__in0": dace.Memlet.simple(
-                in_var_names[0],
-                ", ".join(tskl_ranges[bdim][0] for bdim in eqn.params["broadcast_dimensions"])
-                if eqn.params["broadcast_dimensions"]
-                else "0",
-            )
-        }
+        subset_str = (
+            ", ".join(tskl_ranges[bdim][0] for bdim in eqn.params["broadcast_dimensions"])
+            if eqn.params["broadcast_dimensions"]
+            else "0",
+        )
+        return {"__in0": dace.Memlet.simple(in_var_names[0], subset_str)}
 
 
 translator.register_primitive_translator(BroadcastInDimTranslator())

@@ -5,7 +5,7 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Implements `select_n`."""
+"""Primitive translator for select operations, i.e. generalized `np.where()`."""
 
 from __future__ import annotations
 
@@ -29,16 +29,13 @@ class SelectNTranslator(mapped_base.MappedOperationTranslatorBase):
     Implements the `select_n` primitive.
 
     The `select_n` primitive is a generalization of `np.where`, that can take an
-    arbitrary number of branches, which are selected by an integer predicate.
+    arbitrary number of cases, which are selected by an integer predicate.
     The behaviour is undefined if the predicate is out of bound.
 
     Note:
         For a better understanding this function renames its input connectors.
         The first one, which is the predicate, is renamed to `__cond` and the
         others are renamed again to `__in{i}`, starting with zero.
-
-    Todo:
-        Implement the primitive as a nested SDFG.
     """
 
     def __init__(self) -> None:
@@ -51,11 +48,9 @@ class SelectNTranslator(mapped_base.MappedOperationTranslatorBase):
         in_var_names: Sequence[str | None],
         eqn: jax_core.JaxprEqn,
     ) -> str:
-        if len(in_var_names) == 3:  # noqa: PLR2004  # `3` is not magic.
-            # This order is correct, since `False` is interpreted as `0`, which means
-            #  the first case. DaCe seems to have some problems with bools and integer
-            #  casting around, so we handle the bool case explicitly here.
-            #  See also `ConvertElementTypeTranslator`.
+        if len(in_var_names) == 3:  # noqa: PLR2004 [magic-value-comparison]  # Ternary conditional expression.
+            # The order is correct, since `False` is interpreted as `0`,
+            #  which means "the first case".
             return "__out = __in1 if __cond else __in0"
 
         return "\n".join(
@@ -84,10 +79,9 @@ class SelectNTranslator(mapped_base.MappedOperationTranslatorBase):
     ) -> str:
         assert in_var_names[0]  # Condition can never be a literal.
         for i, in_var_name in enumerate(in_var_names[1:]):
-            if in_var_name is not None:
-                continue
-            t_val = util.get_jax_literal_value(eqn.invars[i + 1])
-            tskl_code = tskl_code.replace(f"__in{i}", str(t_val))
+            if in_var_name is None:
+                t_val = util.get_jax_literal_value(eqn.invars[i + 1])
+                tskl_code = tskl_code.replace(f"__in{i}", str(t_val))
         return tskl_code
 
 

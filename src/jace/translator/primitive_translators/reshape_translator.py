@@ -5,14 +5,13 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Implements the translator for the `reshape` primitive."""
+"""Primitive translator for reshaping operations."""
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
 import dace
-from typing_extensions import override
 
 from jace import translator, util
 
@@ -23,45 +22,42 @@ if TYPE_CHECKING:
     from jax import core as jax_core
 
 
-class ReshapeTranslator(translator.PrimitiveTranslator):
+@translator.register_primitive_translator()
+@translator.make_primitive_translator("reshape")
+def reshape_translator(
+    builder: translator.JaxprTranslationBuilder,  # noqa: ARG001 [unused-function-argument]  # Required by the interface.
+    in_var_names: Sequence[str | None],
+    out_var_names: Sequence[str],
+    eqn: jax_core.JaxprEqn,
+    eqn_state: dace.SDFGState,
+) -> None:
     """
     Implements the `reshape` primitive.
 
-    The current implementation uses a Memlet for this and essentially acts as
-    an optimization barrier. Furthermore the Jax primitive also has the optional
-    `dimensions` parameters which allows to permute the input, this is not
-    supported.
+    The function creates a memlet between the input (old shape) and output (final
+    shape). Because of this, it is best if both arrays do not have any paddings.
+
+    Args:
+        builder: The builder object of the translation.
+        in_var_names: Name of the SDFG variable of the source array,
+            with the old shape.
+        out_var_names: Name of SDFG variable that acts as destination,
+            with the new shape.
+        eqn: The equation that contains the `pjit` primitive.
+        eqn_state: State into which the nested SDFG should be constructed.
+
+    Note:
+        The optional `dimensions` parameters, which allows to permute the input,
+        is not supported.
     """
-
-    @property
-    def primitive(self) -> str:  # noqa: D102  # No docstring needed.
-        return "reshape"
-
-    @override
-    def __call__(
-        self,
-        builder: translator.JaxprTranslationBuilder,
-        in_var_names: Sequence[str | None],
-        out_var_names: Sequence[str],
-        eqn: jax_core.JaxprEqn,
-        eqn_state: dace.SDFGState,
-    ) -> None:
-        """
-        Performs the reshaping.
-
-        Currently a copy using a Memlet is performed.
-        """
-        if eqn.params["dimensions"] is not None:
-            raise NotImplementedError("Currently 'dimensions' must be 'None'.")
-        eqn_state.add_nedge(
-            eqn_state.add_read(in_var_names[0]),
-            eqn_state.add_write(out_var_names[0]),
-            dace.Memlet(
-                data=in_var_names[0],
-                subset=", ".join(f"0:{size}" for size in util.get_jax_var_shape(eqn.invars[0])),
-                other_subset=", ".join(f"0:{size}" for size in eqn.params["new_sizes"]),
-            ),
-        )
-
-
-translator.register_primitive_translator(ReshapeTranslator())
+    if eqn.params["dimensions"] is not None:
+        raise NotImplementedError("Currently 'dimensions' must be 'None'.")
+    eqn_state.add_nedge(
+        eqn_state.add_read(in_var_names[0]),
+        eqn_state.add_write(out_var_names[0]),
+        dace.Memlet(
+            data=in_var_names[0],
+            subset=", ".join(f"0:{size}" for size in util.get_jax_var_shape(eqn.invars[0])),
+            other_subset=", ".join(f"0:{size}" for size in eqn.params["new_sizes"]),
+        ),
+    )

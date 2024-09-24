@@ -5,7 +5,7 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""This implements the `iota` primitive."""
+"""Primitive translator for the `iota` primitive."""
 
 from __future__ import annotations
 

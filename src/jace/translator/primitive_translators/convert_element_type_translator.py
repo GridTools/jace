@@ -5,7 +5,7 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Implements the translator for the `convert_element_type` primitive."""
+"""Primitive translator for type casting operations."""
 
 from __future__ import annotations
 
@@ -28,14 +28,12 @@ class ConvertElementTypeTranslator(mapped_base.MappedOperationTranslatorBase):
     """
     Implements the `convert_element_type` primitive.
 
-    The primitive will expand to a "copy Map", however, the Tasklet will not
-    simply copy the input to the output, but also perform type conversion.
-    However, in cases where the input type is the same as the output type,
-    the Tasklet will just be a copy Tasklet, that can then be removed by DaCe.
+    The primitive is implemented as a copy operation. However, the tasklet body
+    will perform the type conversion operation.
 
     Note:
-        This translator ignores the `new_dtype` and `weak_type` parameters of
-        the equation and only performs the casting based on the type of the fields.
+        The type to cast to id inferred from the output variable and the `new_dtype`
+        parameter of the equation is ignored.
     """
 
     def __init__(self) -> None:
@@ -56,20 +54,19 @@ class ConvertElementTypeTranslator(mapped_base.MappedOperationTranslatorBase):
         out_dtype = util.get_jax_var_dtype(eqn.outvars[0]).type
         out_dtype_s: str = out_dtype.__name__
 
-        # This is the base of the template that we use for conversion. You should notice
-        #  that the Tasklet `__out = __in0` will fail, see commit `f5aabc3` of the
-        #  prototype. Thus we have to do it in this way.
+        if in_dtype == out_dtype:
+            # JAX sometimes adds conversions which are not needed. In these cases
+            #  make a copy out of it.
+            # TODO(phimuell): Create a Memlet instead.
+            return "__out = __in0"
+
+        # A simple copy tasklet `__out = __in0` and rely on the implicit type
+        #  conversion of the C++ compiler, is not enough. Due to a bug in DaCe
+        #  (see https://github.com/spcl/dace/issues/1665) this conversion might be
+        #  lost, thus we have to perform the conversion explicitly in the tasklet.
         conv_code = "__in0"
 
-        if in_dtype == out_dtype:
-            # For some reason Jax sometimes adds conversions where no are needed. In
-            #  these cases we explicitly create a copy Tasklet, which is trivial and can
-            #  be removed by DaCe.
-            # TODO(phimuell): Create a Memlet instead.
-            return f"__out = {conv_code}"
-
         if in_dtype_s.startswith("bool"):
-            # Interestingly `__out = int(__in0)` will not work.
             conv_code = f"(1 if {conv_code} else 0)"
         if out_dtype_s.startswith("bool"):
             conv_code = f"dace.bool_({conv_code})"

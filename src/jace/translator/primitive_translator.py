@@ -77,7 +77,7 @@ class PrimitiveTranslatorCallable(Protocol):
         Args:
             builder: The builder object of the translation.
             in_var_names: List of the names of the arrays created inside the
-                SDFG for the inpts or `None` in case of a literal.
+                SDFG for the inputs or `None` in case of a literal.
             out_var_names: List of the names of the arrays created inside the
                 SDFG for the outputs.
             eqn: The JAX primitive that should be translated.

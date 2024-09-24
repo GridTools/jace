@@ -5,7 +5,7 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Implements the `squeeze` primitive."""
+"""Primitive translator for squeezing (the removal of size 1 dimensions) operations."""
 
 from __future__ import annotations
 
