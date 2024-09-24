@@ -41,18 +41,19 @@ def condition_translator(
 
     Args:
         builder: The builder object of the translation.
-        in_var_names: The SDFG variables used an input arguments. First is the index,
-            the variable that selects the branch, the remaining ones are passed as
-            inputs to the branches.
+        in_var_names: The SDFG variables used an input arguments. First is the
+            selection variable. The remaining ones are passed to the branches as
+            inputs.
         out_var_names: Names of SDFG variables that should be used as outputs.
         eqn: The equation that should be translated.
         eqn_state: State into which the nested SDFG should be constructed.
 
     Notes:
-        According to the JAX documentation (https://jax.readthedocs.io/en/latest/_autosummary/jax.lax.switch.html)
-        the selector is clamped. But according to XLA (https://openxla.org/xla/operation_semantics#conditional)
-        an out of range selector uses the last branch. JaCe conforms to JAX semantic.
-        After this function the terminal state of the `builder` is unspecific.
+        - According to the JAX documentation (https://jax.readthedocs.io/en/latest/_autosummary/jax.lax.switch.html)
+            the selector is clamped. But according to XLA (https://openxla.org/xla/operation_semantics#conditional)
+            an out of range selector uses the last branch. JaCe conforms to JAX
+            semantic.
+        - After this function the terminal state of the `builder` is unspecific.
     """
     if util.get_jax_var_dtype(eqn.invars[0]) is dace.bool_:
         # XLA explicitly provides a binary form of the primitive
@@ -61,7 +62,7 @@ def condition_translator(
         #  integer implementation.
         raise NotImplementedError("The boolean conditional primitive is not implemented.")
 
-    # To make names in the (nested) SDFG unique we use the name of the equation state
+    # Used as prefix to give all additional states/variables a unique name.
     name_pattern = eqn_state.name
 
     # To avoid special cases promote all symbols to constants.
@@ -80,9 +81,7 @@ def condition_translator(
         literal_selection_value = str(util.get_jax_literal_value(eqn.invars[0]))
         selection_symbol = f"max({len(branches)}, min(0, {literal_selection_value}))"
         selection_state = eqn_state
-
     else:
-        # Promotion of a scalar to a symbol through a state transition.
         selection_variable_name = in_var_names[0]
         selection_symbol = f"{selection_variable_name}_symb"
         selection_state = builder.append_new_state(
@@ -93,12 +92,15 @@ def condition_translator(
             prev_state=eqn_state,
         )
 
+    # Translate the subbranches, the branches are all connected from `selection_state`.
     branch_states: list[dace.SDFGState] = []
     for i, branch_jaxpr in enumerate(branches):
         branch_pattern = f"{name_pattern}_{{}}_branch_{i}"
         branch_ctx = builder.translate_jaxpr(jaxpr=branch_jaxpr, name=branch_pattern.format("sdfg"))
 
-        # This will update the terminal state only for the first branch
+        # The first time it is called it will update the builder's terminal state
+        #  but since we will return the join state it will be updated later. But
+        #  until then the terminal state of the builder is invalid.
         branch_state = builder.append_new_state(
             label=branch_pattern.format("state"),
             condition=f"{selection_symbol} == {i}",
@@ -113,6 +115,7 @@ def condition_translator(
         )
         branch_states.append(branch_state)
 
+    # Connect all branch states to the join state
     join_state = builder.add_orphan_state(f"{name_pattern}__join_state")
     for branch_state in branch_states:
         builder.sdfg.add_edge(

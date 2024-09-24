@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 @translator.register_primitive_translator()
 @translator.make_primitive_translator("gather")
 def gather_translator(  # noqa: PLR0914 [too-many-locals]  # Can not reduce any further.
-    builder: translator.JaxprTranslationBuilder,  # noqa: ARG001  # Required by the interface.
+    builder: translator.JaxprTranslationBuilder,  # noqa: ARG001 [unused-function-argument]  # Required by the interface.
     in_var_names: Sequence[str | None],
     out_var_names: Sequence[str],
     eqn: jax_core.JaxprEqn,
@@ -64,8 +64,8 @@ def gather_translator(  # noqa: PLR0914 [too-many-locals]  # Can not reduce any 
         raise NotImplementedError(f"The mode {eqn.params['mode']} is not implemented.")
 
     # This is the size of the slice window that is copied. Its length equal the rank
-    #  of the source array, dimensions that should not be copied are listed in
-    #  `collapsed_slice_dims`.
+    #  of the source array, dimensions that are excluded from copying are listed
+    #  in `collapsed_slice_dims`.
     slice_sizes: Sequence[int] = eqn.params["slice_sizes"]
     collapsed_slice_dims: Sequence[int] = dimension_numbers.collapsed_slice_dims
     not_collapsed_slice_dims = tuple(
@@ -73,34 +73,38 @@ def gather_translator(  # noqa: PLR0914 [too-many-locals]  # Can not reduce any 
     )
     assert len(slice_sizes) == len(src_shape)
 
-    # The batch dimensions are used to iterate through the slice windows, thus access
-    #  the index array, with the exception of the last dimension, see below.
-    # NOTE: In pure XLA this last dimension might not be present, however, JAX
-    #   adds it and our implementation relies on it.
+    # The batch dimensions are used to iterate through the different slice windows
+    #  (not inside them) thus they access the index array, with the exception of the
+    #  last dimension, see below.
+    # NOTE: In pure XLA this last dimension is in certain cases optional, however,
+    #   JAX adds it and our implementation relies on it.
     batch_dims = tuple(d for d in range(len(out_shape)) if d not in dimension_numbers.offset_dims)
     if (len(batch_dims) + 1) != len(idx_shape):
         raise ValueError(
             f"Expected that the index array has {len(batch_dims) + 1} dimensions, but it had {len(idx_shape)}."
         )
 
-    # The last dimension is special, as it contains the actual start point for the
-    #  slice window when the dimension is only partially copied. The `start_index_map`
-    #  associates each position element in the last dimension with the corresponding
+    # The last dimension of the index array is special, as it contains the actual
+    #  start point for the slice windows when the dimension is only partially copied.
+    #  Thus the last dimension must be seen as a list of start indexes and the other
+    #  dimensions are used to enumerate the slice windows. The `start_index_map`
+    #  associates each position in the last dimension with the corresponding
     #  dimension of the source array.
     start_index_map: Sequence[int] = dimension_numbers.start_index_map
     assert len(start_index_map) == idx_shape[-1]
 
-    # The final map has two parts. The first part iterates through all the slice
-    #  windows that are given through the index array (except last dimension).
-    #  If a dimension is not fully copied then the start index of the window is
-    #  given through the elements of the last dimensions of the index array.
-    #  Map variables that are used for this use the pattern `__i{out_name}_gather{bd}`.
-    #  The second loop is used to copy the slice windows themselves, their map
-    #  variables follow the pattern `__i{i}`.
+    # The iteration variable of the final map can be divided into two parts or
+    #  categories. The first part iterates through all the slice windows that are
+    #  given through the index array. If a dimension is not fully copied then the
+    #  start index of the window is given through the elements of the last dimensions
+    #  of the index array. Map variables that are used for this use the pattern
+    #  `__i{out_name}_gather{bd}`. The second kind of variables are used to copy the
+    #  content of the slice windows themselves, these map variables follow the
+    #  pattern `__i{i}`.
 
     # Because the offsets of the slice window (which are given by the elements of
-    #  the last dimension of the index array) are variables and not symbols, it
-    #  can not be included in the memlets. Instead we generate an tasklet that
+    #  the last dimension of the index array) are variables and not symbols, they
+    #  can not be included in the memlets. Instead we generate a tasklet that
     #  performs an indirect access and get all elements of the last dimension of the
     #  index array (with the names `__gather_{dim}`), together with the full source
     #  array as input.
@@ -108,7 +112,8 @@ def gather_translator(  # noqa: PLR0914 [too-many-locals]  # Can not reduce any 
     # Access pattern of the source array _inside_ the tasklet.
     src_access_pattern: list[str] = []
 
-    # The ranges of the second part implicit loop (the one that copies the windows).
+    # The map variables and their ranges of the second part implicit loop; the one
+    #  that copy the content inside the window.
     inside_window_map_ranges: list[tuple[str, str]] = []
 
     for dim, slice_size in enumerate(slice_sizes):
@@ -123,14 +128,14 @@ def gather_translator(  # noqa: PLR0914 [too-many-locals]  # Can not reduce any 
         elif dim in collapsed_slice_dims:
             # This dimension is only partially copied, but because it is collapsed,
             #  only a single element is copied. Thus the offset is only given by the
-            #  index array.
+            #  what we read from the index array.
             src_access_pattern.append(f"__gather_{dim}")
             assert dim in batch_dims
 
         else:
-            # This dimension is partially copied, but _not colapsed_. This creates a
-            #  slice index and the offset (of a single element) is given by the static
-            #  start of the window and the current position inside of the window.
+            # This dimension is partially copied, but _not colapsed_. This the element
+            #  that is read depends on the (static) offset of this window and the
+            #  current position within the slicing window.
             inside_window_map_ranges.append((f"__i{dim}", f"0:{slice_size}"))
             src_access_pattern.append(f"__gather_{dim} + {inside_window_map_ranges[-1][0]}")
             assert dim in batch_dims
@@ -154,9 +159,8 @@ def gather_translator(  # noqa: PLR0914 [too-many-locals]  # Can not reduce any 
         num_accesses=1,
     )
 
-    # The static offset of the slice window, which is given through the elements
-    #  of the last dimensions of the index array, for every element in that dimension
-    #  there is an input.
+    # The static offsets of the slice window, are given through the elements of the
+    #  last dimensions of the index array.
     for i, dim in enumerate(start_index_map):
         tasklet_inputs[f"__gather_{dim}"] = dace.Memlet.simple(
             data=idx_name,
@@ -165,10 +169,10 @@ def gather_translator(  # noqa: PLR0914 [too-many-locals]  # Can not reduce any 
             ),
         )
 
-    # The output shape is given by the combination of the non collapsed slice sizes
+    # The output shape is given by the combination of the not collapsed slice sizes
     #  and the index array (without the last dimension) with some permutation.
-    #  Note that the relative order of slice sizes can not be changed, but they
-    #  might be interleaved with the batch variables.
+    #  While the relative order of slice window does not change, `start_index_map`
+    #  already applied a permutation, it might be interleaved with batch dimensions.
     output_memlet_pattern: list[str] = []
     dim_counter = 0
     for dim in range(len(out_shape)):

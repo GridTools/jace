@@ -28,21 +28,31 @@ def copy_translator(
     builder: translator.JaxprTranslationBuilder,
     in_var_names: Sequence[str | None],
     out_var_names: Sequence[str],
-    eqn: jax_core.JaxprEqn,  # noqa: ARG001  # Required by the interface.
+    eqn: jax_core.JaxprEqn,  # noqa: ARG001 [unused-function-argument]  # Required by the interface.
     eqn_state: dace.SDFGState,
 ) -> None:
     """
     Implements the `copy` primitive.
 
+    The copy is implemented by creating a memlet between the source and destination.
+
+    Args:
+        builder: The builder object of the translation.
+        in_var_names: The SDFG variable that acts as source.
+        out_var_names: The SDFG variable that acts as destination of the copy.
+        eqn: The equation that should be translated; unused.
+        eqn_state: State into which the nested SDFG should be constructed.
+
     Todo:
         Investigate if operation should expand to a map.
     """
+    assert in_var_names[0] is not None
     eqn_state.add_nedge(
         eqn_state.add_read(in_var_names[0]),
         eqn_state.add_write(out_var_names[0]),
         dace.Memlet.from_array(
             in_var_names[0],
-            builder.arrays[in_var_names[0]],  # type: ignore[index]  # Guaranteed to be a string
+            builder.arrays[in_var_names[0]],
         ),
     )
 
@@ -60,9 +70,16 @@ def device_put_translator(
     Implements the `device_put` primitive.
 
     In JAX this primitive is used to copy data between the host and the device,
-    in DaCe Memlets can do this. However, because of the way JaCe operates, at
-    least in the beginning a computation is either fully on the host or on the
-    device this copy will essentially perform a copying.
+    in DaCe only memlets can do this. However, because of the way JaCe (currently)
+    operates (a computation is either fully on the host or on GPU), the `device_put`
+    primitive essentially decays to a copy.
+
+    Args:
+        builder: The builder object of the translation.
+        in_var_names: The SDFG variable that acts as source.
+        out_var_names: The SDFG variable that acts as destination of the copy.
+        eqn: The equation that should be translated.
+        eqn_state: State into which the nested SDFG should be constructed.
     """
     if not (eqn.params["device"] is None and eqn.params["src"] is None):
         raise NotImplementedError(

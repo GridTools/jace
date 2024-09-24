@@ -48,7 +48,7 @@ class SelectNTranslator(mapped_base.MappedOperationTranslatorBase):
         in_var_names: Sequence[str | None],
         eqn: jax_core.JaxprEqn,
     ) -> str:
-        if len(in_var_names) == 3:  # noqa: PLR2004  # Ternary conditional expression.
+        if len(in_var_names) == 3:  # noqa: PLR2004 [magic-value-comparison]  # Ternary conditional expression.
             # The order is correct, since `False` is interpreted as `0`,
             #  which means "the first case".
             return "__out = __in1 if __cond else __in0"

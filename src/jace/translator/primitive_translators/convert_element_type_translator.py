@@ -56,7 +56,7 @@ class ConvertElementTypeTranslator(mapped_base.MappedOperationTranslatorBase):
 
         if in_dtype == out_dtype:
             # JAX sometimes adds conversions which are not needed. In these cases
-            #  we perform a copy.
+            #  make a copy out of it.
             # TODO(phimuell): Create a Memlet instead.
             return "__out = __in0"
 

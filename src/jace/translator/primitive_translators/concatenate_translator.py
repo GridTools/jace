@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 @translator.register_primitive_translator()
 @translator.make_primitive_translator("concatenate")
 def concatenate_translator(
-    builder: translator.JaxprTranslationBuilder,  # noqa: ARG001  # Required by the interface.
+    builder: translator.JaxprTranslationBuilder,  # noqa: ARG001 [unused-function-argument]  # Required by the interface.
     in_var_names: Sequence[str | None],
     out_var_names: Sequence[str],
     eqn: jax_core.JaxprEqn,
@@ -36,6 +36,15 @@ def concatenate_translator(
 
     Each source array is copied by its own map, but all maps write to the same
     access node.
+
+    Args:
+        builder: The builder object of the translation; unused.
+        in_var_names: The SDFG variables used an input arguments in order as they
+            should be concatenated.
+        out_var_names: Names of SDFG variables that should be used as outputs.
+        eqn: The equation that should be translated, the concatenation dimensions
+            is read from the `dimension` parameter.
+        eqn_state: State into which the nested SDFG should be constructed.
     """
     if any(in_var_name is None for in_var_name in in_var_names):
         raise NotImplementedError("Concatenate: No literal inputs supported.")

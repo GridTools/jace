@@ -5,7 +5,7 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Module containing all translators related to arithmetic logical operations."""
+"""Module implementing the `MappedOperationTranslatorBase` helper class."""
 
 from __future__ import annotations
 
@@ -37,8 +37,9 @@ class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
     ```
     where `__in*` are the connector names of the Tasklet and `__out` is the
     output connector. For problems such as this, the SDFG API provides the
-    `SDFGState.add_mapped_tasklet()` function, however, because it is very low
-    level and very verbose to use, this class acts as a convenience wrapper around it.
+    `SDFGState.add_mapped_tasklet()` function. However, because the function
+    operates on a very low level and is very verbose to use, this class acts
+    as a convenience wrapper around it.
 
     To use this class a user has to define the abstract `write_tasklet_code()` method.
     This function generates the entire code that should be put into the Tasklet,
@@ -160,8 +161,8 @@ class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
             in_var_names: The list of SDFG variables used as input, `None` if literal.
             eqn: The equation object.
         """
-        out_shp = tuple(util.get_jax_var_shape(eqn.outvars[0]))  # Shape of the output
-        out_rank = len(out_shp)
+        out_shape = tuple(util.get_jax_var_shape(eqn.outvars[0]))
+        out_rank = len(out_shape)
         if any(len(util.get_jax_var_shape(invar)) not in {0, out_rank} for invar in eqn.invars):
             raise NotImplementedError(
                 f"'MappedOperationTranslatorBase' Inputs must have the same rank as the output! "
@@ -170,29 +171,26 @@ class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
 
         # Now we will generate the input Memlets.
         tskl_inputs: dict[str, dace.Memlet] = {}
-        for i, (in_var_name, inp_shp) in enumerate(
+        for i, (in_var_name, in_shape) in enumerate(
             zip(in_var_names, (util.get_jax_var_shape(invar) for invar in eqn.invars))
         ):
-            if in_var_name is None:  # Input is a literal: No Memlet needed
-                continue
+            if in_var_name is None:
+                pass
 
-            if inp_shp == ():  # Scalars
-                tskl_inputs[f"__in{i}"] = dace.Memlet.simple(in_var_name, "0")  # Scalar
-                continue
+            elif in_shape == ():
+                tskl_inputs[f"__in{i}"] = dace.Memlet.simple(in_var_name, "0")
 
-            # We might have to do broadcasting.
-            #  We ensured that input and output have the same rank (JAX is doing that
-            #  for us). So we must do broadcasting, i.e. replicating that input
-            #  dimension, if its size is 1. We threat the case where the output has
-            #  size 1 in that dimension as broadcasting as well.
-            dims_to_bcast: Sequence[int] = [dim for dim in range(out_rank) if inp_shp[dim] == 1]
-            tskl_inputs[f"__in{i}"] = dace.Memlet.simple(
-                in_var_name,
-                ", ".join(
-                    ("0" if i in dims_to_bcast else it_var)
-                    for i, (it_var, _) in enumerate(tskl_ranges)
-                ),
-            )
+            else:
+                dims_to_bcast = [
+                    dim for dim in range(out_rank) if in_shape[dim] == 1 and out_shape[dim] != 1
+                ]
+                tskl_inputs[f"__in{i}"] = dace.Memlet.simple(
+                    in_var_name,
+                    ", ".join(
+                        ("0" if i in dims_to_bcast else it_var)
+                        for i, (it_var, _) in enumerate(tskl_ranges)
+                    ),
+                )
         return tskl_inputs
 
     def literal_substitution(  # noqa: PLR6301 [no-self-use]  # Subclasses might need it.

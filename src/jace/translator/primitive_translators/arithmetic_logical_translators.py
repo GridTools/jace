@@ -100,14 +100,12 @@ class LogicalOperationTranslator(mapped_base.MappedOperationTranslatorBase):
         in_var_names: Sequence[str | None],
         eqn: jax_core.JaxprEqn,
     ) -> str:
-        return (
-            self._bool_tmpl
-            if all(util.get_jax_var_dtype(invar) is dace.bool_ for invar in eqn.invars)
-            else self._int_tmpl
-        )
+        if all(util.get_jax_var_dtype(invar) is dace.bool_ for invar in eqn.invars):
+            return self._bool_tmpl
+        return self._int_tmpl
 
 
-# Maps the name of an arithmetic primitives to the code template that is used to
+# Maps the name of an arithmetic JAX primitive to the code template that is used to
 #  generate the body of the mapped tasklet. These are used to instantiate the
 #  `ArithmeticOperationTranslator` objects.
 # fmt: off
@@ -175,9 +173,9 @@ _ARITMETIC_OPERATION_TEMPLATES: Final[dict[str, str]] = {
 }
 
 
-# Maps the name of a logical primitive to the two code templates (first the integer
-#  case and second the boolean case) used to create the body of the mapped tasklet.
-#  They are used to instantiate the `LogicalOperationTranslator` translators.
+# Maps the name of a logical primitive to the two code templates, first the integer
+#  case and second the boolean case, that are used to create the body of the mapped
+#  tasklet. They are used to instantiate the `LogicalOperationTranslator` translators.
 _LOGICAL_OPERATION_TEMPLATES: Final[dict[str, tuple[str, str]]] = {
     "or": ("__out = (__in0) | (__in1)",  "__out = (__in0) or (__in1)"),
     "not": ("__out = ~(__in0)", "__out = not (__in0)"),

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from jax._src import sharding_impls as jax_sharding  # noqa: PLC2701 [import-private-name]
 
@@ -54,13 +54,12 @@ def pjit_translator(
         The translator ignores the `donated_invars`, the `keep_unused` and the
         `inline` parameter and let's DaCe handle it.
     """
-    params: dict[str, Any] = eqn.params
-    nested_jaxpr: jax_core.ClosedJaxpr = params["jaxpr"]
-    in_shardings = params["in_shardings"]
-    out_shardings = params["out_shardings"]
-    _ = params["donated_invars"]  # Always ignored
-    _ = params["keep_unused"]
-    _ = params["inline"]
+    nested_jaxpr: jax_core.ClosedJaxpr = eqn.params["jaxpr"]
+    in_shardings = eqn.params["in_shardings"]
+    out_shardings = eqn.params["out_shardings"]
+    _ = eqn.params["donated_invars"]  # Always ignored
+    _ = eqn.params["keep_unused"]
+    _ = eqn.params["inline"]
 
     if not all(in_sharding is jax_sharding.UNSPECIFIED for in_sharding in in_shardings):
         raise NotImplementedError("Currently 'pjit' does not support sharding in its input.")
@@ -68,7 +67,7 @@ def pjit_translator(
         raise NotImplementedError("Currently 'pjit' does not support sharding in its output.")
 
     # TODO(phimuell): Controlflow region and name
-    pjit_name = params["name"]
+    pjit_name = eqn.params["name"]
 
     # Name in SDFG must be unique, thus we mangle it, furthermore, we have to clean it.
     sdfg_name = f"pjit_{re.subn('[^a-zA-Z0-9_]', '_', pjit_name)[0]}__{'_'.join(out_var_names)}"
