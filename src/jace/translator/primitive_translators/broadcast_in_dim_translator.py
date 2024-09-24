@@ -56,7 +56,7 @@ class BroadcastInDimTranslator(mapped_base.MappedOperationTranslatorBase):
         subset_str = (
             ", ".join(tskl_ranges[bdim][0] for bdim in eqn.params["broadcast_dimensions"])
             if eqn.params["broadcast_dimensions"]
-            else "0",
+            else "0"
         )
         return {"__in0": dace.Memlet.simple(in_var_names[0], subset_str)}
 

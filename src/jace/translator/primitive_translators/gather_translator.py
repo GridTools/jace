@@ -123,14 +123,12 @@ def gather_translator(  # noqa: PLR0914 [too-many-locals]  # Can not reduce any 
             inside_window_map_ranges.append((f"__i{dim}", f"0:{slice_size}"))
             src_access_pattern.append(inside_window_map_ranges[-1][0])
             assert dim in not_collapsed_slice_dims
-            assert dim not in batch_dims
 
         elif dim in collapsed_slice_dims:
             # This dimension is only partially copied, but because it is collapsed,
             #  only a single element is copied. Thus the offset is only given by the
             #  what we read from the index array.
             src_access_pattern.append(f"__gather_{dim}")
-            assert dim in batch_dims
 
         else:
             # This dimension is partially copied, but _not colapsed_. This the element
@@ -138,7 +136,6 @@ def gather_translator(  # noqa: PLR0914 [too-many-locals]  # Can not reduce any 
             #  current position within the slicing window.
             inside_window_map_ranges.append((f"__i{dim}", f"0:{slice_size}"))
             src_access_pattern.append(f"__gather_{dim} + {inside_window_map_ranges[-1][0]}")
-            assert dim in batch_dims
             assert dim in not_collapsed_slice_dims
 
     # These are the map variables that are associated to the first implicit loop (the

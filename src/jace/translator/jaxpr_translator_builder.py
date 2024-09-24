@@ -598,10 +598,9 @@ class JaxprTranslationBuilder:
             prev_terminal_state,
             new_sdfg_term_state,
         )
-        self._ctx.validate()
-
         # Modify terminal root state of 'self'
         self._ctx.terminal_state = new_sdfg_term_state
+        self._ctx.validate()
 
     def _translate_jaxpr_internal(self, jaxpr: jax_core.ClosedJaxpr) -> TranslationContext:
         """
