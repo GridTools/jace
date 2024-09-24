@@ -37,11 +37,10 @@ class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
     ```
     where `__in*` are the connector names of the Tasklet and `__out` is the
     output connector. For problems such as this, the SDFG API provides the
-    `SDFGState.add_mapped_tasklet()` function, however, in most cases it can not
-    be directly used, for various reasons. Thus this class acts like a
-    convenience wrapper around it.
+    `SDFGState.add_mapped_tasklet()` function, however, because it is very low
+    level and very verbose to use, this class acts as a convenience wrapper around it.
 
-    To use this class a user has to overwrite the `write_tasklet_code()` function.
+    To use this class a user has to define the abstract `write_tasklet_code()` method.
     This function generates the entire code that should be put into the Tasklet,
     include the assignment to `__out`. If needed the translator will perform
     literal substitution on the returned code and broadcast the inputs to match
@@ -51,7 +50,7 @@ class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
     to generate custom input Memlets, such as adding an offset.
 
     Args:
-        primitive_name:     The name of the primitive `self` should bind to.
+        primitive_name: The name of the primitive `self` should bind to.
 
     Note:
         This class will always generate a mapped Tasklet, even if a scalar is handled.
@@ -78,7 +77,7 @@ class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
         """
         Create the mapped Tasklet.
 
-        The function will create the map ranges and based on the shape of the
+        The function will create the map ranges based on the shape of the
         output array. It will then call `make_input_memlets()` to get the input
         Memlets. After that it calls `write_tasklet_code()` to get the Tasklet
         code and perform literal substitution by forwarding it to
@@ -88,7 +87,7 @@ class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
             For a description of the arguments see `PrimitiveTranslatorCallable`.
         """
         assert len(out_var_names) == 1
-        if util.get_jax_var_shape(eqn.outvars[0]) != ():
+        if util.get_jax_var_shape(eqn.outvars[0]):
             tskl_ranges: list[tuple[str, str]] = [
                 (f"__i{dim}", f"0:{N}")
                 for dim, N in enumerate(util.get_jax_var_shape(eqn.outvars[0]))
@@ -130,20 +129,20 @@ class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
         eqn: jax_core.JaxprEqn,
     ) -> str:
         """
-        Return the (Python) code that should be put inside the Tasklet.
+        Return the Python code that should be put inside the Tasklet.
 
         This also includes the assignment statement, i.e. `__out`.
         However, the base will do literal substitution on the returned object.
 
         Args:
-            tskl_ranges:    List of pairs used as map parameter, first element
+            tskl_ranges: List of pairs used as map parameter, first element
                 is the name iteration index of the dimension, second is its range.
-            in_var_names:   The list of SDFG variables used as input, `None` if literal.
-            eqn:            The equation.
+            in_var_names: The list of SDFG variables used as input, `None` if literal.
+            eqn: The equation.
         """
         ...
 
-    def make_input_memlets(  # noqa: PLR6301  # Subclasses might need them.
+    def make_input_memlets(  # noqa: PLR6301 [no-self-use]  # Subclasses might need them.
         self,
         tskl_ranges: Sequence[tuple[str, str]],
         in_var_names: Sequence[str | None],
@@ -156,10 +155,10 @@ class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
         that is used to connect it to the Map entry node.
 
         Args:
-            tskl_ranges:    List of pairs used as map parameter, first element
+            tskl_ranges: List of pairs used as map parameter, first element
                 is the name iteration index of the dimension, second is its range
-            in_var_names:   The list of SDFG variables used as input, `None` if literal.
-            eqn:            The equation object.
+            in_var_names: The list of SDFG variables used as input, `None` if literal.
+            eqn: The equation object.
         """
         out_shp = tuple(util.get_jax_var_shape(eqn.outvars[0]))  # Shape of the output
         out_rank = len(out_shp)
@@ -181,7 +180,11 @@ class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
                 tskl_inputs[f"__in{i}"] = dace.Memlet.simple(in_var_name, "0")  # Scalar
                 continue
 
-            # We have to to broadcasting (combine yes and no together)
+            # We might have to do broadcasting.
+            #  We ensured that input and output have the same rank (JAX is doing that
+            #  for us). So we must do broadcasting, i.e. replicating that input
+            #  dimension, if its size is 1. We threat the case where the output has
+            #  size 1 in that dimension as broadcasting as well.
             dims_to_bcast: Sequence[int] = [dim for dim in range(out_rank) if inp_shp[dim] == 1]
             tskl_inputs[f"__in{i}"] = dace.Memlet.simple(
                 in_var_name,
@@ -192,23 +195,22 @@ class MappedOperationTranslatorBase(translator.PrimitiveTranslator):
             )
         return tskl_inputs
 
-    def literal_substitution(  # noqa: PLR6301  # Subclasses might need it.
+    def literal_substitution(  # noqa: PLR6301 [no-self-use]  # Subclasses might need it.
         self, tskl_code: str, in_var_names: Sequence[str | None], eqn: jax_core.JaxprEqn
     ) -> str:
         """
         Perform literal substitution on the proto Tasklet code `tskl_code`.
 
         Args:
-            tskl_code:      The proto Tasklet code with literal.
-            in_var_names:   The list of SDFG variables used as input.
-            eqn:            The equation.
+            tskl_code: The proto Tasklet code with literal.
+            in_var_names: The list of SDFG variables used as input.
+            eqn: The equation.
 
         Note:
             It is allowed but not recommended to override this function.
         """
         for i, in_var_name in enumerate(in_var_names):
-            if in_var_name is not None:
-                continue
-            t_val = util.get_jax_literal_value(eqn.invars[i])
-            tskl_code = tskl_code.replace(f"__in{i}", str(t_val))
+            if in_var_name is None:
+                t_val = util.get_jax_literal_value(eqn.invars[i])
+                tskl_code = tskl_code.replace(f"__in{i}", str(t_val))
         return tskl_code

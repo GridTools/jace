@@ -5,7 +5,7 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Implements the translator for the `gather` primitive."""
+"""Primitive translator for indexing operations."""
 
 from __future__ import annotations
 

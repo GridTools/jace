@@ -6,7 +6,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 """
-Module containing all translators related to arithmetic and logical operations.
+Primitive translators related to all arithmetic, logical and comparison operations.
 
 Todo:
     - Hijack Jax to inject a proper modulo operation.
@@ -31,21 +31,14 @@ if TYPE_CHECKING:
 
 class ArithmeticOperationTranslator(mapped_base.MappedOperationTranslatorBase):
     """
-    Translator for all arithmetic operations.
-
-    The class is derived from `MappedOperationTranslatorBase` and overwrites the
-    `write_tasklet_code()` function for the Tasklet code.
+    Translator for all arithmetic operations and comparisons.
 
     Args:
-        prim_name:      The name of the primitive that should be handled.
-        tskl_tmpl:      Template used for generating the Tasklet code.
+        prim_name: The name of the primitive that should be handled.
+        tskl_tmpl: Template used for generating the Tasklet code.
 
     Note:
-        - It does not implement the logical operations, they are implemented by
-            the `LogicalOperationTranslator` class.
-        - Despite its name this class also provides the comparison operators.
-        - It does not implement `mod` nor `fmod` as they are translated to some
-            nested `pjit` implementation by Jax for unknown reasons.
+        Logical and bitwise operations are implemented by `LogicalOperationTranslator`.
     """
 
     def __init__(self, prim_name: str, tskl_tmpl: str) -> None:
@@ -60,10 +53,7 @@ class ArithmeticOperationTranslator(mapped_base.MappedOperationTranslatorBase):
         eqn: jax_core.JaxprEqn,
     ) -> str:
         """Returns the code for the Tasklet, with all parameters replaced."""
-        tskl_code = self._tskl_tmpl
-        if len(eqn.params) != 0:
-            tskl_code = tskl_code.format(**eqn.params)
-        return tskl_code
+        return self._tskl_tmpl.format(**eqn.params)
 
 
 class LogicalOperationTranslator(mapped_base.MappedOperationTranslatorBase):
@@ -82,15 +72,15 @@ class LogicalOperationTranslator(mapped_base.MappedOperationTranslatorBase):
     as `~true` in C++ is essentially `~1`, which is again `true`!
     Thus the `not` primitive must be handled separately.
 
-    The solution to the problem is, to introduce two templates, one used for the
+    The solution to the problem is to introduce two templates, one used for the
     bool context and one used in the integer context. This works because depending
     if the `logical_*()` or `bitwise_*()` functions are used the input is either
     of type bool or an integer.
 
     Args:
-        prim_name:      The name of the primitive that should be handled.
-        int_tmpl:       The template used for the integer case.
-        bool_tmpl:      The template used for the bool case.
+        prim_name: The name of the primitive that should be handled.
+        int_tmpl: The template used for the integer case.
+        bool_tmpl: The template used for the bool case.
 
     Note:
         Since it does not make sense to single out `not` and keep the other
@@ -110,12 +100,16 @@ class LogicalOperationTranslator(mapped_base.MappedOperationTranslatorBase):
         in_var_names: Sequence[str | None],
         eqn: jax_core.JaxprEqn,
     ) -> str:
-        if all(util.get_jax_var_dtype(invar) is dace.bool_ for invar in eqn.invars):
-            return self._bool_tmpl
-        return self._int_tmpl
+        return (
+            self._bool_tmpl
+            if all(util.get_jax_var_dtype(invar) is dace.bool_ for invar in eqn.invars)
+            else self._int_tmpl
+        )
 
 
-# Contains the code templates for all supported arithmetic operations.
+# Maps the name of an arithmetic primitives to the code template that is used to
+#  generate the body of the mapped tasklet. These are used to instantiate the
+#  `ArithmeticOperationTranslator` objects.
 # fmt: off
 _ARITMETIC_OPERATION_TEMPLATES: Final[dict[str, str]] = {
     # Unary operations
@@ -177,24 +171,24 @@ _ARITMETIC_OPERATION_TEMPLATES: Final[dict[str, str]] = {
     "nextafter": "__out = nextafter((__in0), (__in1))",
 
     # Ternary operations
-    "clamp": "__out = (__in0 if __in1 < __in0 else (__in1 if __in1 < __in2 else __in2))"
+    "clamp": "__out = ((__in0) if (__in1) < (__in0) else ((__in1) if (__in1) < (__in2) else (__in2)))"
 }
 
 
-# Contains the code templates for all logical operations.
-#  The first one is for the integer case, the second for the bool case.
+# Maps the name of a logical primitive to the two code templates (first the integer
+#  case and second the boolean case) used to create the body of the mapped tasklet.
+#  They are used to instantiate the `LogicalOperationTranslator` translators.
 _LOGICAL_OPERATION_TEMPLATES: Final[dict[str, tuple[str, str]]] = {
     "or": ("__out = (__in0) | (__in1)",  "__out = (__in0) or (__in1)"),
     "not": ("__out = ~(__in0)", "__out = not (__in0)"),
     "and": ("__out = (__in0) & (__in1)", "__out = (__in0) and (__in1)"),
     "xor": ("__out = (__in0) ^ (__in1)", "__out = (__in0) != (__in1)"),
 }
+# fmt: on
 
 
-# Create the arithmetic translators
+# Instantiate the arithmetic and logical translators from the templates.
 for pname, ptmpl in _ARITMETIC_OPERATION_TEMPLATES.items():
     translator.register_primitive_translator(ArithmeticOperationTranslator(pname, ptmpl))
-
-# Create the logical translators.
 for pname, (itmpl, btmpl) in _LOGICAL_OPERATION_TEMPLATES.items():
     translator.register_primitive_translator(LogicalOperationTranslator(pname, itmpl, btmpl))

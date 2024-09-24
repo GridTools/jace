@@ -13,33 +13,34 @@ from .arithmetic_logical_translators import (
     LogicalOperationTranslator,
 )
 from .broadcast_in_dim_translator import BroadcastInDimTranslator
-from .concatenate_translator import ConcatenateTranslator
+from .concatenate_translator import concatenate_translator
 from .conditions import condition_translator
 from .convert_element_type_translator import ConvertElementTypeTranslator
-from .copy_translator import CopyTranslator, DevicePutTranslator
+from .copy_translator import copy_translator, device_put_translator
 from .gather_translator import GatherTranslator
 from .iota_translator import IotaTranslator
-from .pjit_translator import PJITTranslator
-from .reshape_translator import ReshapeTranslator
+from .pjit_translator import pjit_translator
+from .reshape_translator import reshape_translator
 from .select_n_translator import SelectNTranslator
-from .slicing import SlicingTranslator
+from .slicing import SlicingTranslator, dynamic_slicing_translator
 from .squeeze_translator import SqueezeTranslator
 
 
 __all__ = [
     "ArithmeticOperationTranslator",
     "BroadcastInDimTranslator",
-    "ConcatenateTranslator",
     "ConvertElementTypeTranslator",
-    "CopyTranslator",
-    "DevicePutTranslator",
     "GatherTranslator",
     "IotaTranslator",
     "LogicalOperationTranslator",
-    "PJITTranslator",
-    "ReshapeTranslator",
     "SelectNTranslator",
     "SlicingTranslator",
     "SqueezeTranslator",
+    "concatenate_translator",
     "condition_translator",
+    "copy_translator",
+    "device_put_translator",
+    "dynamic_slicing_translator",
+    "pjit_translator",
+    "reshape_translator",
 ]

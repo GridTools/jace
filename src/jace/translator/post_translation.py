@@ -20,6 +20,7 @@ from jace import translated_jaxpr_sdfg as tjsdfg, util
 
 if TYPE_CHECKING:
     from dace.sdfg import nodes as dace_nodes
+    from jax import core as jax_core
 
     from jace import translator
 
@@ -271,7 +272,8 @@ def add_nested_sdfg(
         will first pass it to `finalize_translation_context()` and operates on the
         return values. This means that `child_ctx` will be modified in place, and
         a copy will be added to `parent_ctx`.
-        It is highly recommended that `state` is empty.
+        It is highly recommended that `state` is empty, this makes subsequent
+        inlining of the nested SDFG simpler.
     """
     if child_ctx.sdfg.free_symbols:
         raise NotImplementedError("Symbol Mapping is not implemented.")
@@ -298,7 +300,6 @@ def add_nested_sdfg(
     nested_sdfg: dace_nodes.NestedSDFG = state.add_nested_sdfg(
         sdfg=final_child_ctx.sdfg,
         parent=parent_ctx.sdfg,
-        # Bug in DaCe must be a set.
         inputs=set(final_child_ctx.input_names),
         outputs=set(final_child_ctx.output_names),
     )
@@ -326,3 +327,49 @@ def add_nested_sdfg(
         )
 
     return nested_sdfg
+
+
+def promote_literals_to_constants(
+    builder: translator.JaxprTranslationBuilder,
+    var_names: Sequence[str | None],
+    jax_vars: Sequence[jax_core.Atom],
+    name_pattern: str,
+) -> list[str]:
+    """
+    Promotes all literals in `var_names` to DaCe constants and add them to the SDFG.
+
+    The function assumes that `var_names` are the SDFG variables equivalents of
+    `jax_vars`, as by convention `None` indicates a literal. The function will create
+    a constant for each literal and return `var_names` cleared of all literals.
+    For naming the variables the function will use `name_pattern`.
+
+    Args:
+        builder: The builder that is used for translation.
+        var_names: Names of the SDFG variables, `None` indicates a literal.
+        jax_vars: The JAX variables, in the same order than `var_names`.
+        name_pattern: A pattern to generate a unique name for the variables.
+
+    Todo:
+        Is a constant the right idea or should we generate a symbol?
+    """
+    promoted_var_names: list[str] = []
+    for i, var_name in enumerate(var_names):
+        if var_name is None:
+            promoted_var_name = f"__const_{name_pattern}_literal_promotion_{i}"
+            jax_var = jax_vars[i]
+            promoted_jace_var = util.JaCeVar.from_atom(
+                jax_var=jax_var,
+                name=promoted_var_name,
+            )
+            builder.add_array(promoted_jace_var)
+            builder.sdfg.add_constant(
+                promoted_var_name,
+                util.get_jax_literal_value(jax_var),
+                builder.arrays[promoted_var_name],
+            )
+
+        else:
+            # Already an SDFG variable, so nothing to do.
+            promoted_var_name = var_name
+        promoted_var_names.append(promoted_var_name)
+    return promoted_var_names

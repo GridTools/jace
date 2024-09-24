@@ -37,10 +37,10 @@ class JaxprTranslationBuilder:
     - it lacks the special `__return` variable,
     - the `arg_names` parameter is not set,
     - for all scalar values a `Scalar` SDFG variable is used, thus they cannot
-        be used for return values,
+        be used for returning values,
     - for every transient there is exactly one access node that writes to it,
-        except the name of the array starts with `__jace_mutable_`, which can
-        be written to multiple times.
+        except if the name of the array starts with `__jace_mutable_`, in which case
+        it can be written to multiple times.
 
     For these reasons the SDFG is not directly usable, and further manipulations
     have to be performed. Especially, DaCe's validation function will fail and
@@ -178,6 +178,24 @@ class JaxprTranslationBuilder:
         if modify_term_state:
             self._ctx.terminal_state = new_state
         return new_state
+
+    def add_orphan_state(
+        self,
+        label: str,
+    ) -> dace.SDFGState:
+        """
+        Add a new orphan state to the SDFG.
+
+        The state is not connected to any other state, nor it is the new start state.
+        Except you know what you are doing you should not use this function and
+        instead use `self.append_new_state()`.
+
+        Args:
+            label: The name of the state.
+        """
+        if not self.is_allocated():
+            raise RuntimeError("Builder is not allocated.")
+        return self._ctx.sdfg.add_state(label=label, is_start_block=False)
 
     @property
     def arrays(self) -> Mapping[str, dace_data.Data]:
@@ -712,7 +730,7 @@ class JaxprTranslationBuilder:
         ]
 
         while nodes_to_process:
-            currently_processing = nodes_to_process.pop(-1)
+            currently_processing = nodes_to_process.pop()
             if (
                 self.sdfg.out_degree(currently_processing) == 0
                 and currently_processing != new_terminal_state
@@ -790,7 +808,7 @@ class TranslationContext:
         self.terminal_state = self.start_state
         self.jaxpr = jaxpr
 
-    def validate(self) -> bool:
+    def validate(self) -> None:
         """
         Validate internal state of `self`.
 
@@ -829,4 +847,3 @@ class TranslationContext:
                 self.sdfg,
                 None,
             )
-        return True
