@@ -70,8 +70,6 @@ def fake_add_translator(*args: Any, **kwargs: Any) -> None:  # noqa: ARG001 [unu
 
 
 def test_has_pjit():
-    print(f"ADDRESS: {translator.get_registered_primitive_translators()['pjit']}")
-    print(f"FUN ADDRESS: {translator.primitive_translators.pjit_translator.PJITTranslator}")
     assert "pjit" in translator.get_registered_primitive_translators()
 
 
