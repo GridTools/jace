@@ -17,7 +17,7 @@ from .concatenate_translator import concatenate_translator
 from .conditions import condition_translator
 from .convert_element_type_translator import ConvertElementTypeTranslator
 from .copy_translator import copy_translator, device_put_translator
-from .gather_translator import GatherTranslator
+from .gather_translator import gather_translator
 from .iota_translator import IotaTranslator
 from .pjit_translator import pjit_translator
 from .reshape_translator import reshape_translator
@@ -30,7 +30,6 @@ __all__ = [
     "ArithmeticOperationTranslator",
     "BroadcastInDimTranslator",
     "ConvertElementTypeTranslator",
-    "GatherTranslator",
     "IotaTranslator",
     "LogicalOperationTranslator",
     "SelectNTranslator",
@@ -41,6 +40,7 @@ __all__ = [
     "copy_translator",
     "device_put_translator",
     "dynamic_slicing_translator",
+    "gather_translator",
     "pjit_translator",
     "reshape_translator",
 ]
