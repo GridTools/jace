@@ -25,8 +25,7 @@ def _test_impl_reshaping(
     src_shape: Sequence[int], dst_shape: Sequence[int], order: str = "C"
 ) -> None:
     """Performs a reshaping from `src_shape` to `dst_shape`."""
-    a = testutil.make_array(src_shape)
-    a = np.array(a, order=order)  # type: ignore[call-overload]  # MyPy wants a literal as order.
+    a = testutil.make_array(src_shape, order=order)
 
     def testee(a: np.ndarray) -> jax.Array:
         return jnp.reshape(a, dst_shape)

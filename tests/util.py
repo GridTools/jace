@@ -10,7 +10,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import Any, Literal
+from typing import Any
 
 import numpy as np
 
@@ -23,7 +23,7 @@ __all__ = ["make_array"]
 def make_array(
     shape: Sequence[int] | int,
     dtype: type = np.float64,
-    order: Literal[None, "K", "A", "C", "F"] = "C",
+    order: str = "C",
     low: Any = None,
     high: Any = None,
 ) -> np.ndarray:
@@ -69,7 +69,7 @@ def make_array(
             res = low + (high - low) * res
         assert (low is None) == (high is None)
 
-    return np.array(res, order=order, dtype=dtype)
+    return np.array(res, order=order, dtype=dtype)  # type: ignore[call-overload]  # Because we use `str` as `order`.
 
 
 def set_active_primitive_translators_to(
