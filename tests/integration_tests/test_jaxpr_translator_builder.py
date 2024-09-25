@@ -634,23 +634,29 @@ def test_builder_jace_var() -> None:
             _ = JaCeVar((), dace.int8, name=iname)
 
 
-def test_builder_FORTRAN_strides() -> None:  # noqa: N802 [invalid-function-name]
-    """Tests if we can lower without a standard stride.
+def test_builder_strides_lowering() -> None:
+    """Tests if we can lower without standard strides."""
 
-    Notes:
-        This tests if the restriction is currently in place.
-        See also `tests/test_caching.py::test_caching_strides`.
-    """
-
-    def testee(a: np.ndarray) -> np.ndarray:
-        return a + 10.0
+    def testee(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+        return a + b
 
     a = testutil.make_array((4, 3), order="F")
-    ref = testee(a)
-    res = jace.jit(testee)(a)
+    b = testutil.make_array((4, 3), order="C")
+    ref = testee(a, b)
+    a_ref_strides = (1, 4)
+    b_ref_strides = (3, 1)
+
+    lowered = jace.jit(testee).lower(a, b)
+    a_res_strides = lowered.as_sdfg().arrays["__jace_input_0"].strides
+    b_res_strides = lowered.as_sdfg().arrays["__jace_input_1"].strides
+
+    compiled = lowered.compile()
+    res = compiled(a, b)
 
     assert ref.shape == res.shape
     assert np.allclose(ref, res)
+    assert a_ref_strides == a_res_strides
+    assert b_ref_strides == b_res_strides
 
 
 def test_builder_drop_variables() -> None:
