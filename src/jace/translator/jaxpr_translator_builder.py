@@ -179,24 +179,6 @@ class JaxprTranslationBuilder:
             self._ctx.terminal_state = new_state
         return new_state
 
-    def add_orphan_state(
-        self,
-        label: str,
-    ) -> dace.SDFGState:
-        """
-        Add a new orphan state to the SDFG.
-
-        The state is not connected to any other state, nor it is the new start state.
-        Except you know what you are doing you should not use this function and
-        instead use `self.append_new_state()`.
-
-        Args:
-            label: The name of the state.
-        """
-        if not self.is_allocated():
-            raise RuntimeError("Builder is not allocated.")
-        return self._ctx.sdfg.add_state(label=label, is_start_block=False)
-
     @property
     def arrays(self) -> Mapping[str, dace_data.Data]:
         """
@@ -520,7 +502,8 @@ class JaxprTranslationBuilder:
     @property
     def _ctx(self) -> TranslationContext:
         """Returns the currently active translation context."""
-        assert len(self._ctx_stack) != 0, "No context is active."
+        if not self.is_allocated():
+            raise RuntimeError("The context is not allocated.")
         return self._ctx_stack[-1]
 
     def _clear_translation_ctx(self) -> TranslationContext | None:

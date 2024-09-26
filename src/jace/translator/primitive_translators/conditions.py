@@ -116,7 +116,7 @@ def condition_translator(
         branch_states.append(branch_state)
 
     # Connect all branch states to the join state
-    join_state = builder.add_orphan_state(f"{name_pattern}__join_state")
+    join_state = builder._ctx.sdfg.add_state(label=f"{name_pattern}__join_state")
     for branch_state in branch_states:
         builder.sdfg.add_edge(
             branch_state,
