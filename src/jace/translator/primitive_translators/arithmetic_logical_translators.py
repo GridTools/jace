@@ -79,8 +79,8 @@ class LogicalOperationTranslator(mapped_base.MappedOperationTranslatorBase):
 
     Args:
         prim_name: The name of the primitive that should be handled.
-        int_tmpl: The template used for the integer case.
-        bool_tmpl: The template used for the bool case.
+        bitwise_tmpl: The template used for the bitwise case.
+        logical_tmpl: The template used for the logical case.
 
     Note:
         Since it does not make sense to single out `not` and keep the other
@@ -88,10 +88,10 @@ class LogicalOperationTranslator(mapped_base.MappedOperationTranslatorBase):
         handled by this class.
     """
 
-    def __init__(self, prim_name: str, int_tmpl: str, bool_tmpl: str) -> None:
+    def __init__(self, prim_name: str, bitwise_tmpl: str, logical_tmpl: str) -> None:
         super().__init__(primitive_name=prim_name)
-        self._int_tmpl = int_tmpl
-        self._bool_tmpl = bool_tmpl
+        self._bitwise_tmpl = bitwise_tmpl
+        self._logical_tmpl = logical_tmpl
 
     @override
     def write_tasklet_code(
@@ -101,8 +101,8 @@ class LogicalOperationTranslator(mapped_base.MappedOperationTranslatorBase):
         eqn: jax_core.JaxprEqn,
     ) -> str:
         if all(util.get_jax_var_dtype(invar) is dace.bool_ for invar in eqn.invars):
-            return self._bool_tmpl
-        return self._int_tmpl
+            return self._logical_tmpl
+        return self._bitwise_tmpl
 
 
 # Maps the name of an arithmetic JAX primitive to the code template that is used to
@@ -176,11 +176,23 @@ _ARITMETIC_OPERATION_TEMPLATES: Final[dict[str, str]] = {
 # Maps the name of a logical primitive to the two code templates, first the integer
 #  case and second the boolean case, that are used to create the body of the mapped
 #  tasklet. They are used to instantiate the `LogicalOperationTranslator` translators.
-_LOGICAL_OPERATION_TEMPLATES: Final[dict[str, tuple[str, str]]] = {
-    "or": ("__out = (__in0) | (__in1)",  "__out = (__in0) or (__in1)"),
-    "not": ("__out = ~(__in0)", "__out = not (__in0)"),
-    "and": ("__out = (__in0) & (__in1)", "__out = (__in0) and (__in1)"),
-    "xor": ("__out = (__in0) ^ (__in1)", "__out = (__in0) != (__in1)"),
+_LOGICAL_OPERATION_TEMPLATES: Final[dict[str, dict[str, str]]] = {
+    "or": {
+        "bitwise_tmpl": "__out = (__in0) | (__in1)",
+        "logical_tmpl": "__out = (__in0) or (__in1)",
+    },
+    "not": {
+        "bitwise_tmpl": "__out = ~(__in0)",
+        "logical_tmpl": "__out = not (__in0)",
+    },
+    "and": {
+        "bitwise_tmpl": "__out = (__in0) & (__in1)",
+        "logical_tmpl": "__out = (__in0) and (__in1)",
+    },
+    "xor": {
+        "bitwise_tmpl": "__out = (__in0) ^ (__in1)",
+        "logical_tmpl": "__out = (__in0) != (__in1)",
+    },
 }
 # fmt: on
 
@@ -188,5 +200,5 @@ _LOGICAL_OPERATION_TEMPLATES: Final[dict[str, tuple[str, str]]] = {
 # Instantiate the arithmetic and logical translators from the templates.
 for pname, ptmpl in _ARITMETIC_OPERATION_TEMPLATES.items():
     translator.register_primitive_translator(ArithmeticOperationTranslator(pname, ptmpl))
-for pname, (itmpl, btmpl) in _LOGICAL_OPERATION_TEMPLATES.items():
-    translator.register_primitive_translator(LogicalOperationTranslator(pname, itmpl, btmpl))
+for pname, ptmpl in _LOGICAL_OPERATION_TEMPLATES.items():  # type: ignore[assignment]  # Type confusion
+    translator.register_primitive_translator(LogicalOperationTranslator(pname, **ptmpl))  # type: ignore[arg-type]  # Type confusion

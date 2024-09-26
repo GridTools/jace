@@ -57,7 +57,7 @@ class SlicingTranslator(mapped_base.MappedOperationTranslatorBase):
         eqn: jax_core.JaxprEqn,
     ) -> dict[str, dace.Memlet]:
         strides: Sequence[int] = (
-            ((1,) * len(tskl_ranges)) if eqn.params["strides"] is None else eqn.params["strides"]
+            eqn.params["strides"] if eqn.params["strides"] else ((1,) * len(tskl_ranges))
         )
         start_indices: Sequence[int] = eqn.params["start_indices"]  # Fist index to slice
         return {
