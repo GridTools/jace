@@ -63,7 +63,7 @@ def gather_translator(  # noqa: PLR0914 [too-many-locals]  # Can not reduce any 
     if eqn.params["mode"] != jax_lax.GatherScatterMode.PROMISE_IN_BOUNDS:
         raise NotImplementedError(f"The mode {eqn.params['mode']} is not implemented.")
 
-    # This is the size of the slice window that is copied. Its length equal the rank
+    # This is the size of the slice window that is copied. Its length is the rank
     #  of the source array, dimensions that are excluded from copying are listed
     #  in `collapsed_slice_dims`.
     slice_sizes: Sequence[int] = eqn.params["slice_sizes"]
