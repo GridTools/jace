@@ -32,7 +32,7 @@ class ConvertElementTypeTranslator(mapped_base.MappedOperationTranslatorBase):
     will perform the type conversion operation.
 
     Note:
-        The type to cast to id inferred from the output variable and the `new_dtype`
+        The type to cast to is inferred from the output variable and the `new_dtype`
         parameter of the equation is ignored.
     """
 

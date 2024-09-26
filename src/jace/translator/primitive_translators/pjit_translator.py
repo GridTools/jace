@@ -57,9 +57,7 @@ def pjit_translator(
     nested_jaxpr: jax_core.ClosedJaxpr = eqn.params["jaxpr"]
     in_shardings = eqn.params["in_shardings"]
     out_shardings = eqn.params["out_shardings"]
-    _ = eqn.params["donated_invars"]  # Always ignored
-    _ = eqn.params["keep_unused"]
-    _ = eqn.params["inline"]
+    # "donated_invars", "keep_unused", "inline" parameters are just ignored
 
     if not all(in_sharding is jax_sharding.UNSPECIFIED for in_sharding in in_shardings):
         raise NotImplementedError("Currently 'pjit' does not support sharding in its input.")
