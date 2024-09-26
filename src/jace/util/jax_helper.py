@@ -81,6 +81,27 @@ class JaCeVar:
             return NotImplemented
         return id(self) == id(other)
 
+    @classmethod
+    def from_atom(
+        cls,
+        jax_var: jax_core.Atom,
+        name: str | None,
+    ) -> JaCeVar:
+        """
+        Generates a `JaCeVar` from the JAX variable `jax_var`.
+
+        If `jax_var` is a literal its value is ignored.
+
+        Args:
+            jax_var: The variable to process.
+            name: The optional name of the variable.
+        """
+        return cls(
+            shape=get_jax_var_shape(jax_var),
+            dtype=get_jax_var_dtype(jax_var),
+            name=name,
+        )
+
 
 def get_jax_var_name(jax_var: jax_core.Atom | JaCeVar) -> str:
     """Returns the name of `jax_var` as a string."""

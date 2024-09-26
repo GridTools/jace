@@ -19,6 +19,9 @@ from jace import translated_jaxpr_sdfg as tjsdfg, util
 
 
 if TYPE_CHECKING:
+    from dace.sdfg import nodes as dace_nodes
+    from jax import core as jax_core
+
     from jace import translator
 
 
@@ -234,3 +237,139 @@ def finalize_translation_context(
     if validate:
         tsdfg.validate()
     return tsdfg
+
+
+def add_nested_sdfg(
+    state: dace.SDFGState,
+    child_ctx: translator.TranslationContext,
+    parent_ctx: translator.TranslationContext,
+    in_var_names: Sequence[str],
+    out_var_names: Sequence[str],
+) -> dace_nodes.NestedSDFG:
+    """
+    Adds the SDFG in `child_ctx` as nested SDFG at state `state` in `parent_ctx`.
+
+    The function is a convenience wrapper that operates directly on translation
+    contexts instead of SDFGs. The function will also create the necessary Memlet
+    connections.
+
+    Args:
+        state: The state at which the nested SDFG should be inserted.
+            Must be part of `parent_ctx`.
+        child_ctx: The translation context representing the SDFG that should be added.
+        parent_ctx: The parent SDFG to which `child_ctx` should be added as nested
+            SDFG in state `state`.
+        in_var_names: Names of the variables in `parent_ctx` that are used as inputs for
+            the nested SDFG, must have the same order as `child_ctx.input_names`.
+        out_var_names: Names of the variables in `parent_ctx` that are used as outputs
+            for the nested SDFG, must have the same order as `child_ctx.output_names`.
+
+    Returns:
+        The nested SDFG object.
+
+    Note:
+        The function will not add `child_ctx` directly as nested SDFG. Instead it
+        will first pass it to `finalize_translation_context()` and operates on the
+        return values. This means that `child_ctx` will be modified in place, and
+        a copy will be added to `parent_ctx`.
+        It is highly recommended that `state` is empty, this makes subsequent
+        inlining of the nested SDFG simpler.
+    """
+    if child_ctx.sdfg.free_symbols:
+        raise NotImplementedError("Symbol Mapping is not implemented.")
+    assert not (child_ctx.input_names is None or child_ctx.output_names is None)  # Silence mypy
+    assert len(child_ctx.input_names) == len(in_var_names)
+    assert len(child_ctx.output_names) == len(out_var_names)
+    assert state in parent_ctx.sdfg.nodes()
+    assert not set(in_var_names).intersection(out_var_names)
+
+    if any(input_name.startswith("__jace_mutable_") for input_name in in_var_names):
+        raise NotImplementedError(
+            "'__jace_mutable_' variables are not yet handled in 'add_nested_sdfg()'."
+        )
+    if len(set(in_var_names)) != len(in_var_names):
+        raise ValueError(
+            f"An input can only be passed once, but { {in_var_name for in_var_name in in_var_names if in_var_names.count(in_var_name) > 1} } were passed multiple times."
+        )
+    if len(set(out_var_names)) != len(out_var_names):
+        raise NotImplementedError(
+            f"Tried to write multiple times to variables: { {out_var_name for out_var_name in out_var_names if out_var_names.count(out_var_name) > 1} }."
+        )
+
+    final_child_ctx = finalize_translation_context(child_ctx)
+    nested_sdfg: dace_nodes.NestedSDFG = state.add_nested_sdfg(
+        sdfg=final_child_ctx.sdfg,
+        parent=parent_ctx.sdfg,
+        inputs=set(final_child_ctx.input_names),
+        outputs=set(final_child_ctx.output_names),
+    )
+
+    # Now create the connections for the input.
+    for outer_name, inner_name in zip(in_var_names, final_child_ctx.input_names):
+        outer_array = parent_ctx.sdfg.arrays[outer_name]
+        state.add_edge(
+            state.add_read(outer_name),
+            None,
+            nested_sdfg,
+            inner_name,
+            dace.Memlet.from_array(outer_name, outer_array),
+        )
+
+    # Now we create the output connections.
+    for outer_name, inner_name in zip(out_var_names, final_child_ctx.output_names):
+        outer_array = parent_ctx.sdfg.arrays[outer_name]
+        state.add_edge(
+            nested_sdfg,
+            inner_name,
+            state.add_write(outer_name),
+            None,
+            dace.Memlet.from_array(outer_name, outer_array),
+        )
+
+    return nested_sdfg
+
+
+def promote_literals_to_constants(
+    builder: translator.JaxprTranslationBuilder,
+    var_names: Sequence[str | None],
+    jax_vars: Sequence[jax_core.Atom],
+    name_pattern: str,
+) -> list[str]:
+    """
+    Promotes all literals in `var_names` to DaCe constants and add them to the SDFG.
+
+    The function assumes that `var_names` are the SDFG variables equivalents of
+    `jax_vars`, as by convention `None` indicates a literal. The function will create
+    a constant for each literal and return `var_names` cleared of all literals.
+    For naming the variables the function will use `name_pattern`.
+
+    Args:
+        builder: The builder that is used for translation.
+        var_names: Names of the SDFG variables, `None` indicates a literal.
+        jax_vars: The JAX variables, in the same order than `var_names`.
+        name_pattern: A pattern to generate a unique name for the variables.
+
+    Todo:
+        Is a constant the right idea or should we generate a symbol?
+    """
+    promoted_var_names: list[str] = []
+    for i, var_name in enumerate(var_names):
+        if var_name is None:
+            promoted_var_name = f"__const_{name_pattern}_literal_promotion_{i}"
+            jax_var = jax_vars[i]
+            promoted_jace_var = util.JaCeVar.from_atom(
+                jax_var=jax_var,
+                name=promoted_var_name,
+            )
+            builder.add_array(promoted_jace_var)
+            builder.sdfg.add_constant(
+                promoted_var_name,
+                util.get_jax_literal_value(jax_var),
+                builder.arrays[promoted_var_name],
+            )
+
+        else:
+            # Already an SDFG variable, so nothing to do.
+            promoted_var_name = var_name
+        promoted_var_names.append(promoted_var_name)
+    return promoted_var_names

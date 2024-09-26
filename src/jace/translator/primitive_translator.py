@@ -64,6 +64,9 @@ class PrimitiveTranslatorCallable(Protocol):
         primitive translator was able to fully construct the dataflow graph
         within `eqn_state`.
 
+        After the primitive translator returns, the builder will propagate the
+        Memlets in all states that were newly created.
+
         A primitive translator has to use the passed input variables,
         `in_var_names` and must write its output into the variables indicated
         by `out_var_names`. But it is allowed that a primitive translator
@@ -74,7 +77,7 @@ class PrimitiveTranslatorCallable(Protocol):
         Args:
             builder: The builder object of the translation.
             in_var_names: List of the names of the arrays created inside the
-                SDFG for the inpts or `None` in case of a literal.
+                SDFG for the inputs or `None` in case of a literal.
             out_var_names: List of the names of the arrays created inside the
                 SDFG for the outputs.
             eqn: The JAX primitive that should be translated.
