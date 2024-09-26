@@ -14,11 +14,18 @@ from typing import Any
 
 import jax
 import numpy as np
+import pytest
 from jax import numpy as jnp
 
 import jace
 
 from tests import util as testutil
+
+
+@pytest.fixture(params=[True, False])
+def pred(request) -> np.bool_:
+    """Predicate used in the `test_mapped_unary_scalar_literal_*` tests."""
+    return np.bool_(request.param)
 
 
 def _perform_test(testee: Callable, *args: Any) -> None:
@@ -38,24 +45,27 @@ def test_select_n_where() -> None:
     _perform_test(testee, pred, tbranch, fbranch)
 
 
-def test_select_n_where_literal() -> None:
-    def testee1(pred: np.ndarray, fbranch: np.ndarray) -> jax.Array:
+def test_select_n_where_literal_1(pred) -> None:
+    def testee(pred: np.ndarray, fbranch: np.ndarray) -> jax.Array:
         return jnp.where(pred, 2, fbranch)
 
-    def testee2(pred: np.ndarray, tbranch: np.ndarray) -> jax.Array:
+    fbranch = 1
+    _perform_test(testee, pred, fbranch)
+
+
+def test_select_n_where_literal_2(pred) -> None:
+    def testee(pred: np.ndarray, tbranch: np.ndarray) -> jax.Array:
         return jnp.where(pred, tbranch, 3)
 
-    def testee3(pred: np.ndarray) -> jax.Array:
+    tbranch = 2
+    _perform_test(testee, pred, tbranch)
+
+
+def test_select_n_where_literal_3(pred) -> None:
+    def testee(pred: np.ndarray) -> jax.Array:
         return jnp.where(pred, 8, 9)
 
-    shape = ()
-    pred = testutil.make_array(shape, np.bool_)
-    tbranch = testutil.make_array(shape, np.int_)
-    fbranch = tbranch + 1
-
-    _perform_test(testee1, pred, fbranch)
-    _perform_test(testee2, pred, tbranch)
-    _perform_test(testee3, pred)
+    _perform_test(testee, pred)
 
 
 def test_select_n_many_inputs() -> None:
