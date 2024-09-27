@@ -113,6 +113,7 @@ addopts = ["-ra", "--showlocals", "--strict-markers", "--strict-config"]
 filterwarnings = [
   "error",
   "ignore:numpy\\..*:DeprecationWarning",  # DaCe is not NumPy v2.0 ready so ignore the usage of deprecated features.
+  "ignore:pandas not found, skipping conversion test\\.:ImportWarning",  # Pandas is not installed on the CI.
 ]
 log_cli_level = "INFO"
 minversion = "6.0"
