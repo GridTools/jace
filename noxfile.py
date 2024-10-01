@@ -134,7 +134,10 @@ def docs(session: nox.Session) -> None:
 @nox.session(reuse_venv=True)
 def api_docs(session: nox.Session) -> None:
     """Build (regenerate) API docs."""
-    session.install(f"sphinx=={REQUIREMENTS['sphinx']}")
+    sphinx_req = REQUIREMENTS["sphinx"]
+    if sphinx_req.isdigit():
+        sphinx_req = "==" + sphinx_req
+    session.install(f"sphinx{sphinx_req}")
     session.chdir("docs")
     session.run(
         "sphinx-apidoc",

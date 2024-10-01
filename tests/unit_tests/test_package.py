@@ -15,5 +15,5 @@ import jace as m
 
 
 @pytest.mark.skip(reason="This does not work yet.")
-def test_version():
+def test_version() -> None:
     assert importlib.metadata.version("jace") == m.__version__
