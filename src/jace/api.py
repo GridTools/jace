@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import functools
 from collections.abc import Callable, Mapping
-from typing import Literal, ParamSpec, TypedDict, TypeVar, overload
+from typing import Any, Literal, ParamSpec, TypedDict, overload
 
 from jax import grad, jacfwd, jacrev
 from typing_extensions import Unpack
@@ -22,7 +22,6 @@ from jace import stages, translator
 __all__ = ["JITOptions", "grad", "jacfwd", "jacrev", "jit"]
 
 _P = ParamSpec("_P")
-_R = TypeVar("_R")
 
 
 class JITOptions(TypedDict, total=False):
@@ -46,24 +45,24 @@ def jit(
     /,
     primitive_translators: Mapping[str, translator.PrimitiveTranslator] | None = None,
     **kwargs: Unpack[JITOptions],
-) -> Callable[[Callable[_P, _R]], stages.JaCeWrapped[_P, _R]]: ...
+) -> Callable[[Callable[_P, Any]], stages.JaCeWrapped[_P]]: ...
 
 
 @overload
 def jit(
-    fun: Callable[_P, _R],
+    fun: Callable[_P, Any],
     /,
     primitive_translators: Mapping[str, translator.PrimitiveTranslator] | None = None,
     **kwargs: Unpack[JITOptions],
-) -> stages.JaCeWrapped[_P, _R]: ...
+) -> stages.JaCeWrapped[_P]: ...
 
 
 def jit(
-    fun: Callable[_P, _R] | None = None,
+    fun: Callable[_P, Any] | None = None,
     /,
     primitive_translators: Mapping[str, translator.PrimitiveTranslator] | None = None,
     **kwargs: Unpack[JITOptions],
-) -> Callable[[Callable[_P, _R]], stages.JaCeWrapped[_P, _R]] | stages.JaCeWrapped[_P, _R]:
+) -> Callable[[Callable[_P, Any]], stages.JaCeWrapped[_P]] | stages.JaCeWrapped[_P]:
     """
     JaCe's replacement for `jax.jit` (just-in-time) wrapper.
 
@@ -88,7 +87,7 @@ def jit(
             f"The following arguments to 'jace.jit' are not yet supported: {', '.join(not_supported_jit_keys)}."
         )
 
-    def wrapper(f: Callable[_P, _R]) -> stages.JaCeWrapped[_P, _R]:
+    def wrapper(f: Callable[_P, Any]) -> stages.JaCeWrapped[_P]:
         jace_wrapper = stages.JaCeWrapped(
             fun=f,
             primitive_translators=(
