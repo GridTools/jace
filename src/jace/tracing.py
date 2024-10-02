@@ -77,13 +77,19 @@ def make_jaxpr(
         - Handle default arguments of `fun`.
         - Handle static arguments.
         - Turn `trace_options` into a `TypedDict` and sync with `jace.jit`.
+
+    Note:
+        Not all arguments that are supported by `jax.make_jaxpr()` are also supported
+        by this function. There is no error checking performed.
     """
-    if trace_options:
-        raise NotImplementedError(
-            f"Not supported tracing options: {', '.join(f'{k}' for k in trace_options)}"
-        )
     # TODO(phimuell): Test if this restriction is needed.
     assert all(param.default is param.empty for param in inspect.signature(fun).parameters.values())
+
+    # NOTE: `jax.make_jaxpr()` to current tracing backend we use, never supported
+    #   all arguments `jax.jit()` supported, which is strange. But in JaCe this
+    #   _will_ not be the case. To make things work, until we have a better working
+    #   backend we have to filter, i.e. clearing the `trace_options`.
+    trace_options = {}
 
     def tracer_impl(
         *args: _P.args,
@@ -96,7 +102,9 @@ def make_jaxpr(
         #  it for the tracing.
         with jax.experimental.enable_x64():
             # TODO(phimuell): copy the implementation of the real tracing
-            jaxpr_maker = jax.make_jaxpr(
+            # For some reasons MyPy seems to think that `jax.make_jaxpr()` is the same
+            #  as `jace.make_jaxpr()` so we have to ignore the error.
+            jaxpr_maker = jax.make_jaxpr(  # type: ignore[call-overload]
                 fun,
                 **trace_options,
                 return_shape=True,

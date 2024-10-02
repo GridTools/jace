@@ -29,11 +29,15 @@ class JITOptions(TypedDict, total=False):
     """
     All known options to `jace.jit` that influence tracing.
 
-    Note:
-        Currently there are no known options, but essentially it is a subset of some
-        of the options that are supported by `jax.jit` together with some additional
-        JaCe specific ones.
+    Not all arguments that are supported by `jax-jit()` are also supported by
+    `jace.jit`. Furthermore, some additional ones might be supported.
+    The following arguments are supported:
+    - `backend`: For which platform DaCe should generate code for. It is a string,
+        where the following values are supported: `'cpu'` or `'gpu'`.
+        DaCe's `DeviceType` enum or FPGA are not supported.
     """
+
+    backend: str
 
 
 @overload
@@ -72,15 +76,16 @@ def jit(
         fun: Function to wrap.
         primitive_translators: Use these primitive translators for the lowering to SDFG.
             If not specified the translators in the global registry are used.
-        kwargs: Jit arguments.
+        kwargs: Jit arguments, see `JITOptions` for more.
 
     Note:
         This function is the only valid way to obtain a JaCe computation.
     """
-    if kwargs:
+    not_supported_jit_keys = kwargs.keys() - {"backend"}
+    if not_supported_jit_keys:
         # TODO(phimuell): Add proper name verification and exception type.
         raise NotImplementedError(
-            f"The following arguments to 'jace.jit' are not yet supported: {', '.join(kwargs)}."
+            f"The following arguments to 'jace.jit' are not yet supported: {', '.join(not_supported_jit_keys)}."
         )
 
     def wrapper(f: Callable[_P, _R]) -> stages.JaCeWrapped[_P, _R]:

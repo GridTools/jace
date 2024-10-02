@@ -166,14 +166,21 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"], Generic[_P, _R]):
         trans_ctx: translator.TranslationContext = builder.translate_jaxpr(jaxpr)
 
         flat_call_args = jax_tree.tree_leaves((args, kwargs))
+        device = util.parse_backend_jit_option(self._jit_options.get("backend", "cpu"))
         tsdfg: tjsdfg.TranslatedJaxprSDFG = ptranslation.postprocess_jaxpr_sdfg(
             trans_ctx=trans_ctx,
+            device=device,
             fun=self.wrapped_fun,
             flat_call_args=flat_call_args,
         )
 
         # NOTE: `tsdfg` is deepcopied as a side effect of post processing.
-        return JaCeLowered(tsdfg, out_tree, trans_ctx.jaxpr)
+        return JaCeLowered(
+            tsdfg=tsdfg,
+            out_tree=out_tree,
+            jaxpr=trans_ctx.jaxpr,
+            device=device,
+        )
 
     @property
     def wrapped_fun(self) -> Callable:
@@ -217,6 +224,7 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"], Generic[_R]):
         out_tree: The pytree describing how to unflatten the output.
         jaxpr: The Jaxpr expression that was translated into an SDFG. Intended to be
             used during debugging and inspection.
+        device: The device type for which code should be generated.
 
     Note:
         `self` will manage the passed `tsdfg` object. Modifying it results is undefined
@@ -227,17 +235,20 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"], Generic[_R]):
     _translated_sdfg: tjsdfg.TranslatedJaxprSDFG
     _out_tree: jax_tree.PyTreeDef
     _jaxpr: jax_core.ClosedJaxpr
+    _device: dace.DeviceType
 
     def __init__(
         self,
         tsdfg: tjsdfg.TranslatedJaxprSDFG,
         out_tree: jax_tree.PyTreeDef,
         jaxpr: jax_core.ClosedJaxpr,
+        device: str | dace.DeviceType,
     ) -> None:
         super().__init__()
         self._translated_sdfg = tsdfg
         self._out_tree = out_tree
         self._jaxpr = jaxpr
+        self._device = util.parse_backend_jit_option(device)
 
     @tcache.cached_transition
     def compile(self, compiler_options: CompilerOptions | None = None) -> JaCeCompiled[_R]:
@@ -255,7 +266,9 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"], Generic[_R]):
         # We **must** deepcopy before we do any optimization, because all optimizations
         #  are in place, to properly cache stages, stages needs to be immutable.
         tsdfg: tjsdfg.TranslatedJaxprSDFG = copy.deepcopy(self._translated_sdfg)
-        optimization.jace_optimize(tsdfg=tsdfg, **get_compiler_options(compiler_options))
+        optimization.jace_optimize(
+            tsdfg=tsdfg, device=self._device, **get_compiler_options(compiler_options)
+        )
 
         return JaCeCompiled(
             compiled_sdfg=tjsdfg.compile_jaxpr_sdfg(tsdfg),
@@ -348,6 +361,14 @@ class JaCeCompiled(Generic[_R]):
         flat_call_args = jax_tree.tree_leaves((args, kwargs))
         flat_output = self._compiled_sdfg(flat_call_args)
         return jax_tree.tree_unflatten(self._out_tree, flat_output)
+
+    def as_sdfg(self) -> dace.SDFG:
+        """
+        Returns the underlying SDFG.
+
+        It is undefined behaviour if the SDFG is modified.
+        """
+        return self._compiled_sdfg.sdfg
 
 
 # <--------------------------- Compilation/Optimization options management

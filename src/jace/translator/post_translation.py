@@ -27,6 +27,7 @@ if TYPE_CHECKING:
 
 def postprocess_jaxpr_sdfg(
     trans_ctx: translator.TranslationContext,
+    device: dace.DeviceType,
     fun: Callable,  # noqa: ARG001 [unused-function-argument]  # Currently unused.
     flat_call_args: Sequence[Any],
     validate: bool = True,
@@ -39,6 +40,7 @@ def postprocess_jaxpr_sdfg(
 
     Args:
         trans_ctx: The `TranslationContext` obtained from a `translate_jaxpr()` call.
+        device: The device on which the SDFG will run.
         fun: The original function that was translated.
         flat_call_args: The flattened input arguments.
         validate: Perform validation.
@@ -49,12 +51,14 @@ def postprocess_jaxpr_sdfg(
         - Make it such that the context is not modified as a side effect.
     """
     trans_ctx.validate()  # Always validate, it is cheap.
-    create_input_output_stages(trans_ctx=trans_ctx, flat_call_args=flat_call_args)
+    create_input_output_stages(trans_ctx=trans_ctx, device=device, flat_call_args=flat_call_args)
     return finalize_translation_context(trans_ctx, validate=validate)
 
 
 def create_input_output_stages(
-    trans_ctx: translator.TranslationContext, flat_call_args: Sequence[Any]
+    trans_ctx: translator.TranslationContext,
+    device: dace.DeviceType,
+    flat_call_args: Sequence[Any],
 ) -> None:
     """
     Creates an input and output state inside the SDFG in place.
@@ -63,16 +67,20 @@ def create_input_output_stages(
 
     Args:
         trans_ctx: The translation context that should be modified.
+        device: The device on which the SDFG will run.
         flat_call_args: The flattened call arguments that should be used.
 
     Note:
         The processed SDFG will remain canonical.
     """
     _create_input_state(trans_ctx, flat_call_args)
-    _create_output_state(trans_ctx)
+    _create_output_state(trans_ctx, device)
 
 
-def _create_output_state(trans_ctx: translator.TranslationContext) -> None:
+def _create_output_state(
+    trans_ctx: translator.TranslationContext,
+    device: dace.DeviceType,
+) -> None:
     """
     Creates the output processing stage for the SDFG in place.
 
@@ -81,8 +89,13 @@ def _create_output_state(trans_ctx: translator.TranslationContext) -> None:
     output variable is a scalar, the output will be replaced by an array of length one.
     This behaviour is consistent with JAX.
 
+    If `device` is `DeviceType.GPU` then the output objects are created on the GPU,
+    otherwise they will be created on the CPU. Since scalars are promoted to arrays
+    they will also be created on the GPU.
+
     Args:
         trans_ctx: The translation context to process.
+        device: The device on which the SDFG runs.
     """
     assert trans_ctx.input_names is not None and trans_ctx.output_names is not None
 
@@ -90,6 +103,9 @@ def _create_output_state(trans_ctx: translator.TranslationContext) -> None:
     sdfg = trans_ctx.sdfg
     new_output_state: dace.SDFGState = sdfg.add_state("output_processing_stage")
     new_output_names: list[str] = []
+    storage: dace.StorageType = (
+        dace.StorageType.GPU_Global if device == dace.DeviceType.GPU else dace.StorageType.CPU_Heap
+    )
 
     for i, org_output_name in enumerate(trans_ctx.output_names):
         new_output_name = output_pattern.format(i)
@@ -105,11 +121,13 @@ def _create_output_state(trans_ctx: translator.TranslationContext) -> None:
                 dtype=org_output_desc.dtype,
                 shape=(1,),
                 transient=True,  # Needed for an canonical SDFG
+                storage=storage,
             )
             memlet = dace.Memlet.simple(new_output_name, subset_str="0", other_subset_str="0")
 
         else:
             new_output_desc = org_output_desc.clone()
+            new_output_desc.storage = storage
             sdfg.add_datadesc(new_output_name, new_output_desc)
             memlet = dace.Memlet.from_array(org_output_name, org_output_desc)
 
@@ -133,7 +151,8 @@ def _create_input_state(
 
     The function will create a new set of variables that are exposed as inputs. This
     variables are based on the example input arguments passed through `flat_call_args`.
-    This process will hard code the memory location and strides into the SDFG.
+    This process will hard code the memory location, i.e. if the input is on the GPU,
+    then the new input will be don the GPU as well and strides into the SDFG.
     The assignment is performed inside a new state, which is put at the beginning.
 
     Args:

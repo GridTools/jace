@@ -258,3 +258,22 @@ def get_jax_literal_value(lit: jax_core.Atom) -> bool | float | int | np.generic
     if util.is_scalar(val):
         return val
     raise TypeError(f"Failed to extract value from '{lit}' ('{val}' type: {type(val).__name__}).")
+
+
+def parse_backend_jit_option(
+    backend: str | dace.DeviceType,
+) -> dace.DeviceType:
+    """Turn JAX' `backend` option into the proper DaCe device type."""
+    if isinstance(backend, dace.DeviceType):
+        return backend
+    match backend:
+        case "cpu" | "CPU":
+            return dace.DeviceType.CPU
+        case "gpu" | "GPU":
+            return dace.DeviceType.GPU
+        case "fpga" | "FPGA":
+            return dace.DeviceType.FPGA
+        case "tpu" | "TPU":
+            raise NotImplementedError("TPU are not supported.")
+        case _:
+            raise ValueError(f"Could not parse the backend '{backend}'.")
