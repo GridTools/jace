@@ -22,7 +22,7 @@ from jace import util
 
 
 if TYPE_CHECKING:
-    import numpy as np
+    import jax
     from dace.codegen import compiled_sdfg as dace_csdfg
 
 
@@ -139,7 +139,7 @@ class CompiledJaxprSDFG:
     def __call__(
         self,
         flat_call_args: Sequence[Any],
-    ) -> list[np.ndarray]:
+    ) -> list[jax.Array]:
         """
         Run the compiled SDFG using the flattened input.
 
@@ -178,7 +178,10 @@ class CompiledJaxprSDFG:
             dace.Config.set("compiler", "allow_view_arguments", value=True)
             self.compiled_sdfg(**sdfg_call_args)
 
-        return [sdfg_call_args[output_name] for output_name in self.output_names]
+        return [
+            util.move_into_jax_array(sdfg_call_args[output_name])
+            for output_name in self.output_names
+        ]
 
 
 def compile_jaxpr_sdfg(tsdfg: TranslatedJaxprSDFG) -> dace_csdfg.CompiledJaxprSDFG:

@@ -103,6 +103,7 @@ module = [
   "dace.*",
   "jax.*",
   "jaxlib.*",
+  "cupy.",
 ]
 
 # -- pytest  --

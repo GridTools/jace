@@ -21,13 +21,19 @@ from typing import TYPE_CHECKING, Any, overload
 
 import dace
 import jax
-import jax.core as jax_core
+from jax import core as jax_core, dlpack as jax_dlpack
 
 from jace import util
 
 
 if TYPE_CHECKING:
     import numpy as np
+
+
+try:
+    import cupy as cp  # type: ignore[import-not-found]
+except ImportError:
+    cp = None
 
 
 @dataclasses.dataclass(repr=True, frozen=True, eq=False)
@@ -277,3 +283,23 @@ def parse_backend_jit_option(
             raise NotImplementedError("TPU are not supported.")
         case _:
             raise ValueError(f"Could not parse the backend '{backend}'.")
+
+
+def move_into_jax_array(
+    arr: Any,
+    copy: bool | None = False,
+) -> jax.Array:
+    """
+    Moves `arr` into a JAX array using DLPack format.
+
+    By default `copy` is set to `False`, it is the responsibility of the caller
+    to ensure that the underlying buffer is not modified later.
+
+    Args:
+        arr: The array to move into a JAX array.
+        copy: Should a copy be made; defaults to `False`.
+    """
+    if isinstance(arr, jax.Array):
+        return arr
+    # In newer version it is no longer needed to pass a capsule.
+    return jax_dlpack.from_dlpack(arr, copy=copy)  # type: ignore[attr-defined]  # `from_dlpack` is not found.
