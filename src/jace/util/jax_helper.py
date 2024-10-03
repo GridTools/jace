@@ -30,12 +30,6 @@ if TYPE_CHECKING:
     import numpy as np
 
 
-try:
-    import cupy as cp  # type: ignore[import-not-found]
-except ImportError:
-    cp = None
-
-
 @dataclasses.dataclass(repr=True, frozen=True, eq=False)
 class JaCeVar:
     """
@@ -266,7 +260,7 @@ def get_jax_literal_value(lit: jax_core.Atom) -> bool | float | int | np.generic
     raise TypeError(f"Failed to extract value from '{lit}' ('{val}' type: {type(val).__name__}).")
 
 
-def parse_backend_jit_option(
+def to_device_type(
     backend: str | dace.DeviceType,
 ) -> dace.DeviceType:
     """Turn JAX' `backend` option into the proper DaCe device type."""

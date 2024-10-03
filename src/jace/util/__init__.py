@@ -18,8 +18,8 @@ from .jax_helper import (
     get_jax_var_shape,
     is_tracing_ongoing,
     move_into_jax_array,
-    parse_backend_jit_option,
     propose_jax_name,
+    to_device_type,
     translate_dtype,
 )
 from .traits import (
@@ -53,7 +53,7 @@ __all__ = [
     "is_scalar",
     "is_tracing_ongoing",
     "move_into_jax_array",
-    "parse_backend_jit_option",
     "propose_jax_name",
+    "to_device_type",
     "translate_dtype",
 ]

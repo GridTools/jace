@@ -87,10 +87,10 @@ def make_jaxpr(
 
     # NOTE: In the current implementation we are using `jax.make_jaxpr()`. But this
     #   is a different implementation than `jax.jit()` uses. The main difference
-    #   between the two, seems to be the set of arguments that are supported. In JaCe,
+    #   between the two seems to be the set of arguments that are supported. In JaCe,
     #   however, we want to support all arguments that `jace.jit()` does.
     #   For establishing compatibility we have to clear the arguments to make them
-    #   compatible, with what `jax.make_jaxpr()` and `jace.jit()` supports.
+    #   compatible with what `jax.make_jaxpr()` and `jace.jit()` supports.
     trace_options = {}
 
     def tracer_impl(
