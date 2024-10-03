@@ -152,7 +152,7 @@ def _create_input_state(
     The function will create a new set of variables that are exposed as inputs. This
     variables are based on the example input arguments passed through `flat_call_args`.
     This process will hard code the memory location, i.e. if the input is on the GPU,
-    then the new input will be don the GPU as well and strides into the SDFG.
+    then the new input will be on the GPU as well and strides into the SDFG.
     The assignment is performed inside a new state, which is put at the beginning.
 
     Args:

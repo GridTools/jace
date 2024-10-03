@@ -301,5 +301,4 @@ def move_into_jax_array(
     """
     if isinstance(arr, jax.Array):
         return arr
-    # In newer version it is no longer needed to pass a capsule.
     return jax_dlpack.from_dlpack(arr, copy=copy)  # type: ignore[attr-defined]  # `from_dlpack` is not found.

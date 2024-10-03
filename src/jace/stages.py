@@ -89,6 +89,7 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"], Generic[_P]):
         fun: The function that is wrapped.
         primitive_translators: Primitive translators that that should be used.
         jit_options: Options to influence the jit process.
+        device: The device on which the SDFG will run on.
 
     Todo:
         - Support default values of the wrapped function.
@@ -102,17 +103,20 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"], Generic[_P]):
     _fun: Callable[_P, Any]
     _primitive_translators: dict[str, translator.PrimitiveTranslator]
     _jit_options: api.JITOptions
+    _device: dace.DeviceType
 
     def __init__(
         self,
         fun: Callable[_P, Any],
         primitive_translators: Mapping[str, translator.PrimitiveTranslator],
         jit_options: api.JITOptions,
+        device: dace.DeviceType,
     ) -> None:
         super().__init__()
         self._primitive_translators = {**primitive_translators}
         self._jit_options = {**jit_options}
         self._fun = fun
+        self._device = device
 
     def __call__(self, *args: _P.args, **kwargs: _P.kwargs) -> Any:
         """
@@ -165,10 +169,9 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"], Generic[_P]):
         trans_ctx: translator.TranslationContext = builder.translate_jaxpr(jaxpr)
 
         flat_call_args = jax_tree.tree_leaves((args, kwargs))
-        device = util.parse_backend_jit_option(self._jit_options.get("backend", "cpu"))
         tsdfg: tjsdfg.TranslatedJaxprSDFG = ptranslation.postprocess_jaxpr_sdfg(
             trans_ctx=trans_ctx,
-            device=device,
+            device=self._device,
             fun=self.wrapped_fun,
             flat_call_args=flat_call_args,
         )
@@ -178,7 +181,7 @@ class JaCeWrapped(tcache.CachingStage["JaCeLowered"], Generic[_P]):
             tsdfg=tsdfg,
             out_tree=out_tree,
             jaxpr=trans_ctx.jaxpr,
-            device=device,
+            device=self._device,
         )
 
     @property
@@ -241,13 +244,13 @@ class JaCeLowered(tcache.CachingStage["JaCeCompiled"]):
         tsdfg: tjsdfg.TranslatedJaxprSDFG,
         out_tree: jax_tree.PyTreeDef,
         jaxpr: jax_core.ClosedJaxpr,
-        device: str | dace.DeviceType,
+        device: dace.DeviceType,
     ) -> None:
         super().__init__()
         self._translated_sdfg = tsdfg
         self._out_tree = out_tree
         self._jaxpr = jaxpr
-        self._device = util.parse_backend_jit_option(device)
+        self._device = device
 
     @tcache.cached_transition
     def compile(self, compiler_options: CompilerOptions | None = None) -> JaCeCompiled:

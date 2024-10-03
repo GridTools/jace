@@ -28,7 +28,6 @@ if TYPE_CHECKING:
 DEFAULT_OPTIMIZATIONS: Final[CompilerOptions] = {
     "auto_optimize": False,
     "simplify": True,
-    "persistent_transients": True,
     "validate": True,
     "validate_all": False,
 }
@@ -36,7 +35,6 @@ DEFAULT_OPTIMIZATIONS: Final[CompilerOptions] = {
 NO_OPTIMIZATIONS: Final[CompilerOptions] = {
     "auto_optimize": False,
     "simplify": False,
-    "persistent_transients": False,
     "validate": True,
     "validate_all": False,
 }
@@ -55,7 +53,6 @@ class CompilerOptions(TypedDict, total=False):
 
     auto_optimize: bool
     simplify: bool
-    persistent_transients: bool
     validate: bool
     validate_all: bool
 
@@ -77,11 +74,8 @@ def jace_optimize(  # noqa: D417 [undocumented-param]  # `kwargs` is not documen
         device: The device on which the SDFG will run on.
         simplify: Run the simplification pipeline.
         auto_optimize: Run the auto optimization pipeline.
-        persistent_transients: Set the allocation lifetime of (non register) transients
-            in the SDFG to `AllocationLifetime.Persistent`, i.e. keep them allocated
-            between different invocations.
-        validate: Perform validation at the end.
-        validate_all: Perform extensive validation.
+        validate: Perform validation of the SDFG at the end.
+        validate_all: Perform validation after each substep.
 
     Note:
         Currently DaCe's auto optimization pipeline is used when auto optimize is
@@ -89,10 +83,12 @@ def jace_optimize(  # noqa: D417 [undocumented-param]  # `kwargs` is not documen
         optimizer is considered unstable it must be explicitly enabled.
     """
     assert device in {dace.DeviceType.CPU, dace.DeviceType.GPU}
-    simplify = kwargs.get("simplify", False)
-    auto_optimize = kwargs.get("auto_optimize", False)
-    validate = kwargs.get("validate", DEFAULT_OPTIMIZATIONS["validate"])
-    validate_all = kwargs.get("validate_all", DEFAULT_OPTIMIZATIONS["validate_all"])
+    # If an argument is not specified then we consider it disabled.
+    kwargs = {**NO_OPTIMIZATIONS, **kwargs}
+    simplify = kwargs["simplify"]
+    auto_optimize = kwargs["auto_optimize"]
+    validate = kwargs["validate"]
+    validate_all = kwargs["validate_all"]
 
     if simplify:
         tsdfg.sdfg.simplify(
