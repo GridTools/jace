@@ -276,7 +276,7 @@ def to_device_type(
         case "tpu" | "TPU":
             raise NotImplementedError("TPU are not supported.")
         case _:
-            raise ValueError(f"Could not parse the backend '{backend}'.")
+            raise ValueError(f"Can not translate '{backend}' to a 'dace.DeviceType'.")
 
 
 def move_into_jax_array(
