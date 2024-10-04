@@ -22,7 +22,7 @@ from jace import util
 
 
 if TYPE_CHECKING:
-    import numpy as np
+    import jax
     from dace.codegen import compiled_sdfg as dace_csdfg
 
 
@@ -139,7 +139,7 @@ class CompiledJaxprSDFG:
     def __call__(
         self,
         flat_call_args: Sequence[Any],
-    ) -> list[np.ndarray]:
+    ) -> list[jax.Array]:
         """
         Run the compiled SDFG using the flattened input.
 
@@ -163,6 +163,9 @@ class CompiledJaxprSDFG:
                 in_val = in_val.__array__()  # noqa: PLW2901 [redefined-loop-name]  # JAX arrays do not expose the __array_interface__.
             sdfg_call_args[in_name] = in_val
 
+        # Allocate the output arrays.
+        #  In DaCe the output arrays are created by the `CompiledSDFG` calls and all
+        #  calls share the same arrays. In JaCe the output arrays are distinct.
         arrays = self.sdfg.arrays
         for output_name in self.output_names:
             sdfg_call_args[output_name] = dace_data.make_array_from_descriptor(arrays[output_name])
@@ -178,7 +181,14 @@ class CompiledJaxprSDFG:
             dace.Config.set("compiler", "allow_view_arguments", value=True)
             self.compiled_sdfg(**sdfg_call_args)
 
-        return [sdfg_call_args[output_name] for output_name in self.output_names]
+        # DaCe writes the results either into CuPy or NumPy arrays. For compatibility
+        #  with JAX we will now turn them into `jax.Array`s. Note that this is safe
+        #  because we created these arrays in this function explicitly. Thus when
+        #  this function ends, there is no writable reference to these arrays left.
+        return [
+            util.move_into_jax_array(sdfg_call_args[output_name])
+            for output_name in self.output_names
+        ]
 
 
 def compile_jaxpr_sdfg(tsdfg: TranslatedJaxprSDFG) -> dace_csdfg.CompiledJaxprSDFG:

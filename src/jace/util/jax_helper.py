@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, Any, overload
 
 import dace
 import jax
-import jax.core as jax_core
+from jax import core as jax_core, dlpack as jax_dlpack
 
 from jace import util
 
@@ -258,3 +258,41 @@ def get_jax_literal_value(lit: jax_core.Atom) -> bool | float | int | np.generic
     if util.is_scalar(val):
         return val
     raise TypeError(f"Failed to extract value from '{lit}' ('{val}' type: {type(val).__name__}).")
+
+
+def to_device_type(
+    backend: str | dace.DeviceType,
+) -> dace.DeviceType:
+    """Turn JAX' `backend` option into the proper DaCe device type."""
+    if isinstance(backend, dace.DeviceType):
+        return backend
+    match backend:
+        case "cpu" | "CPU":
+            return dace.DeviceType.CPU
+        case "gpu" | "GPU":
+            return dace.DeviceType.GPU
+        case "fpga" | "FPGA":
+            return dace.DeviceType.FPGA
+        case "tpu" | "TPU":
+            raise NotImplementedError("TPU are not supported.")
+        case _:
+            raise ValueError(f"Can not translate '{backend}' to a 'dace.DeviceType'.")
+
+
+def move_into_jax_array(
+    arr: Any,
+    copy: bool | None = False,
+) -> jax.Array:
+    """
+    Moves `arr` into a JAX array using DLPack format.
+
+    By default `copy` is set to `False`, it is the responsibility of the caller
+    to ensure that the underlying buffer is not modified later.
+
+    Args:
+        arr: The array to move into a JAX array.
+        copy: Should a copy be made; defaults to `False`.
+    """
+    if isinstance(arr, jax.Array):
+        return arr
+    return jax_dlpack.from_dlpack(arr, copy=copy)  # type: ignore[attr-defined]  # `from_dlpack` is not found.

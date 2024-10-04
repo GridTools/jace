@@ -11,29 +11,34 @@ from __future__ import annotations
 
 import functools
 from collections.abc import Callable, Mapping
-from typing import Literal, ParamSpec, TypedDict, TypeVar, overload
+from typing import Any, Final, Literal, ParamSpec, TypedDict, overload
 
 from jax import grad, jacfwd, jacrev
 from typing_extensions import Unpack
 
-from jace import stages, translator
+from jace import stages, translator, util
 
 
-__all__ = ["JITOptions", "grad", "jacfwd", "jacrev", "jit"]
+__all__ = ["DEFAULT_BACKEND", "JITOptions", "grad", "jacfwd", "jacrev", "jit"]
 
 _P = ParamSpec("_P")
-_R = TypeVar("_R")
+
+DEFAULT_BACKEND: Final[str] = "cpu"
 
 
 class JITOptions(TypedDict, total=False):
     """
     All known options to `jace.jit` that influence tracing.
 
-    Note:
-        Currently there are no known options, but essentially it is a subset of some
-        of the options that are supported by `jax.jit` together with some additional
-        JaCe specific ones.
+    Not all arguments that are supported by `jax-jit()` are also supported by
+    `jace.jit`. Furthermore, some additional ones might be supported.
+
+    Args:
+        backend: Target platform for which DaCe should generate code. Supported values
+            are `'cpu'` or `'gpu'`.
     """
+
+    backend: Literal["cpu", "gpu"]
 
 
 @overload
@@ -42,24 +47,24 @@ def jit(
     /,
     primitive_translators: Mapping[str, translator.PrimitiveTranslator] | None = None,
     **kwargs: Unpack[JITOptions],
-) -> Callable[[Callable[_P, _R]], stages.JaCeWrapped[_P, _R]]: ...
+) -> Callable[[Callable[_P, Any]], stages.JaCeWrapped[_P]]: ...
 
 
 @overload
 def jit(
-    fun: Callable[_P, _R],
+    fun: Callable[_P, Any],
     /,
     primitive_translators: Mapping[str, translator.PrimitiveTranslator] | None = None,
     **kwargs: Unpack[JITOptions],
-) -> stages.JaCeWrapped[_P, _R]: ...
+) -> stages.JaCeWrapped[_P]: ...
 
 
 def jit(
-    fun: Callable[_P, _R] | None = None,
+    fun: Callable[_P, Any] | None = None,
     /,
     primitive_translators: Mapping[str, translator.PrimitiveTranslator] | None = None,
     **kwargs: Unpack[JITOptions],
-) -> Callable[[Callable[_P, _R]], stages.JaCeWrapped[_P, _R]] | stages.JaCeWrapped[_P, _R]:
+) -> Callable[[Callable[_P, Any]], stages.JaCeWrapped[_P]] | stages.JaCeWrapped[_P]:
     """
     JaCe's replacement for `jax.jit` (just-in-time) wrapper.
 
@@ -72,18 +77,20 @@ def jit(
         fun: Function to wrap.
         primitive_translators: Use these primitive translators for the lowering to SDFG.
             If not specified the translators in the global registry are used.
-        kwargs: Jit arguments.
+        kwargs: JIT arguments, see `JITOptions` for more.
 
     Note:
         This function is the only valid way to obtain a JaCe computation.
     """
-    if kwargs:
-        # TODO(phimuell): Add proper name verification and exception type.
-        raise NotImplementedError(
-            f"The following arguments to 'jace.jit' are not yet supported: {', '.join(kwargs)}."
+    not_supported_jit_keys = kwargs.keys() - JITOptions.__annotations__.keys()
+    if not_supported_jit_keys:
+        raise ValueError(
+            f"The following arguments to 'jace.jit' are not supported: {', '.join(not_supported_jit_keys)}."
         )
+    if kwargs.get("backend", DEFAULT_BACKEND).lower() not in {"cpu", "gpu"}:
+        raise ValueError(f"The backend '{kwargs['backend']}' is not supported.")
 
-    def wrapper(f: Callable[_P, _R]) -> stages.JaCeWrapped[_P, _R]:
+    def wrapper(f: Callable[_P, Any]) -> stages.JaCeWrapped[_P]:
         jace_wrapper = stages.JaCeWrapped(
             fun=f,
             primitive_translators=(
@@ -92,6 +99,7 @@ def jit(
                 else primitive_translators
             ),
             jit_options=kwargs,
+            device=util.to_device_type(kwargs.get("backend", DEFAULT_BACKEND)),
         )
         functools.update_wrapper(jace_wrapper, f)
         return jace_wrapper
