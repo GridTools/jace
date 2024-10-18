@@ -14,9 +14,11 @@ import pytest
 
 import jace
 
+from tests import util as testutil
+
 
 @pytest.mark.skip("Possible bug in DaCe.")
-def test_mismatch_in_datatyte_calling():
+def test_mismatch_in_datatype_calling() -> None:
     """Tests compilation and calling with different types.
 
     Note that this more or less tests the calling implementation of the `CompiledSDFG`
@@ -25,16 +27,16 @@ def test_mismatch_in_datatyte_calling():
     """
 
     @jace.jit
-    def testee(A: np.ndarray) -> np.ndarray:
-        return -A
+    def testee(a: np.ndarray) -> np.ndarray:
+        return -a
 
     # Different types.
-    A1 = np.arange(12, dtype=np.float32).reshape((4, 3))
-    A2 = np.arange(12, dtype=np.int64).reshape((4, 3))
+    a1 = testutil.make_array((4, 3), dtype=np.float32)
+    a2 = testutil.make_array((4, 3), dtype=np.int64)
 
     # Lower and compilation for first type
-    callee = testee.lower(A1).compile()
+    callee = testee.lower(a1).compile()
 
     # But calling with the second type
-    with pytest.raises(Exception):  # noqa: B017, PT011 # Unknown exception.
-        _ = callee(A2)
+    with pytest.raises(Exception):  # noqa: B017, PT011 [assert-raises-exception, pytest-raises-too-broad]  # Unknown exception.
+        _ = callee(a2)
